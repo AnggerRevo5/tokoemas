@@ -19,6 +19,10 @@ type Location struct {
 }
 
 func main() {
+		if len(os.Args) > 2 && os.Args[1] == "hash" {
+		cetakHash(os.Args[2])
+		return
+	}
 		dsn := os.Getenv("DB_DSN")
 	if dsn == "" {
 		if os.Getenv("APP_ENV") == "production" {
@@ -39,6 +43,7 @@ func main() {
 		log.Fatal("gagal konek database: ", err)
 	}
 	log.Println("database terhubung")
+	seedUsers(db)
 
 	// Mode khusus: membuat akun lewat terminal
 	if len(os.Args) > 1 && os.Args[1] == "buatuser" {

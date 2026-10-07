@@ -160,3 +160,53 @@ func meHandler(c *gin.Context) {
 		"location_id": claims.LocationID,
 	})
 }
+
+func seedUsers(db *sql.DB) {
+	akun := []struct {
+		username string
+		envName  string
+		role     string
+		locID    interface{}
+	}{
+		{"admin", "SEED_ADMIN_PASSWORD", "super_admin", nil},
+		{"owner", "SEED_OWNER_PASSWORD", "owner", nil},
+		{"kepanjen", "SEED_KEPANJEN_PASSWORD", "cabang", 1},
+		{"dinoyo", "SEED_DINOYO_PASSWORD", "cabang", 2},
+	}
+
+	for _, a := range akun {
+		pw := os.Getenv(a.envName)
+		if pw == "" {
+			continue
+		}
+
+		var n int
+		db.QueryRow("SELECT COUNT(*) FROM users WHERE username = ?", a.username).Scan(&n)
+		if n > 0 {
+			continue
+		}
+
+		hash, err := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
+		if err != nil {
+			log.Println("gagal enkripsi password untuk", a.username)
+			continue
+		}
+		_, err = db.Exec(
+			"INSERT INTO users (username, password_hash, role, location_id) VALUES (?, ?, ?, ?)",
+			a.username, string(hash), a.role, a.locID,
+		)
+		if err != nil {
+			log.Println("gagal membuat akun", a.username, ":", err)
+			continue
+		}
+		log.Println("akun dibuat:", a.username, "(", a.role, ")")
+	}
+}
+func cetakHash(pw string) {
+	h, err := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
+	if err != nil {
+		fmt.Println("gagal:", err)
+		return
+	}
+	fmt.Println(string(h))
+}
