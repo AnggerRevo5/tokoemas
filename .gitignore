@@ -4,6 +4,9 @@ dist/
 .env.*
 *.exe
 *.log
+.env
+.env.*
+!.env.example
 .vscode/
 backup/
 *.xlsx
