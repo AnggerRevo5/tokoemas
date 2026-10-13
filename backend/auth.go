@@ -42,8 +42,8 @@ func buatUser(db *sql.DB, args []string) {
 	}
 	username, password, role := args[0], args[1], args[2]
 
-	if role != "super_admin" && role != "owner" && role != "cabang" {
-		fmt.Println("role harus: super_admin, owner, atau cabang")
+	if role != "super_admin" && role != "owner" && role != "cabang" && role != "pj" {
+		fmt.Println("role harus: super_admin, owner, cabang, atau pj")
 		return
 	}
 

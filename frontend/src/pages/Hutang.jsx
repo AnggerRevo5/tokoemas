@@ -12,18 +12,22 @@ const hariIni = () => new Date().toLocaleDateString('en-CA')
 
 const JENIS = [
   ['investor', 'Investor'],
+  ['bank_pegadaian', 'Bank / Pegadaian'],
   ['perorangan', 'Perorangan'],
   ['pabrik', 'Pabrik'],
-  ['bank_pegadaian', 'Bank / Pegadaian'],
 ]
 const labelJenis = Object.fromEntries(JENIS)
 
-export default function Hutang() {
+export default function Hutang({ me }) {
+  const bisaVoid = me && me.role === 'super_admin'
+
   const [rows, setRows] = useState([])
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
+  const [warn, setWarn] = useState('')
   const [loading, setLoading] = useState(false)
 
+  const [mode, setMode] = useState('dana')
   const [jenis, setJenis] = useState('investor')
   const [nama, setNama] = useState('')
   const [pokok, setPokok] = useState('')
@@ -35,6 +39,9 @@ export default function Hutang() {
   const [payAmount, setPayAmount] = useState('')
   const [payNote, setPayNote] = useState('')
 
+  const [voidId, setVoidId] = useState(null)
+  const [alasan, setAlasan] = useState('')
+
   const muat = useCallback(() => {
     api('/hutang')
       .then(setRows)
@@ -45,22 +52,28 @@ export default function Hutang() {
     muat()
   }, [muat])
 
-  async function simpan(e) {
-    e.preventDefault()
+  function resetPesan() {
     setError('')
     setInfo('')
+    setWarn('')
+  }
+
+  async function simpan(e) {
+    e.preventDefault()
+    resetPesan()
     setLoading(true)
+    const body = {
+      creditor_type: jenis,
+      creditor_name: nama,
+      principal: Number(pokok),
+      start_date: mulai,
+      due_date: tempo,
+      note,
+    }
     try {
-      const res = await api('/hutang', {
+      const res = await api(mode === 'dana' ? '/dana/terima' : '/hutang', {
         method: 'POST',
-        body: JSON.stringify({
-          creditor_type: jenis,
-          creditor_name: nama,
-          principal: Number(pokok),
-          start_date: mulai,
-          due_date: tempo,
-          note,
-        }),
+        body: JSON.stringify(body),
       })
       setInfo(res.message)
       setNama('')
@@ -75,26 +88,28 @@ export default function Hutang() {
     }
   }
 
+  function ubahMode(m) {
+    setMode(m)
+    setJenis(m === 'dana' ? 'investor' : 'pabrik')
+  }
+
   function mulaiBayar(r) {
     setPayId(r.id)
+    setVoidId(null)
     setPayAmount('')
     setPayNote('')
-    setError('')
-    setInfo('')
+    resetPesan()
   }
 
   async function konfirmasiBayar() {
-    setError('')
+    resetPesan()
     try {
       const res = await api(`/hutang/${payId}/bayar`, {
         method: 'POST',
-        body: JSON.stringify({
-          amount: Number(payAmount),
-          note: payNote,
-          paid_date: hariIni(),
-        }),
+        body: JSON.stringify({ amount: Number(payAmount), note: payNote, paid_date: hariIni() }),
       })
       setInfo(res.lunas ? 'Pembayaran tersimpan, hutang LUNAS' : `Pembayaran tersimpan, sisa ${rupiah(res.sisa)}`)
+      if (res.peringatan) setWarn(res.peringatan)
       setPayId(null)
       muat()
     } catch (err) {
@@ -102,23 +117,59 @@ export default function Hutang() {
     }
   }
 
+  function mulaiBatal(r) {
+    setVoidId(r.id)
+    setPayId(null)
+    setAlasan('')
+    resetPesan()
+  }
+
+  async function konfirmasiBatal() {
+    if (!alasan.trim()) {
+      setError('Alasan pembatalan wajib diisi')
+      return
+    }
+    resetPesan()
+    try {
+      const res = await api(`/dana/void/${voidId}`, {
+        method: 'POST',
+        body: JSON.stringify({ reason: alasan }),
+      })
+      setInfo(res.message)
+      setVoidId(null)
+      muat()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
   const payRow = rows.find((r) => r.id === payId)
+  const voidRow = rows.find((r) => r.id === voidId)
 
   return (
     <div>
       {error && <div className="error" style={{ marginBottom: 16 }}>{error}</div>}
       {info && <div className="success" style={{ marginBottom: 16 }}>{info}</div>}
+      {warn && <div className="banner" style={{ marginBottom: 16 }}>{warn}. Pembayaran tetap tersimpan.</div>}
 
       <form className="card" onSubmit={simpan}>
-        <h3>Catat Hutang Baru</h3>
+        <h3>{mode === 'dana' ? 'Terima Dana Baru' : 'Catat Hutang Tanpa Uang Masuk'}</h3>
         <p className="muted">
-          Kalau uang hutangnya masuk ke kas, catat juga di menu Kas (Back Office, uang masuk
-          dari investor atau pinjaman).
+          {mode === 'dana'
+            ? 'Sekali simpan: kas back office bertambah dan hutang tercatat atas nama pemberi dana.'
+            : 'Untuk hutang yang tidak membawa uang tunai, misalnya barang dari pabrik yang belum dibayar. Kas tidak berubah.'}
         </p>
 
         <div className="form-grid">
           <div>
-            <label>Jenis kreditur</label>
+            <label>Jenis pencatatan</label>
+            <select value={mode} onChange={(e) => ubahMode(e.target.value)}>
+              <option value="dana">Dana masuk (kas bertambah)</option>
+              <option value="tanpa">Hutang tanpa uang masuk</option>
+            </select>
+          </div>
+          <div>
+            <label>Pemberi dana / kreditur</label>
             <select value={jenis} onChange={(e) => setJenis(e.target.value)}>
               {JENIS.map(([k, l]) => (
                 <option key={k} value={k}>{l}</option>
@@ -126,28 +177,30 @@ export default function Hutang() {
             </select>
           </div>
           <div>
-            <label>Nama kreditur</label>
+            <label>Nama</label>
             <input value={nama} onChange={(e) => setNama(e.target.value)} required />
           </div>
           <div>
-            <label>Nominal hutang (Rp)</label>
+            <label>Nominal (Rp)</label>
             <input type="number" min="1" value={pokok} onChange={(e) => setPokok(e.target.value)} required />
           </div>
           <div>
-            <label>Tanggal mulai</label>
+            <label>Tanggal</label>
             <input type="date" value={mulai} onChange={(e) => setMulai(e.target.value)} required />
           </div>
           <div>
             <label>Jatuh tempo (opsional)</label>
             <input type="date" value={tempo} onChange={(e) => setTempo(e.target.value)} />
           </div>
-          <div>
+          <div className="span2">
             <label>Catatan</label>
             <input value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
         </div>
 
-        <button disabled={loading}>{loading ? 'Menyimpan...' : 'Simpan Hutang'}</button>
+        <button disabled={loading}>
+          {loading ? 'Menyimpan...' : mode === 'dana' ? 'Simpan: kas masuk dan hutang tercatat' : 'Simpan hutang'}
+        </button>
       </form>
 
       <div className="card" style={{ marginTop: 16 }}>
@@ -156,8 +209,8 @@ export default function Hutang() {
         {payRow && (
           <div className="void-box">
             <div>
-              Bayar hutang <b>{payRow.creditor_name}</b> (sisa {rupiah(payRow.sisa)}). Uang akan
-              otomatis keluar dari kas Back Office.
+              Bayar hutang <b>{payRow.creditor_name}</b> (sisa {rupiah(payRow.sisa)}). Uang otomatis keluar dari
+              kas back office.
             </div>
             <input
               type="number"
@@ -174,12 +227,22 @@ export default function Hutang() {
               placeholder="Catatan (opsional), contoh: cicilan 2"
             />
             <div className="void-actions">
-              <button type="button" className="mini primary-fill" onClick={konfirmasiBayar}>
-                Bayar
-              </button>
-              <button type="button" className="mini" onClick={() => setPayId(null)}>
-                Tidak jadi
-              </button>
+              <button type="button" className="mini primary-fill" onClick={konfirmasiBayar}>Bayar</button>
+              <button type="button" className="mini" onClick={() => setPayId(null)}>Tidak jadi</button>
+            </div>
+          </div>
+        )}
+
+        {voidRow && (
+          <div className="void-box">
+            <div>
+              Batalkan hutang <b>{voidRow.creditor_name}</b> ({rupiah(voidRow.principal)}).
+              {voidRow.dari_kas && ' Kas back office yang masuk ikut dibatalkan.'} Tulis alasannya:
+            </div>
+            <input value={alasan} onChange={(e) => setAlasan(e.target.value)} autoFocus />
+            <div className="void-actions">
+              <button type="button" className="mini danger-fill" onClick={konfirmasiBatal}>Ya, batalkan</button>
+              <button type="button" className="mini" onClick={() => setVoidId(null)}>Tidak jadi</button>
             </div>
           </div>
         )}
@@ -205,7 +268,12 @@ export default function Hutang() {
                 <tr key={r.id}>
                   <td>
                     {r.creditor_name}
-                    <div className="muted">{labelJenis[r.creditor_type] || r.creditor_type}</div>
+                    <div className="muted">
+                      {labelJenis[r.creditor_type] || r.creditor_type}
+                      {' - '}
+                      {r.dari_kas ? 'kas masuk otomatis' : 'tanpa uang masuk'}
+                    </div>
+                    {r.note && <div className="muted">{r.note}</div>}
                   </td>
                   <td>{rupiah(r.principal)}</td>
                   <td>{rupiah(r.terbayar)}</td>
@@ -220,6 +288,11 @@ export default function Hutang() {
                     {r.status === 'aktif' && (
                       <button type="button" className="mini primary" onClick={() => mulaiBayar(r)}>
                         Bayar
+                      </button>
+                    )}{' '}
+                    {bisaVoid && r.terbayar === 0 && (
+                      <button type="button" className="mini" onClick={() => mulaiBatal(r)}>
+                        Batalkan
                       </button>
                     )}
                   </td>

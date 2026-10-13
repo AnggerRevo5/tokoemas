@@ -7,15 +7,12 @@ export const KATEGORI = {
       ],
       out: [
         ['pengeluaran_toko', 'Pengeluaran toko'],
-        ['pembelian_customer', 'Pembelian barang customer'],
         ['transfer_bo', 'Transfer kas ke back office'],
       ],
     },
     back_office: {
       in: [
         ['jual_barang', 'Pemasukan dari jual barang'],
-        ['investor', 'Pemasukan dari investor'],
-        ['pinjaman', 'Pinjaman'],
         ['jual_aset', 'Penjualan aset'],
         ['kembali_cabang', 'Barang kembali cabang'],
       ],
@@ -29,7 +26,10 @@ export const KATEGORI = {
   },
   stok: {
     cabang: {
-      in: [['barang_masuk', 'Barang masuk']],
+      in: [
+        ['beli_customer', 'Beli dari customer (barang kotor)'],
+        ['stok_awal', 'Stok awal toko'],
+      ],
       out: [
         ['laku', 'Laku'],
         ['pegadaian', 'Pegadaian'],
@@ -43,14 +43,11 @@ export const KATEGORI = {
       in: [
         ['pabrik', 'Pabrik'],
         ['konsinyasi', 'Konsinyasi'],
-        ['cucian', 'Barang cucian'],
-        ['barang_toko', 'Barang toko'],
+        ['stok_awal', 'Stok awal back office'],
       ],
       out: [
         ['ke_toko', 'Ke toko (Kepanjen/Dinoyo)'],
-        ['lebur', 'Lebur'],
         ['jual', 'Jual'],
-        ['cuci', 'Cuci'],
       ],
     },
   },
@@ -60,6 +57,12 @@ const SEMUA = {
   dari_toko: 'Pemasukan dari toko',
   bayar_hutang: 'Pembayaran hutang',
   kembali_cabang: 'Barang kembali cabang',
+  pembelian_customer: 'Pembelian dari customer',
+  barang_masuk: 'Barang masuk',
+  cucian: 'Barang cucian',
+  barang_toko: 'Barang toko',
+  investor: 'Dana dari investor',
+  pinjaman: 'Dana pinjaman',
 }
 Object.values(KATEGORI).forEach((j) =>
   Object.values(j).forEach((t) =>

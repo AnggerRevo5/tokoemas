@@ -73,6 +73,48 @@ func voidHandler(db *sql.DB, tabel string) gin.HandlerFunc {
 			return
 		}
 
+				if tabel == "stock_movements" {
+			var n int
+			tx.QueryRow(
+				`SELECT (SELECT COUNT(*) FROM washing_jobs WHERE out_stock_id = ? OR in_stock_id = ?)
+				      + (SELECT COUNT(*) FROM melt_records WHERE stock_id = ?)`,
+				id, id, id,
+			).Scan(&n)
+			if n > 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "bagian dari cuci atau lebur, batalkan dari menu Cuci atau Lebur"})
+				return
+			}
+		}
+		if tabel == "cash_transactions" {
+			var n int
+			tx.QueryRow("SELECT COUNT(*) FROM melt_records WHERE cash_id = ?", id).Scan(&n)
+			if n > 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "bagian dari lebur, batalkan dari menu Lebur"})
+				return
+			}
+		}
+
+				if tabel == "stock_movements" {
+			var itemID sql.NullInt64
+			tx.QueryRow("SELECT item_id FROM stock_movements WHERE id = ?", id).Scan(&itemID)
+			if itemID.Valid {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "dibuat dari daftar barang, tidak bisa dibatalkan di sini"})
+				return
+			}
+		}
+
+				if tabel == "cash_transactions" {
+			var terkait int
+			tx.QueryRow(`SELECT (SELECT COUNT(*) FROM debts WHERE cash_id = ? AND is_void = FALSE)
+			           + (SELECT COUNT(*) FROM penadah_sales WHERE cash_id = ? AND is_void = FALSE)
+			           + (SELECT COUNT(*) FROM items WHERE purchase_cash_id = ? AND is_void = FALSE)`,
+				id, id, id).Scan(&terkait)
+			if terkait > 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "kas ini dibuat otomatis oleh hutang, penjualan, atau pembelian customer. Batalkan dari menu asalnya"})
+				return
+			}
+		}
+
 		ids := []int{id}
 		if relID.Valid {
 			ids = append(ids, int(relID.Int64))

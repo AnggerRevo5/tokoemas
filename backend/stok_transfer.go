@@ -11,7 +11,7 @@ var stokKategori = map[string]map[string]bool{
 	"cabang|in":       {"barang_masuk": true},
 	"cabang|out":      {"laku": true, "pegadaian": true, "cuci": true, "lebur": true, "jual": true, "kembali_bo": true},
 	"back_office|in":  {"pabrik": true, "konsinyasi": true, "cucian": true, "barang_toko": true},
-	"back_office|out": {"ke_toko": true, "lebur": true, "jual": true, "cuci": true},
+	"back_office|out": {"ke_toko": true, "jual": true},
 }
 
 type stokReq2 struct {

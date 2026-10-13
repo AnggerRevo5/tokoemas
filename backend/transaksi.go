@@ -90,8 +90,8 @@ func kasCreate(db *sql.DB) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "arah atau kategori tidak valid untuk lokasi ini"})
 			return
 		}
-				if req.Category == "bayar_hutang" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "pembayaran hutang diinput lewat menu hutang"})
+				if req.Category == "bayar_hutang" || req.Category == "investor" || req.Category == "pinjaman" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "dana dari investor atau pinjaman dan pembayaran hutang diinput lewat menu Hutang"})
 			return
 		}
 		if req.Amount <= 0 {

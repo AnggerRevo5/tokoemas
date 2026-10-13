@@ -7,3 +7,6 @@ dist/
 .vscode/
 backup/
 *.xlsx
+*.pdf
+*.local.sql
+reset-db.ps1
