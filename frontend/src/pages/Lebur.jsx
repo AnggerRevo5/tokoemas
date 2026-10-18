@@ -21,6 +21,7 @@ const TAHAP = {
   leburan_kotor: ['Leburan kotor', 'tag warn'],
   cukim: ['Cukim siap jual', 'tag in'],
   terjual: ['Terjual', 'tag gray'],
+  batal: ['Dibatalkan', 'tag gray'],
 }
 
 export default function Lebur({ me }) {
@@ -107,6 +108,12 @@ export default function Lebur({ me }) {
           method: 'POST',
           body: JSON.stringify({ cukim_weight: Number(fCuk), karat: fKadar, date: fTgl, note: fNote }),
         })
+      } else if (aksi.jenis === 'kembali') {
+        if (!alasan.trim()) throw new Error('Alasan wajib diisi')
+        res = await api(`/lebur/${aksi.id}/kembali`, {
+          method: 'POST',
+          body: JSON.stringify({ reason: alasan, date: fTgl }),
+        })
       } else {
         if (!alasan.trim()) throw new Error('Alasan pembatalan wajib diisi')
         res = await api(`/lebur/${aksi.id}/undo`, {
@@ -178,7 +185,7 @@ export default function Lebur({ me }) {
     }
     setError('')
     try {
-      const res = await api(`/penjualan/void/${voidSale}`, {
+      const res = await api(`/penjualan/batal/${voidSale}`, {
         method: 'POST',
         body: JSON.stringify({ reason: alasanSale }),
       })
@@ -216,6 +223,7 @@ export default function Lebur({ me }) {
             <select value={filter} onChange={(e) => setFilter(e.target.value)}>
               <option value="berjalan">Sedang berjalan</option>
               <option value="terjual">Sudah terjual</option>
+              <option value="batal">Dibatalkan</option>
               <option value="semua">Semua</option>
             </select>
           </div>
@@ -280,6 +288,24 @@ export default function Lebur({ me }) {
                 </div>
               </>
             )}
+            {aksi.jenis === 'kembali' && (
+              <>
+                <div>
+                  <b>Lebur #{aksi.id}: tidak jadi dilebur.</b> Semua barang kembali tersedia di stok back office.
+                  Tulis alasannya:
+                </div>
+                <div className="form-grid">
+                  <div>
+                    <label>Tanggal</label>
+                    <input type="date" value={fTgl} onChange={(e) => setFTgl(e.target.value)} required />
+                  </div>
+                  <div>
+                    <label>Alasan</label>
+                    <input value={alasan} onChange={(e) => setAlasan(e.target.value)} placeholder="Contoh: tidak jadi dilebur" autoFocus />
+                  </div>
+                </div>
+              </>
+            )}
             {aksi.jenis === 'undo' && (
               <>
                 <div>
@@ -289,8 +315,8 @@ export default function Lebur({ me }) {
               </>
             )}
             <div className="void-actions">
-              <button className={aksi.jenis === 'undo' ? 'mini danger-fill' : 'mini primary-fill'} disabled={loading}>
-                {loading ? 'Memproses...' : aksi.jenis === 'undo' ? 'Ya, batalkan' : 'Simpan'}
+              <button className={['undo', 'kembali'].includes(aksi.jenis) ? 'mini danger-fill' : 'mini primary-fill'} disabled={loading}>
+                {loading ? 'Memproses...' : aksi.jenis === 'undo' ? 'Ya, batalkan' : aksi.jenis === 'kembali' ? 'Ya, kembalikan ke back office' : 'Simpan'}
               </button>
               <button type="button" className="mini" onClick={() => setAksi(null)}>Tidak jadi</button>
             </div>
@@ -354,6 +380,11 @@ export default function Lebur({ me }) {
                     {bisaCatat && b.status === 'proses' && (
                       <button type="button" className="mini primary" onClick={() => bukaAksi('leburan', b)}>
                         Catat leburan kotor
+                      </button>
+                    )}{' '}
+                    {bisaCatat && b.status === 'proses' && (
+                      <button type="button" className="mini" onClick={() => bukaAksi('kembali', b)}>
+                        Tidak jadi, kembalikan
                       </button>
                     )}
                     {bisaCatat && b.status === 'leburan_kotor' && (
@@ -499,7 +530,7 @@ export default function Lebur({ me }) {
                 <th>Harga jual</th>
                 <th>Untung / rugi</th>
                 <th>PJ</th>
-                {bisaUndo && <th></th>}
+                {bisaCatat && <th></th>}
               </tr>
             </thead>
             <tbody>
@@ -520,7 +551,7 @@ export default function Lebur({ me }) {
                     <b>{r.untung < 0 ? 'Rugi ' : 'Untung '}{rupiah(Math.abs(r.untung))}</b>
                   </td>
                   <td>{r.pj}</td>
-                  {bisaUndo && (
+                  {bisaCatat && (
                     <td>
                       <button
                         type="button"

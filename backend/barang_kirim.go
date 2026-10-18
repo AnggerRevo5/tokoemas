@@ -138,6 +138,22 @@ func barangTerima(db *sql.DB) gin.HandlerFunc {
 				return
 			}
 		}
+		{
+			idsArah := kunci(items)
+			argsArah := make([]interface{}, 0, len(idsArah))
+			for _, id := range idsArah {
+				argsArah = append(argsArah, id)
+			}
+			var arahLain int
+			tx.QueryRow(
+				"SELECT COUNT(*) FROM items WHERE id IN ("+placeholders(len(argsArah))+") AND kirim_ke_location_id IS NOT NULL",
+				argsArah...,
+			).Scan(&arahLain)
+			if arahLain > 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "barang ini sedang menuju toko, konfirmasinya oleh akun toko tujuan"})
+				return
+			}
+		}
 
 		if req.Result == "belum" {
 			for _, it := range items {

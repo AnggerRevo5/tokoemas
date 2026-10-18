@@ -226,7 +226,7 @@ func cuciVoidV2(db *sql.DB) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "sudah dibatalkan"})
 			return
 		}
-		if status != "proses" {
+		if status == "selesai" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "cuci sudah selesai, tidak bisa dibatalkan"})
 			return
 		}
@@ -273,9 +273,12 @@ func cuciListV2(db *sql.DB) gin.HandlerFunc {
 			q += " AND w.origin_location_id = ?"
 			args = append(args, cl.LocationID)
 		}
-		if s := c.Query("status"); s == "proses" || s == "selesai" {
+		switch s := c.Query("status"); s {
+		case "menunggu", "proses", "selesai":
 			q += " AND w.status = ?"
 			args = append(args, s)
+		case "aktif":
+			q += " AND w.status <> 'selesai'"
 		}
 		q += " ORDER BY w.status ASC, w.id DESC LIMIT 200"
 

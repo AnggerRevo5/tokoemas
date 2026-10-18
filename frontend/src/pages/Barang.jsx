@@ -23,6 +23,7 @@ const STATUS_LABEL = {
   cuci: 'Proses cuci',
   lebur: 'Dilebur',
   hasil: 'Hasil lebur',
+  kembali: 'Dikembalikan ke back office',
   terjual: 'Terjual',
 }
 const STATUS_CLASS = {
@@ -31,10 +32,11 @@ const STATUS_CLASS = {
   cuci: 'tag warn',
   lebur: 'tag gray',
   hasil: 'tag gray',
+  kembali: 'tag warn',
   terjual: 'tag gray',
 }
 
-const bisaPilih = (r) => r.status === 'tersedia' || r.status === 'dikirim' || r.status === 'cuci'
+const bisaPilih = (r) => r.status === 'tersedia' || r.status === 'dikirim' || r.status === 'cuci' || r.status === 'kembali'
 
 const barisBaru = (dari) => ({
   jenis: dari ? dari.jenis : 'perhiasan',
@@ -56,7 +58,7 @@ export default function Barang({ me, onUbah }) {
   const [jenisF, setJenisF] = useState('semua')
   const [cari, setCari] = useState('')
   const [data, setData] = useState({ rows: [], jumlah: 0, total_gram: 0, total_beli: 0 })
-  const [notif, setNotif] = useState({ menunggu: 0, belum_sampai: 0 })
+  const [notif, setNotif] = useState({ menunggu: 0, belum_sampai: 0, keluar: 0 })
   const [pilih, setPilih] = useState({})
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
@@ -75,7 +77,6 @@ export default function Barang({ me, onUbah }) {
   const [aksi, setAksi] = useState(null)
   const [tgl, setTgl] = useState(hariIni())
   const [target, setTarget] = useState('')
-  const [pencuci, setPencuci] = useState('')
   const [catatan, setCatatan] = useState('')
 
   const [voidId, setVoidId] = useState(null)
@@ -148,17 +149,31 @@ export default function Barang({ me, onUbah }) {
 
   let mode = null
   if (terpilih.length > 0) {
-    if (statusSet.size > 1) mode = 'campur'
-    else if (statusSet.has('dikirim')) mode = 'transit'
-    else if (statusSet.has('cuci')) mode = 'cuci'
-    else mode = tipeTerpilih.size > 1 ? 'campur' : [...tipeTerpilih][0]
+    if (statusSet.size > 1) {
+      mode = 'campur'
+    } else if (statusSet.has('dikirim')) {
+      const keToko = terpilih.filter((r) => r.tujuan_id > 0).length
+      if (keToko === terpilih.length) mode = 'transit_toko'
+      else if (keToko === 0) mode = 'transit'
+      else mode = 'campur'
+    } else if (statusSet.has('kembali')) {
+      mode = 'kembali'
+    } else if (statusSet.has('cuci')) {
+      mode = 'cuci'
+    } else {
+      mode = tipeTerpilih.size > 1 ? 'campur' : [...tipeTerpilih][0]
+    }
   }
 
   let aksiTersedia = []
   if (mode === 'transit' && !isCabang) {
     aksiTersedia = [['sampai', 'Sudah sampai'], ['belum', 'Belum sampai']]
+  } else if (mode === 'transit_toko') {
+    aksiTersedia = [['terima_toko', 'Sudah diterima'], ['belum_toko', 'Belum diterima']]
+  } else if (mode === 'kembali' && !isCabang) {
+    aksiTersedia = [['terima_kembali', 'Sudah diterima'], ['belum_kembali', 'Belum diterima']]
   } else if (mode === 'cuci' && !isCabang) {
-    aksiTersedia = [['selesai_cuci', 'Selesai cuci']]
+    aksiTersedia = []
   } else if (mode === 'back_office' && !isCabang) {
     aksiTersedia = adaLM
       ? [['kirim', 'Jual (oper ke toko)']]
@@ -270,9 +285,19 @@ export default function Barang({ me, onUbah }) {
     try {
       let res
       if (aksi === 'kirim') {
-        res = await api('/barang/pindah', {
+        res = await api('/barang/oper', {
           method: 'POST',
-          body: JSON.stringify({ item_ids: ids, action: 'kirim_toko', target_location_id: Number(target), date: tgl }),
+          body: JSON.stringify({ item_ids: ids, target_location_id: Number(target), date: tgl }),
+        })
+      } else if (aksi === 'terima_toko' || aksi === 'belum_toko') {
+        res = await api('/barang/terima-toko', {
+          method: 'POST',
+          body: JSON.stringify({
+            item_ids: ids,
+            result: aksi === 'terima_toko' ? 'sampai' : 'belum',
+            date: tgl,
+            note: catatan,
+          }),
         })
       } else if (aksi === 'antar') {
         res = await api('/barang/kirim-bo', {
@@ -289,15 +314,20 @@ export default function Barang({ me, onUbah }) {
           method: 'POST',
           body: JSON.stringify({ item_ids: ids, result: 'belum', date: tgl, note: catatan }),
         })
-      } else if (aksi === 'selesai_cuci') {
-        res = await api('/barang/selesai-cuci', {
+      } else if (aksi === 'terima_kembali' || aksi === 'belum_kembali') {
+        res = await api('/barang/terima-kembali', {
           method: 'POST',
-          body: JSON.stringify({ item_ids: ids, finish_date: tgl }),
+          body: JSON.stringify({
+            item_ids: ids,
+            result: aksi === 'terima_kembali' ? 'sampai' : 'belum',
+            date: tgl,
+            note: catatan,
+          }),
         })
       } else if (aksi === 'cuci') {
         res = await api('/cuci', {
           method: 'POST',
-          body: JSON.stringify({ item_ids: ids, washer_name: pencuci, start_date: tgl }),
+          body: JSON.stringify({ item_ids: ids, start_date: tgl }),
         })
       } else if (aksi === 'lebur') {
         res = await api('/lebur', {
@@ -313,7 +343,6 @@ export default function Barang({ me, onUbah }) {
       setInfo(res.message)
       setAksi(null)
       setPilih({})
-      setPencuci('')
       setCatatan('')
       selesai()
     } catch (err) {
@@ -354,19 +383,39 @@ export default function Barang({ me, onUbah }) {
       {error && <div className="error" style={{ marginBottom: 16 }}>{error}</div>}
       {info && <div className="success" style={{ marginBottom: 16 }}>{info}</div>}
 
-      {notif.menunggu > 0 && (
+      {(notif.menunggu > 0 || notif.keluar > 0) && (
         <div className="banner">
-          {isCabang ? (
-            <div>
-              <b>{notif.menunggu}</b> barang sudah diantar, menunggu konfirmasi back office
-              {notif.belum_sampai > 0 && <> ({notif.belum_sampai} ditandai belum sampai)</>}
-            </div>
-          ) : (
-            <div>
-              <b>{notif.menunggu}</b> barang menunggu konfirmasi
-              {notif.belum_sampai > 0 && <> ({notif.belum_sampai} ditandai belum sampai)</>}
-            </div>
-          )}
+          <div>
+            {isCabang ? (
+              <>
+                {notif.menunggu > 0 && (
+                  <div>
+                    <b>{notif.menunggu}</b> barang dioper ke toko ini, menunggu konfirmasi kamu
+                    {notif.belum_sampai > 0 && <> ({notif.belum_sampai} ditandai belum diterima)</>}
+                  </div>
+                )}
+                {notif.keluar > 0 && (
+                  <div>
+                    <b>{notif.keluar}</b> barang sudah diantar, menunggu konfirmasi back office
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {notif.menunggu > 0 && (
+                  <div>
+                    <b>{notif.menunggu}</b> barang dari toko menunggu konfirmasi
+                    {notif.belum_sampai > 0 && <> ({notif.belum_sampai} ditandai belum sampai)</>}
+                  </div>
+                )}
+                {notif.keluar > 0 && (
+                  <div>
+                    <b>{notif.keluar}</b> barang dioper ke toko, menunggu konfirmasi toko tujuan
+                  </div>
+                )}
+              </>
+            )}
+          </div>
           <button
             type="button"
             className="mini primary"
@@ -375,7 +424,7 @@ export default function Barang({ me, onUbah }) {
               setStatus('dikirim')
             }}
           >
-            {isCabang ? 'Lihat' : 'Lihat dan konfirmasi'}
+            Lihat
           </button>
         </div>
       )}
@@ -618,7 +667,7 @@ export default function Barang({ me, onUbah }) {
             <b>{terpilih.length}</b> barang dipilih ({gram(beratTerpilih)} gram)
           </div>
           {mode === 'campur' && (
-            <div className="muted">Pilih barang dengan status dan lokasi yang sama.</div>
+            <div className="muted">Pilih barang dengan status, lokasi, dan arah kiriman yang sama.</div>
           )}
           {mode === 'transit' && isCabang && (
             <div className="muted">Menunggu konfirmasi dari back office.</div>
@@ -675,21 +724,20 @@ export default function Barang({ me, onUbah }) {
                   </div>
                 )}
 
-                {(aksi === 'belum' || aksi === 'lebur') && (
+                {(aksi === 'belum' || aksi === 'belum_toko' || aksi === 'belum_kembali' || aksi === 'lebur') && (
                   <div className="span2">
                     <label>Catatan (opsional)</label>
                     <input
                       value={catatan}
                       onChange={(e) => setCatatan(e.target.value)}
-                      placeholder={aksi === 'belum' ? 'Contoh: masih di kurir' : 'Contoh: ada permata, dilepas dulu'}
+                      placeholder={
+                        aksi === 'lebur'
+                          ? 'Contoh: ada permata, dilepas dulu'
+                          : aksi === 'belum_toko'
+                            ? 'Contoh: belum ada kurir yang datang'
+                            : 'Contoh: masih di kurir'
+                      }
                     />
-                  </div>
-                )}
-
-                {aksi === 'cuci' && (
-                  <div>
-                    <label>Nama pencuci</label>
-                    <input value={pencuci} onChange={(e) => setPencuci(e.target.value)} required />
                   </div>
                 )}
               </div>
@@ -701,14 +749,26 @@ export default function Barang({ me, onUbah }) {
               {aksi === 'belum' && (
                 <p className="muted">Barang tetap di daftar dengan label belum sampai.</p>
               )}
-              {aksi === 'selesai_cuci' && (
+              {aksi === 'terima_toko' && (
+                <p className="muted">Stok back office berkurang dan stok toko ini bertambah.</p>
+              )}
+              {aksi === 'belum_toko' && (
+                <p className="muted">Barang tetap tercatat di back office dengan label belum diterima.</p>
+              )}
+              {aksi === 'terima_kembali' && (
                 <p className="muted">
-                  Barang kembali ke stok back office dengan status Bersih. Setelah itu pilih Jual (oper ke toko)
-                  untuk mengirimnya ke Kepanjen atau Dinoyo.
+                  Barang masuk ke stok back office dengan berat terbaru yang dicatat PJ. Barang hasil cuci
+                  berstatus Bersih, lalu bisa dioper ke Kepanjen atau Dinoyo.
                 </p>
               )}
+              {aksi === 'belum_kembali' && (
+                <p className="muted">Barang tetap tercatat dengan label belum diterima.</p>
+              )}
               {aksi === 'kirim' && (
-                <p className="muted">Barang langsung tercatat masuk di stok toko tujuan untuk dijual.</p>
+                <p className="muted">
+                  Barang berstatus dalam perjalanan dan masih tercatat di back office sampai akun toko tujuan
+                  menekan Sudah diterima.
+                </p>
               )}
               {aksi === 'lebur' && (
                 <p className="muted">
@@ -718,8 +778,8 @@ export default function Barang({ me, onUbah }) {
               )}
               {aksi === 'cuci' && (
                 <p className="muted">
-                  Stok back office berkurang selama dicuci. Saat selesai, barang kembali ke back office
-                  dengan status Bersih.
+                  Stok back office berkurang dan barang masuk antrean cuci. PJ yang mengirimnya ke pencuci dan
+                  mencatat saat selesai di menu Cuci. Barang yang selesai berstatus Bersih.
                 </p>
               )}
               {aksi === 'jual' && <p className="muted">Omzet penjualan dicatat di menu Kas.</p>}
@@ -795,23 +855,32 @@ export default function Barang({ me, onUbah }) {
                   <td>{r.asal}</td>
                   <td>
                     {r.status === 'dikirim' && r.belum_sampai ? (
-                      <span className="tag out">Belum sampai</span>
+                      <span className="tag out">{r.tujuan_id > 0 ? 'Belum diterima' : 'Belum sampai'}</span>
                     ) : (
                       <span className={STATUS_CLASS[r.status]}>{STATUS_LABEL[r.status]}</span>
                     )}
-                    {r.status === 'dikirim' && r.kirim_tgl && (
-                      <div className="muted">diantar {r.kirim_tgl.slice(0, 10)}</div>
+                    {r.status === 'dikirim' && (
+                      <div className="muted">
+                        {r.tujuan_id > 0 ? `menuju ${r.tujuan}` : 'menuju Back Office'}
+                        {r.kirim_tgl && `, ${r.kirim_tgl.slice(0, 10)}`}
+                      </div>
                     )}
                     {r.status === 'dikirim' && r.belum_sampai && r.belum_sampai_note && (
                       <div className="muted">{r.belum_sampai_note}</div>
                     )}
                     {r.status === 'cuci' && (
                       <div className="muted">
-                        {r.pencuci}
-                        {r.cuci_tgl && `, sejak ${r.cuci_tgl.slice(0, 10)}`}
+                        {r.pencuci || 'Menunggu PJ mengirim ke pencuci'}
+                        {r.pencuci && r.cuci_tgl && `, sejak ${r.cuci_tgl.slice(0, 10)}`}
                       </div>
                     )}
                     {r.status === 'hasil' && <div className="muted">dikelola di menu Lebur</div>}
+                    {r.status === 'kembali' && (
+                      <div className="muted">
+                        dari PJ, menunggu konfirmasi back office
+                        {r.belum_sampai && ' (ditandai belum diterima)'}
+                      </div>
+                    )}
                   </td>
                   <td>{r.entry_date.slice(0, 10)}</td>
                   {bisaVoid && (

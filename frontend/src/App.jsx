@@ -129,10 +129,12 @@ function Shell({ onLogout }) {
   const [tab, setTab] = useState('dashboard')
   const [notif, setNotif] = useState({ menunggu: 0, belum_sampai: 0 })
   const [notifSvc, setNotifSvc] = useState({ badge: 0 })
+  const [notifCuci, setNotifCuci] = useState({ badge: 0 })
 
   const ambilNotif = useCallback(() => {
     api('/barang/notif').then(setNotif).catch(() => {})
     api('/service/notif').then(setNotifSvc).catch(() => {})
+    api('/cucian/notif').then(setNotifCuci).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -152,7 +154,7 @@ function Shell({ onLogout }) {
 
   let menu
   if (me.role === 'pj') {
-    menu = [['lebur', 'Lebur'], ['service', 'Service']]
+    menu = [['lebur', 'Lebur'], ['cuci', 'Cuci'], ['service', 'Service']]
   } else {
     menu = [
       ['dashboard', 'Dashboard'],
@@ -191,6 +193,7 @@ function Shell({ onLogout }) {
             {l}
             {k === 'stok' && notif.menunggu > 0 && <span className="badge">{notif.menunggu}</span>}
             {k === 'service' && notifSvc.badge > 0 && <span className="badge">{notifSvc.badge}</span>}
+            {k === 'cuci' && notifCuci.badge > 0 && <span className="badge">{notifCuci.badge}</span>}
           </button>
         ))}
       </nav>
@@ -198,7 +201,7 @@ function Shell({ onLogout }) {
       {tab === 'dashboard' && me.role !== 'pj' && <Dashboard />}
       {tab === 'kas' && me.role !== 'pj' && <Transaksi jenis="kas" me={me} />}
       {tab === 'stok' && me.role !== 'pj' && <Barang me={me} onUbah={ambilNotif} />}
-      {tab === 'cuci' && me.role !== 'pj' && <Cuci me={me} />}
+      {tab === 'cuci' && <Cuci me={me} />}
       {tab === 'service' && <Service me={me} onUbah={ambilNotif} />}
       {tab === 'lebur' && me.role !== 'cabang' && <Lebur me={me} />}
       {tab === 'laporan' && me.role !== 'cabang' && me.role !== 'pj' && <Laporan me={me} />}

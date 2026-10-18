@@ -18,22 +18,26 @@ func barangListV3(db *sql.DB) gin.HandlerFunc {
 		             i.location_id, l.name, i.origin_location_id, o.name, i.status, i.entry_date, IFNULL(i.note,''),
 		             i.kirim_tgl, i.belum_sampai, IFNULL(i.belum_sampai_note,''),
 		             IF(i.status = 'cuci', IFNULL(w.washer_name,''), ''),
-		             IF(i.status = 'cuci', w.start_date, NULL)
+		             IF(i.status = 'cuci', w.start_date, NULL),
+		             IFNULL(i.kirim_ke_location_id,0), IFNULL(k.name,'')
 		      FROM items i
 		      JOIN locations l ON l.id = i.location_id
 		      JOIN locations o ON o.id = i.origin_location_id
+		      LEFT JOIN locations k ON k.id = i.kirim_ke_location_id
 		      LEFT JOIN washing_jobs w ON w.id = i.washing_job_id
 		      WHERE i.is_void = FALSE`
 		args := []interface{}{}
 
 		if cl.Role == "cabang" {
-			q += " AND i.location_id = ?"
-			args = append(args, cl.LocationID)
+			q += " AND (i.location_id = ? OR i.kirim_ke_location_id = ?)"
+			args = append(args, cl.LocationID, cl.LocationID)
 		} else if loc := c.Query("location_id"); loc != "" && loc != "0" {
 			q += " AND i.location_id = ?"
 			args = append(args, loc)
 		}
-		if s := c.Query("status"); s != "" && s != "semua" {
+		if s := c.Query("status"); s == "dikirim" {
+			q += " AND i.status IN ('dikirim','kembali')"
+		} else if s != "" && s != "semua" {
 			q += " AND i.status = ?"
 			args = append(args, s)
 		}
@@ -76,6 +80,8 @@ func barangListV3(db *sql.DB) gin.HandlerFunc {
 			BelumNote   string     `json:"belum_sampai_note"`
 			Pencuci     string     `json:"pencuci"`
 			CuciTgl     *time.Time `json:"cuci_tgl"`
+			TujuanID    int        `json:"tujuan_id"`
+			Tujuan      string     `json:"tujuan"`
 		}
 		out := []row{}
 		var totalGram, totalBeli float64
@@ -85,7 +91,7 @@ func barangListV3(db *sql.DB) gin.HandlerFunc {
 			if err := rows.Scan(&r.ID, &r.ItemNo, &r.ItemName, &r.Karat, &r.WeightGram,
 				&r.Jenis, &r.Brand, &r.Kondisi, &r.HargaBeli,
 				&r.LocationID, &r.Lokasi, &r.OriginID, &r.Asal, &r.Status, &r.EntryDate, &r.Note,
-				&kirim, &r.BelumSampai, &r.BelumNote, &r.Pencuci, &cuciTgl); err != nil {
+				&kirim, &r.BelumSampai, &r.BelumNote, &r.Pencuci, &cuciTgl, &r.TujuanID, &r.Tujuan); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}

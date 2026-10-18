@@ -481,9 +481,11 @@ func leburListV2(db *sql.DB) gin.HandlerFunc {
 		switch c.Query("status") {
 		case "terjual":
 			q += " AND b.status = 'terjual'"
+		case "batal":
+			q += " AND b.status = 'batal'"
 		case "semua":
 		default:
-			q += " AND b.status <> 'terjual'"
+			q += " AND b.status NOT IN ('terjual','batal')"
 		}
 		q += " ORDER BY b.id DESC LIMIT 200"
 

@@ -173,13 +173,17 @@ func tabelCuci(db *sql.DB, dari, sampai string) (tabelLaporan, error) {
 	t := tabelLaporan{
 		Kode:  "cuci",
 		Judul: "Cuci",
-		Kolom: []string{"No", "Mulai", "Asal", "Pencuci", "Barang", "Jumlah (pcs)", "Selesai (pcs)", "Berat (g)", "Status", "Tanggal selesai", "Catatan"},
-		Tipe:  []string{"teks", "teks", "teks", "teks", "teks", "angka", "angka", "gram", "teks", "teks", "teks"},
+		Kolom: []string{"No", "Mulai", "Asal", "Pencuci", "Barang", "Jumlah (pcs)", "Selesai (pcs)", "Berat sistem (g)",
+			"Berat awal selesai (g)", "Berat sesudah (g)", "Susut (g)", "Status", "Tanggal selesai", "Catatan"},
+		Tipe: []string{"teks", "teks", "teks", "teks", "teks", "angka", "angka", "gram", "gram", "gram", "gram", "teks", "teks", "teks"},
 	}
 	rows, err := db.Query(`
 		SELECT w.id, w.start_date, l.name, w.washer_name, w.qty, w.weight_gram, w.status, w.finish_date, IFNULL(w.note,''),
 		       (SELECT COUNT(*) FROM items i WHERE i.washing_job_id = w.id AND i.status = 'cuci' AND i.is_void = FALSE),
-		       IFNULL((SELECT `+sqlBarangGabung+` FROM items i WHERE i.washing_job_id = w.id),'')
+		       IFNULL((SELECT `+sqlBarangGabung+` FROM items i WHERE i.washing_job_id = w.id),''),
+		       IFNULL(w.cancel_returned,0), IFNULL(w.cancel_reason,''),
+		       IFNULL((SELECT SUM(x.weight_before) FROM washing_job_items x WHERE x.job_id = w.id AND x.weight_after IS NOT NULL),0),
+		       IFNULL((SELECT SUM(x.weight_after) FROM washing_job_items x WHERE x.job_id = w.id),0)
 		FROM washing_jobs w
 		JOIN locations l ON l.id = w.origin_location_id
 		WHERE w.is_void = FALSE AND w.start_date BETWEEN ? AND ?
@@ -190,31 +194,51 @@ func tabelCuci(db *sql.DB, dari, sampai string) (tabelLaporan, error) {
 	defer rows.Close()
 
 	var totQty, totSelesai int
-	var totBerat float64
+	var totSistem, totAwal, totSesudah float64
 	for rows.Next() {
-		var id, qty, sisa int
+		var id, qty, sisa, kembali int
 		var mulai time.Time
-		var asal, pencuci, status, note, barang string
-		var berat float64
+		var asal, pencuci, status, note, barang, alasan string
+		var berat, awal, sesudah float64
 		var fin sql.NullTime
-		if err := rows.Scan(&id, &mulai, &asal, &pencuci, &qty, &berat, &status, &fin, &note, &sisa, &barang); err != nil {
+		if err := rows.Scan(&id, &mulai, &asal, &pencuci, &qty, &berat, &status, &fin, &note, &sisa, &barang,
+			&kembali, &alasan, &awal, &sesudah); err != nil {
 			return t, err
 		}
 		selesai := qty - sisa
+		st := "Proses"
+		switch status {
+		case "selesai":
+			st = "Selesai"
+		case "menunggu":
+			st = "Menunggu PJ"
+		case "batal":
+			st = "Dibatalkan"
+			selesai = qty - kembali
+			if alasan != "" {
+				if note != "" {
+					note += " | "
+				}
+				note += "Batal: " + alasan
+			}
+		}
 		tglSelesai := ""
 		if fin.Valid {
 			tglSelesai = fmtTgl(fin.Time)
 		}
-		st := "Proses"
-		if status == "selesai" {
-			st = "Selesai"
+		var vAwal, vSesudah, vSusut interface{}
+		if sesudah > 0 {
+			vAwal, vSesudah, vSusut = awal, sesudah, awal-sesudah
+			totAwal += awal
+			totSesudah += sesudah
 		}
 		totQty += qty
 		totSelesai += selesai
-		totBerat += berat
-		t.Baris = append(t.Baris, []interface{}{fmt.Sprintf("#%d", id), fmtTgl(mulai), asal, pencuci, barang, qty, selesai, berat, st, tglSelesai, note})
+		totSistem += berat
+		t.Baris = append(t.Baris, []interface{}{fmt.Sprintf("#%d", id), fmtTgl(mulai), asal, pencuci, barang, qty, selesai,
+			berat, vAwal, vSesudah, vSusut, st, tglSelesai, note})
 	}
-	t.Baris = append(t.Baris, []interface{}{"TOTAL", "", "", "", "", totQty, totSelesai, totBerat, "", "", ""})
+	t.Baris = append(t.Baris, []interface{}{"TOTAL", "", "", "", "", totQty, totSelesai, totSistem, totAwal, totSesudah, totAwal - totSesudah, "", "", ""})
 	t.Tebal = []int{len(t.Baris) - 1}
 	return t, nil
 }
@@ -239,7 +263,7 @@ func tabelLebur(db *sql.DB, dari, sampai string) (tabelLaporan, error) {
 		LEFT JOIN users u2 ON u2.id = b.cukim_by
 		LEFT JOIN items ci ON ci.id = b.cukim_item_id
 		LEFT JOIN penadah_sales ps ON ps.id = ci.sale_id AND ps.is_void = FALSE
-		WHERE b.is_void = FALSE AND b.start_date BETWEEN ? AND ?
+		WHERE b.is_void = FALSE AND b.status <> 'batal' AND b.start_date BETWEEN ? AND ?
 		ORDER BY b.start_date, b.id`, dari, sampai)
 	if err != nil {
 		return t, err
