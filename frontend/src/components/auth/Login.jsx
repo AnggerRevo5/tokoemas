@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api, setToken } from '../../services/api'
 import { simpanTema, temaAwal } from '../../utils/tema'
+import TombolTema from '../common/TombolTema'
 
 export default function Login({ onSuccess }) {
   const [username, setUsername] = useState('')
@@ -37,9 +38,7 @@ export default function Login({ onSuccess }) {
     <div className="login-page">
       <div className="login-bulan" aria-hidden="true" />
 
-      <button type="button" className="ghost login-tema" onClick={ubahTema}>
-        {tema === 'gelap' ? 'Mode terang' : 'Mode gelap'}
-      </button>
+      <TombolTema tema={tema} onUbah={ubahTema} className="login-tema" />
 
       <form className="card login" onSubmit={submit}>
         <div className="login-garis" />

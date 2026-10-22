@@ -1,6 +1,7 @@
 import { NAMA_ROLE } from '../../constants/roles'
+import TombolTema from '../common/TombolTema'
 
-// Bilah atas: tombol menu, judul halaman, tema, akun, dan tombol keluar.
+// Bilah atas: tombol menu, judul halaman, ikon tema, akun, dan tombol keluar.
 export default function Topbar({ judul, me, onMenu, tema, onTema, onLogout }) {
   return (
     <header className="topbar">
@@ -10,9 +11,7 @@ export default function Topbar({ judul, me, onMenu, tema, onTema, onLogout }) {
         <span />
       </button>
       <h1>{judul}</h1>
-      <button type="button" className="ghost tema-btn" onClick={onTema}>
-        {tema === 'gelap' ? 'Mode terang' : 'Mode gelap'}
-      </button>
+      <TombolTema tema={tema} onUbah={onTema} />
       <div className="user-chip">
         {me.username}
         <small>{NAMA_ROLE[me.role] || me.role}</small>

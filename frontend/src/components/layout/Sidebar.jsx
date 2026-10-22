@@ -13,7 +13,7 @@ function bacaTersimpan() {
 
 // Sidebar menu berkelompok dengan dropdown. Grup yang berisi halaman aktif terbuka otomatis.
 // grup = [{ kode, judul, items: [[kodeMenu, label]] }]; badges = { kodeMenu: jumlah }.
-export default function Sidebar({ grup, tab, onPilih, badges, me, tema, onTema }) {
+export default function Sidebar({ grup, tab, onPilih, badges, me }) {
   const [terbuka, setTerbuka] = useState(bacaTersimpan)
 
   const jumlah = (g) => g.items.reduce((s, [k]) => s + (badges[k] || 0), 0)
@@ -75,9 +75,6 @@ export default function Sidebar({ grup, tab, onPilih, badges, me, tema, onTema }
       <div className="side-user">
         {me.username} - {NAMA_ROLE[me.role] || me.role}
       </div>
-      <button type="button" className="tema-btn" onClick={onTema}>
-        {tema === 'gelap' ? 'Mode terang' : 'Mode gelap'}
-      </button>
     </aside>
   )
 }

@@ -96,8 +96,6 @@ export default function AppShell({ onLogout }) {
         onPilih={pilihMenu}
         badges={{ stok: notif.menunggu, service: notifSvc.badge, cuci: notifCuci.badge }}
         me={me}
-        tema={tema}
-        onTema={ubahTema}
       />
       <div className="overlay" onClick={() => setBuka(false)} />
 
