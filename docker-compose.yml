@@ -47,6 +47,13 @@ services:
         condition: service_healthy
     ports:
       - "127.0.0.1:8081:80"
+    # default: untuk menghubungi backend; private-net: supaya cloudflared bisa menjangkau frontend.
+    # Backend dan db tidak ikut ke private-net.
+    networks:
+      default:
+      private-net:
+        aliases:
+          - tokoemas-frontend
 
 volumes:
   db_data:
