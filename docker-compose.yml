@@ -1,22 +1,6 @@
 services:
-  db:
-    image: mysql:8.0
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
-      MYSQL_DATABASE: toko_emas
-      MYSQL_USER: app
-      MYSQL_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
-    volumes:
-      - db_data:/var/lib/mysql
-      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-
+  # Database memakai container MariaDB yang sudah ada di server (dikelola lewat phpMyAdmin),
+  # bukan database bawaan compose ini. Backend tersambung lewat jaringan DB_NETWORK.
   backend:
     build:
       context: ./backend
@@ -25,12 +9,13 @@ services:
       APP_ENV: production
       GIN_MODE: release
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
-      DB_DSN: "app:${DB_PASSWORD:?Set DB_PASSWORD in .env}@tcp(db:3306)/toko_emas?parseTime=true&loc=Asia%2FJakarta&time_zone=%27%2B07%3A00%27"
-    depends_on:
-      db:
-        condition: service_healthy
+      DB_DSN: "app:${DB_PASSWORD:?Set DB_PASSWORD in .env}@tcp(${DB_HOST:-mariadb}:3306)/toko_emas?parseTime=true&loc=Asia%2FJakarta&time_zone=%27%2B07%3A00%27"
     expose:
       - "8080"
+    # default: untuk dihubungi frontend; db-net: untuk menjangkau MariaDB.
+    networks:
+      default:
+      db-net:
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health"]
       interval: 30s
@@ -48,16 +33,16 @@ services:
     ports:
       - "127.0.0.1:8081:80"
     # default: untuk menghubungi backend; private-net: supaya cloudflared bisa menjangkau frontend.
-    # Backend dan db tidak ikut ke private-net.
+    # Backend dan database tidak ikut ke private-net.
     networks:
       default:
       private-net:
         aliases:
           - tokoemas-frontend
 
-volumes:
-  db_data:
-
 networks:
   private-net:
     external: true
+  db-net:
+    external: true
+    name: ${DB_NETWORK:-db-net}
