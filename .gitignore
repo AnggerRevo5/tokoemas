@@ -14,3 +14,4 @@ backup/
 *.local.sql
 reset-db.ps1
 docker-compose.override.yml
+db/
