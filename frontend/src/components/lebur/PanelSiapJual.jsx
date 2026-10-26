@@ -1,11 +1,6 @@
 import { useState } from 'react'
 import { api } from '../../services/api'
 import { rupiah, gram, hariIni, toggleId } from '../../utils/format'
-import AngkaBerjalan from '../common/AngkaBerjalan'
-import BarisKosong from '../common/BarisKosong'
-import Spinner from '../common/Spinner'
-
-const formatRupiah = (v) => rupiah(Math.round(v))
 
 // Kartu "Siap Dijual ke Penadah": daftar cukim/logam mulia di back office dan form penjualannya.
 // onMulai: bersihkan pesan; onSukses(message): setelah tersimpan; onError(msg).
@@ -68,13 +63,15 @@ export default function PanelSiapJual({ siap, bisaCatat, onMulai, onSukses, onEr
               {bisaCatat && <th></th>}
               <th>No</th>
               <th>Barang</th>
-              <th className="num">Berat</th>
-              <th className="num">Modal</th>
+              <th>Berat</th>
+              <th>Modal</th>
               <th>Asal</th>
             </tr>
           </thead>
           <tbody>
-            {siap.length === 0 && <BarisKosong kolom="6">Belum ada barang siap jual</BarisKosong>}
+            {siap.length === 0 && (
+              <tr><td colSpan="6" className="muted">Belum ada barang siap jual</td></tr>
+            )}
             {siap.map((r) => (
               <tr key={r.id}>
                 {bisaCatat && (
@@ -84,8 +81,8 @@ export default function PanelSiapJual({ siap, bisaCatat, onMulai, onSukses, onEr
                 )}
                 <td>{r.item_no}</td>
                 <td>{r.item_name} {r.karat}</td>
-                <td className="num">{r.weight_gram} g</td>
-                <td className="num">{r.harga_beli > 0 ? rupiah(r.harga_beli) : '-'}</td>
+                <td>{r.weight_gram} g</td>
+                <td>{r.harga_beli > 0 ? rupiah(r.harga_beli) : '-'}</td>
                 <td>{r.batch_id ? `Lebur #${r.batch_id}` : 'Beli dari customer'}</td>
               </tr>
             ))}
@@ -118,17 +115,11 @@ export default function PanelSiapJual({ siap, bisaCatat, onMulai, onSukses, onEr
             </div>
           </div>
           {hargaJual && (
-            <div className="total-bar">
-              <span className={untungPreview < 0 ? 'neg' : ''}>
-                {untungPreview < 0 ? 'Rugi' : 'Untung'}:{' '}
-                <b className={untungPreview < 0 ? 'neg' : 'utama'}>
-                  <AngkaBerjalan nilai={Math.abs(untungPreview)} format={formatRupiah} />
-                </b>{' '}
-                (harga jual dikurangi modal)
-              </span>
-            </div>
+            <p className={untungPreview < 0 ? 'neg' : 'muted'}>
+              {untungPreview < 0 ? 'Rugi' : 'Untung'}: <b>{rupiah(Math.abs(untungPreview))}</b> (harga jual dikurangi modal)
+            </p>
           )}
-          <button disabled={loading || !!salahPilih}>{loading ? <><Spinner />Memproses...</> : 'Jual ke penadah'}</button>
+          <button disabled={loading || !!salahPilih}>{loading ? 'Memproses...' : 'Jual ke penadah'}</button>
         </form>
       )}
     </div>

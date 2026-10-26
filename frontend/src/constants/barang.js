@@ -19,8 +19,8 @@ export const STATUS_LABEL = {
 export const STATUS_CLASS = {
   tersedia: 'tag in',
   dikirim: 'tag warn',
-  cuci: 'tag info',
-  lebur: 'tag info',
+  cuci: 'tag warn',
+  lebur: 'tag gray',
   hasil: 'tag gray',
   kembali: 'tag warn',
   terjual: 'tag gray',

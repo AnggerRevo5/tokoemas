@@ -1,6 +1,5 @@
 import { rupiah } from '../../utils/format'
 import { labelKategori } from '../../constants/kategori'
-import BarisKosong from '../common/BarisKosong'
 
 export default function TabelTransaksi({ rows, isKas, bisaVoid, onBatal }) {
   return (
@@ -10,13 +9,15 @@ export default function TabelTransaksi({ rows, isKas, bisaVoid, onBatal }) {
           <tr>
             <th>Tanggal</th>
             <th>Kategori</th>
-            <th className={isKas ? 'num' : ''}>{isKas ? 'Nominal' : 'Barang'}</th>
+            <th>{isKas ? 'Nominal' : 'Barang'}</th>
             <th>Catatan</th>
             {bisaVoid && <th></th>}
           </tr>
         </thead>
         <tbody>
-          {rows.length === 0 && <BarisKosong kolom="5">Belum ada data</BarisKosong>}
+          {rows.length === 0 && (
+            <tr><td colSpan="5" className="muted">Belum ada data</td></tr>
+          )}
           {rows.map((r) => (
             <tr key={r.id}>
               <td>{r.transaction_date.slice(0, 10)}</td>
@@ -26,7 +27,7 @@ export default function TabelTransaksi({ rows, isKas, bisaVoid, onBatal }) {
                 </span>{' '}
                 {labelKategori(r.category)}
               </td>
-              <td className={isKas ? 'num' : ''}>
+              <td>
                 {isKas
                   ? rupiah(r.amount)
                   : `${r.item_name} - ${r.weight_gram} g ${r.karat} (${r.qty} pcs)`}

@@ -3,7 +3,7 @@ export const STATUS_SERVICE = {
   di_toko: ['Di toko', 'tag in'],
   dikirim_bo: ['Dalam perjalanan ke back office', 'tag warn'],
   di_bo: ['Di back office', 'tag in'],
-  diproses: ['Sedang diservis', 'tag info'],
+  diproses: ['Sedang diservis', 'tag warn'],
   kembali_bo: ['Dikembalikan ke back office', 'tag warn'],
   selesai: ['Selesai servis', 'tag in'],
   dikirim_toko: ['Dalam perjalanan ke toko', 'tag warn'],

@@ -1,7 +1,5 @@
 import { LAPORAN, KELOMPOK_LAPORAN } from '../../constants/laporan'
 import PilihanLokasi from '../common/PilihanLokasi'
-import { CircleAlert, Download, Eye, Printer } from 'lucide-react'
-import Spinner from '../common/Spinner'
 
 // pilihan periode, lokasi, jenis laporan, dan tombol pratinjau/unduh/cetak
 export default function FormLaporan({
@@ -52,23 +50,12 @@ export default function FormLaporan({
         <button type="button" className="mini" onClick={() => onSemua(false)}>Kosongkan</button>
       </div>
 
-      {error && (
-        <div className="error" role="alert">
-          <CircleAlert size={18} aria-hidden="true" />
-          <span>{error}</span>
-        </div>
-      )}
+      {error && <div className="error">{error}</div>}
 
       <div className="aksi-tombol">
-        <button type="button" className="mini primary-fill" disabled={loading} onClick={onPratinjau}>
-          {loading ? <Spinner size={14} /> : <Eye size={15} aria-hidden="true" />}Pratinjau
-        </button>
-        <button type="button" className="mini primary" disabled={loading} onClick={onExcel}>
-          <Download size={15} aria-hidden="true" />Unduh Excel
-        </button>
-        <button type="button" className="mini primary" disabled={loading} onClick={onCetak}>
-          <Printer size={15} aria-hidden="true" />Cetak / PDF
-        </button>
+        <button type="button" className="mini primary" disabled={loading} onClick={onPratinjau}>Pratinjau</button>
+        <button type="button" className="mini primary" disabled={loading} onClick={onExcel}>Unduh Excel</button>
+        <button type="button" className="mini primary" disabled={loading} onClick={onCetak}>Cetak / PDF</button>
       </div>
     </div>
   )

@@ -3,12 +3,6 @@ import { api } from '../../services/api'
 import { gram, hariIni, rupiah } from '../../utils/format'
 import { KETERANGAN_AKSI } from '../../constants/barang'
 import PilihanLokasi from '../common/PilihanLokasi'
-import { m } from 'motion/react'
-import AngkaBerjalan from '../common/AngkaBerjalan'
-import Spinner from '../common/Spinner'
-
-const formatGram = (v) => String(gram(v))
-const formatRupiah = (v) => rupiah(Math.round(v))
 
 // Bar aksi untuk barang yang dicentang: tombol langkah dan form konfirmasinya.
 // aksi/onAksi dipegang halaman. onMulai: bersihkan pesan; onSelesai(message); onError(msg); onBatalPilih().
@@ -105,15 +99,9 @@ export default function BarAksiBarang({
   }
 
   return (
-    <m.div
-      className="card action-bar"
-      style={{ marginTop: 16 }}
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, ease: 'easeOut' }}
-    >
+    <div className="card action-bar" style={{ marginTop: 16 }}>
       <div>
-        <b>{terpilih.length}</b> barang dipilih (<AngkaBerjalan nilai={beratTerpilih} format={formatGram} durasi={0.4} /> gram)
+        <b>{terpilih.length}</b> barang dipilih ({gram(beratTerpilih)} gram)
       </div>
       {mode === 'campur' && (
         <div className="muted">Pilih barang dengan status, lokasi, dan arah kiriman yang sama.</div>
@@ -188,8 +176,8 @@ export default function BarAksiBarang({
                 <thead>
                   <tr>
                     <th>Barang</th>
-                    <th className="num">Berat</th>
-                    <th className="num">Harga beli</th>
+                    <th>Berat</th>
+                    <th>Harga beli</th>
                     <th>Harga jual (Rp)</th>
                   </tr>
                 </thead>
@@ -197,8 +185,8 @@ export default function BarAksiBarang({
                   {terpilih.map((r) => (
                     <tr key={r.id}>
                       <td>{r.item_no} {r.item_name} {r.karat}</td>
-                      <td className="num">{gram(r.weight_gram)} g</td>
-                      <td className="num">{r.harga_beli > 0 ? rupiah(r.harga_beli) : '-'}</td>
+                      <td>{gram(r.weight_gram)} g</td>
+                      <td>{r.harga_beli > 0 ? rupiah(r.harga_beli) : '-'}</td>
                       <td>
                         <input
                           type="number"
@@ -212,22 +200,17 @@ export default function BarAksiBarang({
                   ))}
                 </tbody>
               </table>
-              <div className="total-bar">
-                <span>
-                  Total harga jual (masuk ke kas toko):{' '}
-                  <b className="utama">
-                    <AngkaBerjalan nilai={terpilih.reduce((s, r) => s + (Number(harga[r.id]) || 0), 0)} format={formatRupiah} />
-                  </b>
-                </span>
-              </div>
+              <p className="muted">
+                Total harga jual (masuk ke kas toko): <b>{rupiah(terpilih.reduce((s, r) => s + (Number(harga[r.id]) || 0), 0))}</b>
+              </p>
             </div>
           )}
 
           {KETERANGAN_AKSI[aksi] && <p className="muted">{KETERANGAN_AKSI[aksi]}</p>}
 
-          <button disabled={loading}>{loading ? <><Spinner />Memproses...</> : 'Konfirmasi'}</button>
+          <button disabled={loading}>{loading ? 'Memproses...' : 'Konfirmasi'}</button>
         </form>
       )}
-    </m.div>
+    </div>
   )
 }

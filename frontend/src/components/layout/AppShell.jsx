@@ -5,7 +5,6 @@ import { simpanTema, temaAwal } from '../../utils/tema'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import AreaKonten from './AreaKonten'
-import { KerangkaAplikasi } from '../common/Skeleton'
 import Dashboard from '../dashboard/Dashboard'
 import Transaksi from '../../pages/Transaksi'
 import Hutang from '../../pages/Hutang'
@@ -83,7 +82,7 @@ export default function AppShell({ onLogout }) {
     setTema(baru)
   }
 
-  if (!me) return <KerangkaAplikasi />
+  if (!me) return <div className="content muted">Memuat...</div>
 
   const bukanPJ = me.role !== 'pj'
   const bukanCabang = me.role !== 'cabang'
@@ -103,10 +102,8 @@ export default function AppShell({ onLogout }) {
       <div className="main">
         <Topbar judul={judul} me={me} onMenu={ubahSidebar} tema={tema} onTema={ubahTema} onLogout={onLogout} />
 
-        <AreaKonten halaman={tab}>
-          {tab === 'dashboard' && bukanPJ && (
-            <Dashboard perluTindakan={{ stok: notif.menunggu, service: notifSvc.badge, cuci: notifCuci.badge }} />
-          )}
+        <AreaKonten>
+          {tab === 'dashboard' && bukanPJ && <Dashboard />}
           {tab === 'kas' && bukanPJ && <Transaksi jenis="kas" me={me} />}
           {tab === 'stok' && bukanPJ && <Barang me={me} onUbah={ambilNotif} />}
           {tab === 'cuci' && <Cuci me={me} />}

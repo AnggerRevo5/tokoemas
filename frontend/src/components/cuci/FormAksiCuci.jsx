@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { api } from '../../services/api'
 import { hariIni, gram } from '../../utils/format'
 import FormAksi from '../common/FormAksi'
-import BarisKosong from '../common/BarisKosong'
 
 // Form konfirmasi aksi pada satu pekerjaan cuci: kirim ke pencuci, batalkan dan kembalikan, atau batal (salah input).
 // aksi = { jenis: 'kirim' | 'kembali' | 'batal', id, sisa, qty }; itemJob = barang pada pekerjaan itu (untuk kirim).
@@ -90,16 +89,18 @@ export default function FormAksiCuci({ aksi, itemJob, onMulai, onSelesai, onErro
               <thead>
                 <tr>
                   <th>Barang</th>
-                  <th className="num">Berat sistem</th>
+                  <th>Berat sistem</th>
                   <th>Berat awal ditimbang (g)</th>
                 </tr>
               </thead>
               <tbody>
-                {itemJob.length === 0 && <BarisKosong kolom="3">Tidak ada barang</BarisKosong>}
+                {itemJob.length === 0 && (
+                  <tr><td colSpan="3" className="muted">Tidak ada barang</td></tr>
+                )}
                 {itemJob.map((i) => (
                   <tr key={i.id}>
                     <td>{i.item_no} {i.item_name} {i.karat}</td>
-                    <td className="num">{gram(i.weight_gram)} g</td>
+                    <td>{gram(i.weight_gram)} g</td>
                     <td>
                       <input
                         type="number"

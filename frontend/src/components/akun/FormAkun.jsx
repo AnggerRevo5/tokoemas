@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { api } from '../../services/api'
 import { NAMA_ROLE, URUTAN_ROLE } from '../../constants/roles'
 import PilihanLokasi from '../common/PilihanLokasi'
-import Spinner from '../common/Spinner'
 
 // Form tambah akun baru. Role cabang wajib memilih cabang.
 // onMulai: bersihkan pesan; onSukses(message); onError(msg).
@@ -67,7 +66,7 @@ export default function FormAkun({ cabangList, onMulai, onSukses, onError }) {
           </div>
         )}
       </div>
-      <button disabled={loading}>{loading ? <><Spinner />Menyimpan...</> : 'Tambah akun'}</button>
+      <button disabled={loading}>{loading ? 'Menyimpan...' : 'Tambah akun'}</button>
     </form>
   )
 }

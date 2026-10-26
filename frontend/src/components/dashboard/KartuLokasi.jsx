@@ -1,4 +1,3 @@
-import { Store } from 'lucide-react'
 import { rupiah } from '../../utils/format'
 
 // rincian barang service yang jumlahnya lebih dari nol
@@ -15,11 +14,8 @@ const rincian = (s) =>
 // satu kartu ringkasan per lokasi: saldo kas, stok emas, dan barang service
 export default function KartuLokasi({ saldo, service }) {
   return (
-    <div className="card interaktif">
-      <div className="lokasi-kepala">
-        <Store size={18} strokeWidth={1.8} aria-hidden="true" />
-        <h3>{saldo.name}</h3>
-      </div>
+    <div className="card">
+      <h3>{saldo.name}</h3>
       <div className="label">Saldo kas</div>
       <div className="big">{rupiah(saldo.saldo_kas)}</div>
       <div className="label">Stok emas</div>

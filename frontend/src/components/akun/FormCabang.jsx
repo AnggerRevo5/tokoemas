@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { api } from '../../services/api'
-import Spinner from '../common/Spinner'
 
 // Form tambah cabang baru. Setelah cabang dibuat, tambahkan akun dengan role Akun Cabang untuk cabang itu.
 export default function FormCabang({ cabangList, onMulai, onSukses, onError }) {
@@ -36,7 +35,7 @@ export default function FormCabang({ cabangList, onMulai, onSukses, onError }) {
           <input value={nama} onChange={(e) => setNama(e.target.value)} placeholder="Contoh: Cabang Malang Kota" required />
         </div>
       </div>
-      <button disabled={loading}>{loading ? <><Spinner />Menyimpan...</> : 'Tambah cabang'}</button>
+      <button disabled={loading}>{loading ? 'Menyimpan...' : 'Tambah cabang'}</button>
     </form>
   )
 }

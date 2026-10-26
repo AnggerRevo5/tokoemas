@@ -2,10 +2,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { api } from '../services/api'
 import { rupiah, awalBulan, hariIni } from '../utils/format'
 import BarisRincian from '../components/labarugi/BarisRincian'
-import AngkaBerjalan from '../components/common/AngkaBerjalan'
-import { KerangkaHalaman } from '../components/common/Skeleton'
-
-const formatRupiah = (v) => rupiah(Math.round(v))
 
 export default function LabaRugi() {
   const [dari, setDari] = useState(awalBulan())
@@ -42,20 +38,12 @@ export default function LabaRugi() {
 
       {error && <div className="error" style={{ marginTop: 16 }}>{error}</div>}
 
-      {!data && !error && (
-        <div style={{ marginTop: 16 }}>
-          <KerangkaHalaman kartu={1} />
-        </div>
-      )}
-
       {data && (
         <>
-          <div className="card stat gold-shimmer" style={{ marginTop: 16 }}>
-            <div className="stat-label">Laba / Rugi</div>
-            <span className={data.laba_rugi < 0 ? 'angka-besar neg' : 'angka-besar text-gold'}>
-              <AngkaBerjalan nilai={data.laba_rugi} format={formatRupiah} dariNol />
-            </span>
-            <div className="stat-sub">
+          <div className="card" style={{ marginTop: 16 }}>
+            <div className="label">Laba / Rugi</div>
+            <div className={data.laba_rugi < 0 ? 'big neg' : 'big'}>{rupiah(data.laba_rugi)}</div>
+            <div className="muted">
               {data.dari} sampai {data.sampai}
             </div>
           </div>

@@ -1,15 +1,10 @@
-import { AnimatePresence } from 'motion/react'
 import { rupiah } from '../../utils/format'
 import { STATUS_LABEL, STATUS_CLASS } from '../../constants/barang'
 import { bisaPilih } from '../../utils/barang'
-import useAnimasiDaftar from '../../hooks/useAnimasiDaftar'
-import BarisAnimasi from '../common/BarisAnimasi'
-import BarisKosong from '../common/BarisKosong'
 
 export default function TabelBarang({
   rows, pilih, onToggle, semuaDipilih, onToggleSemua, bisaVoid, onBatal,
 }) {
-  const animasi = useAnimasiDaftar(rows.map((r) => r.id))
   return (
     <div className="table-wrap">
       <table>
@@ -20,10 +15,10 @@ export default function TabelBarang({
             </th>
             <th>No</th>
             <th>Barang</th>
-            <th className="num">Berat</th>
+            <th>Berat</th>
             <th>Kondisi</th>
-            <th className="num">Harga beli</th>
-            <th className="num">Harga jual</th>
+            <th>Harga beli</th>
+            <th>Harga jual</th>
             <th>Keterangan</th>
             <th>Lokasi</th>
             <th>Asal</th>
@@ -33,10 +28,11 @@ export default function TabelBarang({
           </tr>
         </thead>
         <tbody>
-          {rows.length === 0 && <BarisKosong kolom="13">Belum ada barang</BarisKosong>}
-          <AnimatePresence initial={false} custom={animasi.instan}>
+          {rows.length === 0 && (
+            <tr><td colSpan="13" className="muted">Belum ada barang</td></tr>
+          )}
           {rows.map((r) => (
-            <BarisAnimasi key={r.id} layout={animasi.layout}>
+            <tr key={r.id}>
               <td>
                 <input
                   type="checkbox"
@@ -47,14 +43,14 @@ export default function TabelBarang({
               </td>
               <td>{r.item_no}</td>
               <td>{r.item_name} {r.karat}</td>
-              <td className="num">{r.weight_gram} g</td>
+              <td>{r.weight_gram} g</td>
               <td>
                 <span className={r.kondisi === 'kotor' ? 'tag warn' : 'tag in'}>
                   {r.kondisi === 'kotor' ? 'Kotor' : 'Bersih'}
                 </span>
               </td>
-              <td className="num">{r.harga_beli > 0 ? rupiah(r.harga_beli) : '-'}</td>
-              <td className="num">
+              <td>{r.harga_beli > 0 ? rupiah(r.harga_beli) : '-'}</td>
+              <td>
                 {r.harga_jual ? rupiah(r.harga_jual) : '-'}
                 {r.harga_jual > 0 && r.harga_beli > 0 && (
                   <div className={r.harga_jual < r.harga_beli ? 'neg' : 'muted'}>
@@ -105,9 +101,8 @@ export default function TabelBarang({
                   )}
                 </td>
               )}
-            </BarisAnimasi>
+            </tr>
           ))}
-          </AnimatePresence>
         </tbody>
       </table>
     </div>

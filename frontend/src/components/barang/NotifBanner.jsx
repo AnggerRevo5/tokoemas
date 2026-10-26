@@ -1,22 +1,10 @@
-import { m } from 'motion/react'
-import { BellRing } from 'lucide-react'
-
 // Banner kiriman barang yang menunggu konfirmasi (isi berbeda untuk akun cabang dan owner/admin).
 export default function NotifBanner({ notif, isCabang, onLihat }) {
   if (notif.menunggu <= 0 && notif.keluar <= 0) return null
 
   return (
-    <m.div
-      className="banner"
-      initial={{ opacity: 0, y: -8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.22, ease: 'easeOut' }}
-    >
-      <div className="banner-isi">
-        <span className="banner-ikon">
-          <BellRing size={16} strokeWidth={1.8} aria-hidden="true" />
-        </span>
-        <div>
+    <div className="banner">
+      <div>
         {isCabang ? (
           <>
             {notif.menunggu > 0 && (
@@ -46,11 +34,10 @@ export default function NotifBanner({ notif, isCabang, onLihat }) {
             )}
           </>
         )}
-        </div>
       </div>
       <button type="button" className="mini primary" onClick={onLihat}>
         Lihat
       </button>
-    </m.div>
+    </div>
   )
 }

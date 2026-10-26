@@ -3,9 +3,6 @@ import { api } from '../../services/api'
 import { hariIni } from '../../utils/format'
 import { NAMA_UMUM, KARAT } from '../../constants/barang'
 import PilihanLokasi from '../common/PilihanLokasi'
-import { m } from 'motion/react'
-import { Plus, X } from 'lucide-react'
-import Spinner from '../common/Spinner'
 
 // Tombol dan form "Terima barang service" dari customer.
 // onMulai: bersihkan pesan; onSukses(res): setelah tersimpan; onError(msg).
@@ -68,19 +65,12 @@ export default function FormTerimaService({ isCabang, me, cabangList, onMulai, o
     <>
       <div style={{ marginBottom: 16 }}>
         <button type="button" className="ghost" onClick={() => setFormBuka(!formBuka)}>
-          {formBuka ? <><X size={16} aria-hidden="true" />Tutup form</> : <><Plus size={16} aria-hidden="true" />Terima barang service</>}
+          {formBuka ? 'Tutup form' : '+ Terima barang service'}
         </button>
       </div>
 
       {formBuka && (
-        <m.form
-          className="card"
-          style={{ marginBottom: 16 }}
-          onSubmit={simpan}
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.22, ease: 'easeOut' }}
-        >
+        <form className="card" style={{ marginBottom: 16 }} onSubmit={simpan}>
           <h3>Terima Barang Service</h3>
           <p className="muted">
             Barang milik customer: tidak masuk stok dan tidak mempengaruhi kas. Nomor nota dibuat otomatis.
@@ -92,8 +82,6 @@ export default function FormTerimaService({ isCabang, me, cabangList, onMulai, o
             ))}
           </datalist>
 
-          <div className="form-section">
-          <div className="section-title">Customer</div>
           <div className="form-grid">
             {!isCabang && (
               <div>
@@ -109,12 +97,6 @@ export default function FormTerimaService({ isCabang, me, cabangList, onMulai, o
               <label>No. HP (opsional)</label>
               <input value={fHp} onChange={(e) => setFHp(e.target.value)} />
             </div>
-          </div>
-          </div>
-
-          <div className="form-section">
-          <div className="section-title">Barang</div>
-          <div className="form-grid">
             <div>
               <label>Nama barang</label>
               <input list="nama-service" value={fNama} onChange={(e) => setFNama(e.target.value)} placeholder="Cincin" required />
@@ -136,12 +118,6 @@ export default function FormTerimaService({ isCabang, me, cabangList, onMulai, o
               <label>Pekerjaan service</label>
               <input value={fKeluhan} onChange={(e) => setFKeluhan(e.target.value)} placeholder="Contoh: ganti mata, poles" required />
             </div>
-          </div>
-          </div>
-
-          <div className="form-section">
-          <div className="section-title">Penanganan</div>
-          <div className="form-grid">
             <div>
               <label>Posisi barang</label>
               <select value={fPosisi} onChange={(e) => setFPosisi(e.target.value)}>
@@ -158,10 +134,9 @@ export default function FormTerimaService({ isCabang, me, cabangList, onMulai, o
               <input value={fNote} onChange={(e) => setFNote(e.target.value)} />
             </div>
           </div>
-          </div>
 
-          <button disabled={loading}>{loading ? <><Spinner />Menyimpan...</> : 'Simpan'}</button>
-        </m.form>
+          <button disabled={loading}>{loading ? 'Menyimpan...' : 'Simpan'}</button>
+        </form>
       )}
     </>
   )

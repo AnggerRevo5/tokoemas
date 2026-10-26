@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { api } from '../../services/api'
 import { rupiah } from '../../utils/format'
 import KotakBatal from '../common/KotakBatal'
-import BarisKosong from '../common/BarisKosong'
 
 // Kartu "Riwayat Penjualan ke Penadah": periode, total, tabel, dan pembatalan penjualan.
 // onMulai: bersihkan pesan; onSelesai(message): setelah dibatalkan; onError(msg).
@@ -74,15 +73,17 @@ export default function RiwayatPenjualan({
               <th>Tanggal</th>
               <th>Penadah</th>
               <th>Barang</th>
-              <th className="num">Modal</th>
-              <th className="num">Harga jual</th>
-              <th className="num">Untung / rugi</th>
+              <th>Modal</th>
+              <th>Harga jual</th>
+              <th>Untung / rugi</th>
               <th>PJ</th>
               {bisaCatat && <th></th>}
             </tr>
           </thead>
           <tbody>
-            {penj.rows.length === 0 && <BarisKosong kolom="8">Belum ada penjualan</BarisKosong>}
+            {penj.rows.length === 0 && (
+              <tr><td colSpan="8" className="muted">Belum ada penjualan</td></tr>
+            )}
             {penj.rows.map((r) => (
               <tr key={r.id}>
                 <td>{r.sale_date.slice(0, 10)}</td>
@@ -91,9 +92,9 @@ export default function RiwayatPenjualan({
                   {r.barang}
                   {r.note && <div className="muted">{r.note}</div>}
                 </td>
-                <td className="num">{rupiah(r.modal)}</td>
-                <td className="num">{rupiah(r.sale_total)}</td>
-                <td className={r.untung < 0 ? 'num neg' : 'num'}>
+                <td>{rupiah(r.modal)}</td>
+                <td>{rupiah(r.sale_total)}</td>
+                <td className={r.untung < 0 ? 'neg' : ''}>
                   <b>{r.untung < 0 ? 'Rugi ' : 'Untung '}{rupiah(Math.abs(r.untung))}</b>
                 </td>
                 <td>{r.pj}</td>

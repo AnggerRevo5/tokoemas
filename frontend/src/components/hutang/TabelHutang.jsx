@@ -1,6 +1,5 @@
 import { rupiah } from '../../utils/format'
 import { labelJenis } from '../../constants/hutang'
-import BarisKosong from '../common/BarisKosong'
 
 export default function TabelHutang({ rows, bisaVoid, onBayar, onBatal }) {
   return (
@@ -9,16 +8,18 @@ export default function TabelHutang({ rows, bisaVoid, onBayar, onBatal }) {
         <thead>
           <tr>
             <th>Kreditur</th>
-            <th className="num">Total</th>
-            <th className="num">Terbayar</th>
-            <th className="num">Sisa</th>
+            <th>Total</th>
+            <th>Terbayar</th>
+            <th>Sisa</th>
             <th>Jatuh tempo</th>
             <th>Status</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
-          {rows.length === 0 && <BarisKosong kolom="7">Belum ada hutang</BarisKosong>}
+          {rows.length === 0 && (
+            <tr><td colSpan="7" className="muted">Belum ada hutang</td></tr>
+          )}
           {rows.map((r) => (
             <tr key={r.id}>
               <td>
@@ -30,9 +31,9 @@ export default function TabelHutang({ rows, bisaVoid, onBayar, onBatal }) {
                 </div>
                 {r.note && <div className="muted">{r.note}</div>}
               </td>
-              <td className="num">{rupiah(r.principal)}</td>
-              <td className="num">{rupiah(r.terbayar)}</td>
-              <td className="num"><b>{rupiah(r.sisa)}</b></td>
+              <td>{rupiah(r.principal)}</td>
+              <td>{rupiah(r.terbayar)}</td>
+              <td><b>{rupiah(r.sisa)}</b></td>
               <td>{r.due_date ? r.due_date.slice(0, 10) : '-'}</td>
               <td>
                 <span className={r.status === 'lunas' ? 'tag in' : 'tag warn'}>

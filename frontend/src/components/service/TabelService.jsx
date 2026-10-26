@@ -1,10 +1,5 @@
 import { gram, tgl10, rupiah } from '../../utils/format'
 import { STATUS_SERVICE, aksiUntuk } from '../../constants/service'
-import { AnimatePresence } from 'motion/react'
-import useAnimasiDaftar from '../../hooks/useAnimasiDaftar'
-import BarisAnimasi from '../common/BarisAnimasi'
-import BarisKosong from '../common/BarisKosong'
-import Stepper from '../common/Stepper'
 
 const riwayat = (r) => {
   const out = [`Diterima ${tgl10(r.received_date)} di ${r.origin}`]
@@ -23,12 +18,7 @@ const riwayat = (r) => {
 
 const STATUS_PERJALANAN = ['dikirim_bo', 'kembali_bo']
 
-// urutan langkah sesuai urutan STATUS_SERVICE
-const KODE_LANGKAH = Object.keys(STATUS_SERVICE)
-const LANGKAH = Object.values(STATUS_SERVICE).map(([l]) => l)
-
 export default function TabelService({ rows, role, bisaVoid, pilih, onToggle, onBatal }) {
-  const animasi = useAnimasiDaftar(rows.map((r) => r.id))
   return (
     <div className="table-wrap">
       <table>
@@ -46,10 +36,11 @@ export default function TabelService({ rows, role, bisaVoid, pilih, onToggle, on
           </tr>
         </thead>
         <tbody>
-          {rows.length === 0 && <BarisKosong kolom="9">Belum ada barang service</BarisKosong>}
-          <AnimatePresence initial={false} custom={animasi.instan}>
+          {rows.length === 0 && (
+            <tr><td colSpan="9" className="muted">Belum ada barang service</td></tr>
+          )}
           {rows.map((r) => (
-            <BarisAnimasi key={r.id} layout={animasi.layout}>
+            <tr key={r.id}>
               <td>
                 <input
                   type="checkbox"
@@ -87,7 +78,6 @@ export default function TabelService({ rows, role, bisaVoid, pilih, onToggle, on
                 {r.service_name && ['diproses'].includes(r.status) && (
                   <div className="muted">oleh {r.service_name}</div>
                 )}
-                <Stepper ringkas langkah={LANGKAH} aktif={KODE_LANGKAH.indexOf(r.status)} />
               </td>
               <td>
                 {r.location}
@@ -107,9 +97,8 @@ export default function TabelService({ rows, role, bisaVoid, pilih, onToggle, on
                   )}
                 </td>
               )}
-            </BarisAnimasi>
+            </tr>
           ))}
-          </AnimatePresence>
         </tbody>
       </table>
     </div>
