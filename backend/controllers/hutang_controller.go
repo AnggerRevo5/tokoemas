@@ -58,11 +58,11 @@ func HutangCreate(db *sql.DB) gin.HandlerFunc {
 			req.CreditorType, req.CreditorName, req.Principal, req.Note, start, due, cl.UserID,
 		)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			utils.Gagal(c, err)
 			return
 		}
 		id, _ := res.LastInsertId()
-		services.CatatAudit(tx, cl.UserID, "create", "debts", id, req)
+		services.CatatAudit(tx, middleware.Meta(c), "create", "debts", id, req)
 
 		if err := tx.Commit(); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal menyimpan"})
@@ -139,7 +139,7 @@ func HutangTerimaDana(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		debtID, _ := res2.LastInsertId()
-		services.CatatAudit(tx, cl.UserID, "terima_dana", "debts", debtID, gin.H{"kas_id": cashID, "request": req})
+		services.CatatAudit(tx, middleware.Meta(c), "terima_dana", "debts", debtID, gin.H{"kas_id": cashID, "request": req})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
@@ -266,7 +266,7 @@ func HutangBayar(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		payID, _ := res.LastInsertId()
-		services.CatatAudit(tx, cl.UserID, "create", "debt_payments", payID, req)
+		services.CatatAudit(tx, middleware.Meta(c), "create", "debt_payments", payID, req)
 
 		res2, err := tx.Exec(
 			`INSERT INTO cash_transactions (location_id, direction, category, amount, note, transaction_date, created_by)
@@ -278,7 +278,7 @@ func HutangBayar(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		cashID, _ := res2.LastInsertId()
-		services.CatatAudit(tx, cl.UserID, "create_auto", "cash_transactions", cashID, gin.H{"dari_pembayaran_hutang": payID})
+		services.CatatAudit(tx, middleware.Meta(c), "create_auto", "cash_transactions", cashID, gin.H{"dari_pembayaran_hutang": payID})
 
 		lunas := sisa-req.Amount < 0.005
 		if lunas {
@@ -302,7 +302,7 @@ func HutangBayar(db *sql.DB) gin.HandlerFunc {
 
 func HutangVoid(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl, ok := middleware.HanyaSuperAdmin(c)
+		_, ok := middleware.HanyaSuperAdmin(c)
 		if !ok {
 			return
 		}
@@ -342,10 +342,10 @@ func HutangVoid(db *sql.DB) gin.HandlerFunc {
 
 		if cashID.Valid {
 			tx.Exec("UPDATE cash_transactions SET is_void = TRUE, void_reason = ? WHERE id = ?", reason, cashID.Int64)
-			services.CatatAudit(tx, cl.UserID, "void", "cash_transactions", cashID.Int64, gin.H{"reason": reason})
+			services.CatatAudit(tx, middleware.Meta(c), "void", "cash_transactions", cashID.Int64, gin.H{"reason": reason})
 		}
 		tx.Exec("UPDATE debts SET is_void = TRUE, void_reason = ? WHERE id = ?", reason, id)
-		services.CatatAudit(tx, cl.UserID, "void", "debts", int64(id), gin.H{"reason": reason})
+		services.CatatAudit(tx, middleware.Meta(c), "void", "debts", int64(id), gin.H{"reason": reason})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)

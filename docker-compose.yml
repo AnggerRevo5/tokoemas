@@ -10,8 +10,18 @@ services:
       GIN_MODE: release
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       DB_DSN: "app:${DB_PASSWORD:?Set DB_PASSWORD in .env}@tcp(${DB_HOST:-mariadb}:3306)/toko_emas?parseTime=true&loc=Asia%2FJakarta&time_zone=%27%2B07%3A00%27"
+      # opsional, lihat .env.example
+      SESI_JAM: ${SESI_JAM:-12}
+      SESI_IDLE_MENIT: ${SESI_IDLE_MENIT:-240}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
     expose:
       - "8080"
+    # backend tidak menulis file apa pun: sistem file read-only, tanpa hak istimewa tambahan
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     # default: untuk dihubungi frontend; db-net: untuk menjangkau MariaDB.
     networks:
       default:
@@ -30,6 +40,8 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "127.0.0.1:8081:80"
     # default: untuk menghubungi backend; private-net: supaya cloudflared bisa menjangkau frontend.

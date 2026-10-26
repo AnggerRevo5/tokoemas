@@ -82,7 +82,7 @@ func ServiceCreate(db *sql.DB) gin.HandlerFunc {
 		id, _ := res.LastInsertId()
 		no := fmt.Sprintf("SRV-%05d", id)
 		tx.Exec("UPDATE service_jobs SET job_no = ? WHERE id = ?", no, id)
-		services.CatatAudit(tx, cl.UserID, "service_terima", "service_jobs", id, req)
+		services.CatatAudit(tx, middleware.Meta(c), "service_terima", "service_jobs", id, req)
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
@@ -387,7 +387,7 @@ func ServiceAksi(db *sql.DB) gin.HandlerFunc {
 			res, err := tx.Exec(
 				`INSERT INTO cash_transactions (location_id, direction, category, amount, note, transaction_date, created_by)
 				 VALUES (?, 'in', 'biaya_service', ?, ?, ?, ?)`,
-				lokasi, kj.Total, "Biaya service "+strings.Join(kj.Nos, ", "), tgl, cl.UserID)
+				lokasi, kj.Total, utils.BatasTeks("Biaya service "+strings.Join(kj.Nos, ", "), 255), tgl, cl.UserID)
 			if err != nil {
 				utils.Gagal(c, err)
 				return
@@ -399,9 +399,9 @@ func ServiceAksi(db *sql.DB) gin.HandlerFunc {
 					return
 				}
 			}
-			services.CatatAudit(tx, cl.UserID, "create_auto", "cash_transactions", kasID, gin.H{"biaya_service": len(kj.IDs), "total": kj.Total})
+			services.CatatAudit(tx, middleware.Meta(c), "create_auto", "cash_transactions", kasID, gin.H{"biaya_service": len(kj.IDs), "total": kj.Total})
 		}
-		services.CatatAudit(tx, cl.UserID, "service_"+req.Action, "service_jobs", int64(daftarJob[0].ID), req)
+		services.CatatAudit(tx, middleware.Meta(c), "service_"+req.Action, "service_jobs", int64(daftarJob[0].ID), req)
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
@@ -415,7 +415,7 @@ func ServiceAksi(db *sql.DB) gin.HandlerFunc {
 
 func ServiceVoid(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl, ok := middleware.HanyaSuperAdmin(c)
+		_, ok := middleware.HanyaSuperAdmin(c)
 		if !ok {
 			return
 		}
@@ -451,7 +451,7 @@ func ServiceVoid(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		tx.Exec("UPDATE service_jobs SET is_void = TRUE, void_reason = ? WHERE id = ?", reason, id)
-		services.CatatAudit(tx, cl.UserID, "void", "service_jobs", int64(id), gin.H{"reason": reason})
+		services.CatatAudit(tx, middleware.Meta(c), "void", "service_jobs", int64(id), gin.H{"reason": reason})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)

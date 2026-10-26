@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"toko-emas/middleware"
 	"toko-emas/models"
 	"toko-emas/services"
 	"toko-emas/utils"
@@ -71,7 +72,7 @@ func LegacyStokCreate(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		id, _ := res.LastInsertId()
-		services.CatatAudit(tx, cl.UserID, "create", "stock_movements", id, req)
+		services.CatatAudit(tx, middleware.Meta(c), "create", "stock_movements", id, req)
 
 		if err := tx.Commit(); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal menyimpan"})

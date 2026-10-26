@@ -3,43 +3,43 @@ package models
 import "time"
 
 type BeratItem struct {
-	ItemID int     `json:"item_id"`
-	Weight float64 `json:"weight"`
+	ItemID int     `json:"item_id" binding:"gte=0"`
+	Weight float64 `json:"weight" binding:"lte=100000"`
 }
 
 // CuciMulaiRequest adalah payload JSON untuk CuciMulai.
 type CuciMulaiRequest struct {
-	ItemIDs   []int  `json:"item_ids"`
-	StartDate string `json:"start_date"`
-	Note      string `json:"note"`
+	ItemIDs   []int  `json:"item_ids" binding:"max=1000,dive,gt=0"`
+	StartDate string `json:"start_date" binding:"max=10"`
+	Note      string `json:"note" binding:"max=200"`
 }
 
 // CuciSelesaiBarangLangsungRequest adalah payload JSON untuk CuciSelesaiBarangLangsung.
 type CuciSelesaiBarangLangsungRequest struct {
-	ItemIDs    []int  `json:"item_ids"`
-	FinishDate string `json:"finish_date"`
+	ItemIDs    []int  `json:"item_ids" binding:"max=1000,dive,gt=0"`
+	FinishDate string `json:"finish_date" binding:"max=10"`
 }
 
 // CuciKirimRequest adalah payload JSON untuk CuciKirim.
 type CuciKirimRequest struct {
-	WasherName string      `json:"washer_name"`
-	Date       string      `json:"date"`
-	Weights    []BeratItem `json:"weights"`
+	WasherName string      `json:"washer_name" binding:"max=100"`
+	Date       string      `json:"date" binding:"max=10"`
+	Weights    []BeratItem `json:"weights" binding:"max=1000,dive"`
 }
 
 // CuciSelesaiBarangRequest adalah payload JSON untuk CuciSelesaiBarang.
 type CuciSelesaiBarangRequest struct {
 	Items []struct {
-		ItemID int     `json:"item_id"`
-		Weight float64 `json:"weight_after"`
-	} `json:"items"`
-	FinishDate string `json:"finish_date"`
+		ItemID int     `json:"item_id" binding:"gte=0"`
+		Weight float64 `json:"weight_after" binding:"lte=100000"`
+	} `json:"items" binding:"max=1000,dive"`
+	FinishDate string `json:"finish_date" binding:"max=10"`
 }
 
 // CuciKembaliRequest adalah payload JSON untuk CuciKembali.
 type CuciKembaliRequest struct {
-	Reason string `json:"reason"`
-	Date   string `json:"date"`
+	Reason string `json:"reason" binding:"max=250"`
+	Date   string `json:"date" binding:"max=10"`
 }
 
 // CucianBarangRow adalah satu baris respons JSON dari CucianBarang.

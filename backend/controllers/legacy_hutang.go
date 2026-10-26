@@ -125,7 +125,7 @@ func LegacyHutangBayar(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		payID, _ := res.LastInsertId()
-		services.CatatAudit(tx, cl.UserID, "create", "debt_payments", payID, req)
+		services.CatatAudit(tx, middleware.Meta(c), "create", "debt_payments", payID, req)
 
 		// Otomatis: kas Back Office keluar
 		var boID int
@@ -143,7 +143,7 @@ func LegacyHutangBayar(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		cashID, _ := res2.LastInsertId()
-		services.CatatAudit(tx, cl.UserID, "create_auto", "cash_transactions", cashID, gin.H{"dari_pembayaran_hutang": payID})
+		services.CatatAudit(tx, middleware.Meta(c), "create_auto", "cash_transactions", cashID, gin.H{"dari_pembayaran_hutang": payID})
 
 		lunas := sisa-req.Amount < 0.005
 		if lunas {

@@ -81,7 +81,7 @@ func CuciMulai(db *sql.DB) gin.HandlerFunc {
 					return
 				}
 			}
-			services.CatatAudit(tx, cl.UserID, "cuci_mulai", "washing_jobs", jobID, gin.H{"jumlah": len(g)})
+			services.CatatAudit(tx, middleware.Meta(c), "cuci_mulai", "washing_jobs", jobID, gin.H{"jumlah": len(g)})
 			jobs++
 		}
 
@@ -99,7 +99,7 @@ func CuciMulai(db *sql.DB) gin.HandlerFunc {
 
 func CuciSelesaiBarangLangsung(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl, ok := middleware.HanyaPJ(c)
+		_, ok := middleware.HanyaPJ(c)
 		if !ok {
 			return
 		}
@@ -131,7 +131,7 @@ func CuciSelesaiBarangLangsung(db *sql.DB) gin.HandlerFunc {
 
 		items, err := services.AmbilBarang(tx, req.ItemIDs)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			balasKesalahan(c, err)
 			return
 		}
 		for _, it := range items {
@@ -155,7 +155,7 @@ func CuciSelesaiBarangLangsung(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		if err := services.SelesaiCuci(tx, ids, tgl, cl.UserID, boID); err != nil {
+		if err := services.SelesaiCuci(tx, ids, tgl, middleware.Meta(c), boID); err != nil {
 			utils.Gagal(c, err)
 			return
 		}
@@ -181,7 +181,7 @@ func CucianNotif(db *sql.DB) gin.HandlerFunc {
 // batalkan pekerjaan cuci (hanya kalau belum ada barang yang selesai)
 func CuciVoid(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl, ok := middleware.HanyaSuperAdmin(c)
+		_, ok := middleware.HanyaSuperAdmin(c)
 		if !ok {
 			return
 		}
@@ -235,7 +235,7 @@ func CuciVoid(db *sql.DB) gin.HandlerFunc {
 			tx.Exec("UPDATE items SET status = 'tersedia', washing_job_id = NULL WHERE id = ?", itemID)
 		}
 		tx.Exec("UPDATE washing_jobs SET is_void = TRUE, void_reason = ? WHERE id = ?", reason, id)
-		services.CatatAudit(tx, cl.UserID, "void", "washing_jobs", int64(id), gin.H{"reason": reason})
+		services.CatatAudit(tx, middleware.Meta(c), "void", "washing_jobs", int64(id), gin.H{"reason": reason})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
@@ -349,7 +349,7 @@ func CuciKirim(db *sql.DB) gin.HandlerFunc {
 			utils.Gagal(c, err)
 			return
 		}
-		services.CatatAudit(tx, cl.UserID, "cuci_kirim", "washing_jobs", int64(id), gin.H{"pencuci": nama, "berat_awal": timbang})
+		services.CatatAudit(tx, middleware.Meta(c), "cuci_kirim", "washing_jobs", int64(id), gin.H{"pencuci": nama, "berat_awal": timbang})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
@@ -363,7 +363,7 @@ func CuciKirim(db *sql.DB) gin.HandlerFunc {
 
 func CuciSelesaiBarang(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl, ok := middleware.HanyaPJ(c)
+		_, ok := middleware.HanyaPJ(c)
 		if !ok {
 			return
 		}
@@ -475,7 +475,7 @@ func CuciSelesaiBarang(db *sql.DB) gin.HandlerFunc {
 			if sisa == 0 {
 				tx.Exec("UPDATE washing_jobs SET status = 'selesai', finish_date = ? WHERE id = ?", tgl, job)
 			}
-			services.CatatAudit(tx, cl.UserID, "cuci_selesai", "washing_jobs", int64(job), gin.H{"sisa": sisa, "susut": totalSusut})
+			services.CatatAudit(tx, middleware.Meta(c), "cuci_selesai", "washing_jobs", int64(job), gin.H{"sisa": sisa, "susut": totalSusut})
 		}
 
 		if err := tx.Commit(); err != nil {
@@ -555,7 +555,7 @@ func CuciKembali(db *sql.DB) gin.HandlerFunc {
 			utils.Gagal(c, err)
 			return
 		}
-		services.CatatAudit(tx, cl.UserID, "cuci_batal_kembali", "washing_jobs", int64(id), gin.H{"alasan": alasan, "dikembalikan": len(ids)})
+		services.CatatAudit(tx, middleware.Meta(c), "cuci_batal_kembali", "washing_jobs", int64(id), gin.H{"alasan": alasan, "dikembalikan": len(ids)})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)

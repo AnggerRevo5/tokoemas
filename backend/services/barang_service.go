@@ -2,7 +2,6 @@ package services
 
 import (
 	"database/sql"
-	"fmt"
 
 	"toko-emas/models"
 	"toko-emas/utils"
@@ -34,7 +33,7 @@ func AmbilBarang(tx *sql.Tx, ids []int) (map[int]models.ItemRow, error) {
 		out[r.ID] = r
 	}
 	if len(out) != len(args) {
-		return nil, fmt.Errorf("ada barang yang tidak ditemukan")
+		return nil, salah("ada barang yang tidak ditemukan")
 	}
 	return out, nil
 }

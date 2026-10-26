@@ -17,10 +17,12 @@ func Setup(r *gin.Engine, db *sql.DB) {
 	})
 	r.POST("/login", controllers.Login(db))
 
-	// Semua route di grup ini wajib login
+	// Semua route di grup ini wajib login (cookie sesi + token CSRF untuk request yang mengubah data).
+	// Akun PJ dibatasi ke menu Lebur, Cuci, dan Service.
 	auth := r.Group("/")
-	auth.Use(middleware.AuthMiddleware(db))
+	auth.Use(middleware.AuthMiddleware(db), middleware.BatasiPJ())
 	auth.GET("/me", controllers.Me)
+	auth.POST("/logout", controllers.Logout(db))
 	auth.GET("/locations", controllers.ListLokasi(db))
 
 	// Akun dan cabang (Super Admin)
@@ -49,7 +51,8 @@ func Setup(r *gin.Engine, db *sql.DB) {
 	auth.POST("/barang/oper", controllers.BarangOper(db))
 	auth.POST("/barang/terima-toko", controllers.BarangTerimaToko(db))
 	auth.POST("/barang/terima-kembali", controllers.BarangTerimaKembali(db))
-	auth.POST("/barang/selesai-cuci", controllers.CuciSelesaiBarangLangsung(db))
+	// /barang/selesai-cuci ditutup: langsung mengembalikan barang ke stok tanpa konfirmasi owner
+	// (tidak dipakai frontend; alur yang berlaku adalah /cucian/selesai lalu /barang/terima-kembali).
 	auth.POST("/barang/void/:id", controllers.BarangVoid(db))
 
 	// Cuci

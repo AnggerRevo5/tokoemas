@@ -8,12 +8,20 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"toko-emas/middleware"
 	"toko-emas/models"
 	"toko-emas/services"
+	"toko-emas/utils"
 )
 
-// tabel hanya diisi dari kode kita sendiri (bukan dari input user)
+// tabel hanya diisi dari kode kita sendiri (bukan dari input user); tetap dibatasi ke daftar ini
+// karena namanya disambung langsung ke query.
+var tabelBolehVoid = map[string]bool{"cash_transactions": true, "stock_movements": true}
+
 func VoidTransaksi(db *sql.DB, tabel string) gin.HandlerFunc {
+	if !tabelBolehVoid[tabel] {
+		panic("VoidTransaksi: tabel tidak diizinkan: " + tabel)
+	}
 	return func(c *gin.Context) {
 		cl := c.MustGet("claims").(*models.Claims)
 		if cl.Role != "super_admin" && cl.Role != "cabang" {
@@ -124,10 +132,10 @@ func VoidTransaksi(db *sql.DB, tabel string) gin.HandlerFunc {
 		}
 		for _, x := range ids {
 			if _, err := tx.Exec("UPDATE "+tabel+" SET is_void = TRUE, void_reason = ? WHERE id = ?", req.Reason, x); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				utils.Gagal(c, err)
 				return
 			}
-			services.CatatAudit(tx, cl.UserID, "void", tabel, int64(x), gin.H{"reason": req.Reason})
+			services.CatatAudit(tx, middleware.Meta(c), "void", tabel, int64(x), gin.H{"reason": req.Reason})
 		}
 
 		if err := tx.Commit(); err != nil {
@@ -156,7 +164,7 @@ func Saldo(db *sql.DB) gin.HandlerFunc {
 
 		rows, err := db.Query(q, args...)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			utils.Gagal(c, err)
 			return
 		}
 		defer rows.Close()
@@ -165,7 +173,7 @@ func Saldo(db *sql.DB) gin.HandlerFunc {
 		for rows.Next() {
 			var r models.SaldoRow
 			if err := rows.Scan(&r.LocationID, &r.Name, &r.SaldoKas, &r.StokGram, &r.StokPcs); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				utils.Gagal(c, err)
 				return
 			}
 			out = append(out, r)

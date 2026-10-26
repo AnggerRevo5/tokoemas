@@ -38,7 +38,7 @@ func LabaRugi(db *sql.DB) gin.HandlerFunc {
 			WHERE is_void = FALSE AND transaction_date BETWEEN ? AND ?
 			GROUP BY category`, from, to)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			utils.Gagal(c, err)
 			return
 		}
 		defer rows.Close()
@@ -52,7 +52,7 @@ func LabaRugi(db *sql.DB) gin.HandlerFunc {
 			var kat string
 			var jml float64
 			if err := rows.Scan(&kat, &jml); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				utils.Gagal(c, err)
 				return
 			}
 			switch {
@@ -99,10 +99,17 @@ func siapkanLaporan(c *gin.Context, db *sql.DB) (string, string, []models.TabelL
 
 	jenis := strings.Split(c.DefaultQuery("jenis", strings.Join(services.DaftarLaporan, ",")), ",")
 	hasil := []models.TabelLaporan{}
+	// setiap jenis laporan hanya dibuat sekali, agar satu request tidak bisa memicu ribuan query berat
+	sudah := map[string]bool{}
 	for _, j := range jenis {
 		j = strings.TrimSpace(j)
-		if j == "" {
+		if j == "" || sudah[j] {
 			continue
+		}
+		sudah[j] = true
+		if len(sudah) > len(services.DaftarLaporan) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "jenis laporan tidak dikenal"})
+			return "", "", nil, false
 		}
 		var t models.TabelLaporan
 		var err error

@@ -4,33 +4,33 @@ import "time"
 
 // JualItem adalah satu barang yang dijual beserta harga jualnya (diisi manual per barang).
 type JualItem struct {
-	ItemID int     `json:"item_id"`
-	Harga  float64 `json:"harga"`
+	ItemID int     `json:"item_id" binding:"gte=0"`
+	Harga  float64 `json:"harga" binding:"lte=1000000000000"`
 }
 
 type JualReq struct {
-	Items []JualItem `json:"items"`
-	Date  string     `json:"date"`
-	Note  string     `json:"note"`
+	Items []JualItem `json:"items" binding:"max=1000,dive"`
+	Date  string     `json:"date" binding:"max=10"`
+	Note  string     `json:"note" binding:"max=200"`
 }
 
 type BarangSatu struct {
-	Jenis      string  `json:"jenis"`
-	ItemName   string  `json:"item_name"`
-	Brand      string  `json:"brand"`
-	Karat      string  `json:"karat"`
-	WeightGram float64 `json:"weight_gram"`
-	HargaBeli  float64 `json:"harga_beli"`
-	Note       string  `json:"note"`
+	Jenis      string  `json:"jenis" binding:"max=20"`
+	ItemName   string  `json:"item_name" binding:"max=100"`
+	Brand      string  `json:"brand" binding:"max=50"`
+	Karat      string  `json:"karat" binding:"max=10"`
+	WeightGram float64 `json:"weight_gram" binding:"lte=100000"`
+	HargaBeli  float64 `json:"harga_beli" binding:"lte=1000000000000"`
+	Note       string  `json:"note" binding:"max=200"`
 }
 
 type BarangMasukReq struct {
-	LocationID int          `json:"location_id"`
-	Category   string       `json:"category"`
-	EntryDate  string       `json:"entry_date"`
-	Note       string       `json:"note"`
-	Posisi     string       `json:"posisi"`
-	Items      []BarangSatu `json:"items"`
+	LocationID int          `json:"location_id" binding:"gte=0"`
+	Category   string       `json:"category" binding:"max=30"`
+	EntryDate  string       `json:"entry_date" binding:"max=10"`
+	Note       string       `json:"note" binding:"max=200"`
+	Posisi     string       `json:"posisi" binding:"max=10"`
+	Items      []BarangSatu `json:"items" binding:"max=1000,dive"`
 }
 
 // BarangListRow adalah satu baris respons JSON dari BarangList.
@@ -63,36 +63,36 @@ type BarangListRow struct {
 }
 
 type KirimBOReq struct {
-	ItemIDs []int  `json:"item_ids"`
-	Date    string `json:"date"`
+	ItemIDs []int  `json:"item_ids" binding:"max=1000,dive,gt=0"`
+	Date    string `json:"date" binding:"max=10"`
 }
 
 type TerimaReq struct {
-	ItemIDs []int  `json:"item_ids"`
-	Result  string `json:"result"` // sampai atau belum
-	Date    string `json:"date"`
-	Note    string `json:"note"`
+	ItemIDs []int  `json:"item_ids" binding:"max=1000,dive,gt=0"`
+	Result  string `json:"result" binding:"max=10"` // sampai atau belum
+	Date    string `json:"date" binding:"max=10"`
+	Note    string `json:"note" binding:"max=200"`
 }
 
 // BarangOperRequest adalah payload JSON untuk BarangOper.
 type BarangOperRequest struct {
-	ItemIDs          []int  `json:"item_ids"`
-	TargetLocationID int    `json:"target_location_id"`
-	Date             string `json:"date"`
+	ItemIDs          []int  `json:"item_ids" binding:"max=1000,dive,gt=0"`
+	TargetLocationID int    `json:"target_location_id" binding:"gte=0"`
+	Date             string `json:"date" binding:"max=10"`
 }
 
 // BarangTerimaTokoRequest adalah payload JSON untuk BarangTerimaToko.
 type BarangTerimaTokoRequest struct {
-	ItemIDs []int  `json:"item_ids"`
-	Result  string `json:"result"`
-	Date    string `json:"date"`
-	Note    string `json:"note"`
+	ItemIDs []int  `json:"item_ids" binding:"max=1000,dive,gt=0"`
+	Result  string `json:"result" binding:"max=10"`
+	Date    string `json:"date" binding:"max=10"`
+	Note    string `json:"note" binding:"max=200"`
 }
 
 // BarangTerimaKembaliRequest adalah payload JSON untuk BarangTerimaKembali.
 type BarangTerimaKembaliRequest struct {
-	ItemIDs []int  `json:"item_ids"`
-	Result  string `json:"result"`
-	Date    string `json:"date"`
-	Note    string `json:"note"`
+	ItemIDs []int  `json:"item_ids" binding:"max=1000,dive,gt=0"`
+	Result  string `json:"result" binding:"max=10"`
+	Date    string `json:"date" binding:"max=10"`
+	Note    string `json:"note" binding:"max=200"`
 }

@@ -17,11 +17,11 @@ type PenjualanSiapRow struct {
 
 // PenjualanPenadahRequest adalah payload JSON untuk PenjualanPenadah.
 type PenjualanPenadahRequest struct {
-	ItemIDs     []int   `json:"item_ids"`
-	PenadahName string  `json:"penadah_name"`
-	SaleTotal   float64 `json:"sale_total"`
-	SaleDate    string  `json:"sale_date"`
-	Note        string  `json:"note"`
+	ItemIDs     []int   `json:"item_ids" binding:"max=1000,dive,gt=0"`
+	PenadahName string  `json:"penadah_name" binding:"max=100"`
+	SaleTotal   float64 `json:"sale_total" binding:"lte=1000000000000"`
+	SaleDate    string  `json:"sale_date" binding:"max=10"`
+	Note        string  `json:"note" binding:"max=200"`
 }
 
 // PenjualanListRow adalah satu baris respons JSON dari PenjualanList.

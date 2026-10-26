@@ -16,7 +16,8 @@ const SQLStokItem = `INSERT INTO stock_movements
 // ---------- INPUT BARANG MASUK (banyak sekaligus) ----------
 
 // barang selesai dicuci: kembali ke stok back office, kondisi bersih
-func SelesaiCuci(tx *sql.Tx, ids []int, tgl string, userID int, boID int) error {
+func SelesaiCuci(tx *sql.Tx, ids []int, tgl string, meta MetaAudit, boID int) error {
+	userID := meta.UserID
 	args := make([]interface{}, 0, len(ids))
 	for _, id := range ids {
 		args = append(args, id)
@@ -66,7 +67,7 @@ func SelesaiCuci(tx *sql.Tx, ids []int, tgl string, userID int, boID int) error 
 		if sisa == 0 {
 			tx.Exec("UPDATE washing_jobs SET status = 'selesai', finish_date = ? WHERE id = ?", tgl, job)
 		}
-		CatatAudit(tx, userID, "cuci_selesai", "washing_jobs", int64(job), gin.H{"jumlah": n, "sisa": sisa})
+		CatatAudit(tx, meta, "cuci_selesai", "washing_jobs", int64(job), gin.H{"jumlah": n, "sisa": sisa})
 	}
 	return nil
 }

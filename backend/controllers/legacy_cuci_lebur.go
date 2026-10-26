@@ -114,7 +114,7 @@ func LegacyCuciKembali(db *sql.DB) gin.HandlerFunc {
 			utils.Gagal(c, err)
 			return
 		}
-		services.CatatAudit(tx, cl.UserID, "cuci_batal_kembali", "washing_jobs", int64(id), gin.H{"alasan": alasan, "dikembalikan": len(list)})
+		services.CatatAudit(tx, middleware.Meta(c), "cuci_batal_kembali", "washing_jobs", int64(id), gin.H{"alasan": alasan, "dikembalikan": len(list)})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
@@ -290,7 +290,7 @@ func LegacyLeburKembali(db *sql.DB) gin.HandlerFunc {
 			utils.Gagal(c, err)
 			return
 		}
-		services.CatatAudit(tx, cl.UserID, "lebur_batal_kembali", "melt_batches", int64(id), gin.H{"alasan": alasan, "dikembalikan": len(list)})
+		services.CatatAudit(tx, middleware.Meta(c), "lebur_batal_kembali", "melt_batches", int64(id), gin.H{"alasan": alasan, "dikembalikan": len(list)})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
@@ -378,7 +378,7 @@ func LegacyCuciCreate(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		id, _ := res2.LastInsertId()
-		services.CatatAudit(tx, cl.UserID, "create", "washing_jobs", id, req)
+		services.CatatAudit(tx, middleware.Meta(c), "create", "washing_jobs", id, req)
 
 		if err := tx.Commit(); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal menyimpan"})
@@ -451,7 +451,7 @@ func LegacyCuciSelesai(db *sql.DB) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		services.CatatAudit(tx, cl.UserID, "cuci_selesai", "washing_jobs", int64(id), gin.H{"finish_date": tgl, "in_stock_id": inID})
+		services.CatatAudit(tx, middleware.Meta(c), "cuci_selesai", "washing_jobs", int64(id), gin.H{"finish_date": tgl, "in_stock_id": inID})
 
 		if err := tx.Commit(); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal menyimpan"})
@@ -521,7 +521,7 @@ func LegacyCuciList(db *sql.DB) gin.HandlerFunc {
 
 func LegacyCuciVoid(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl, ok := middleware.HanyaSuperAdmin(c)
+		_, ok := middleware.HanyaSuperAdmin(c)
 		if !ok {
 			return
 		}
@@ -558,11 +558,11 @@ func LegacyCuciVoid(db *sql.DB) gin.HandlerFunc {
 		}
 
 		tx.Exec("UPDATE washing_jobs SET is_void = TRUE, void_reason = ? WHERE id = ?", req.Reason, id)
-		services.CatatAudit(tx, cl.UserID, "void", "washing_jobs", int64(id), gin.H{"reason": req.Reason})
+		services.CatatAudit(tx, middleware.Meta(c), "void", "washing_jobs", int64(id), gin.H{"reason": req.Reason})
 		for _, s := range []sql.NullInt64{outID, inID} {
 			if s.Valid {
 				tx.Exec("UPDATE stock_movements SET is_void = TRUE, void_reason = ? WHERE id = ?", req.Reason, s.Int64)
-				services.CatatAudit(tx, cl.UserID, "void", "stock_movements", s.Int64, gin.H{"reason": req.Reason})
+				services.CatatAudit(tx, middleware.Meta(c), "void", "stock_movements", s.Int64, gin.H{"reason": req.Reason})
 			}
 		}
 
@@ -664,7 +664,7 @@ func LegacyLeburCreate(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		id, _ := res3.LastInsertId()
-		services.CatatAudit(tx, cl.UserID, "create", "melt_records", id, req)
+		services.CatatAudit(tx, middleware.Meta(c), "create", "melt_records", id, req)
 
 		if err := tx.Commit(); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal menyimpan"})
@@ -743,7 +743,7 @@ func LegacyLeburList(db *sql.DB) gin.HandlerFunc {
 
 func LegacyLeburVoid(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl, ok := middleware.HanyaSuperAdmin(c)
+		_, ok := middleware.HanyaSuperAdmin(c)
 		if !ok {
 			return
 		}
@@ -780,14 +780,14 @@ func LegacyLeburVoid(db *sql.DB) gin.HandlerFunc {
 		}
 
 		tx.Exec("UPDATE melt_records SET is_void = TRUE, void_reason = ? WHERE id = ?", req.Reason, id)
-		services.CatatAudit(tx, cl.UserID, "void", "melt_records", int64(id), gin.H{"reason": req.Reason})
+		services.CatatAudit(tx, middleware.Meta(c), "void", "melt_records", int64(id), gin.H{"reason": req.Reason})
 		if stockID.Valid {
 			tx.Exec("UPDATE stock_movements SET is_void = TRUE, void_reason = ? WHERE id = ?", req.Reason, stockID.Int64)
-			services.CatatAudit(tx, cl.UserID, "void", "stock_movements", stockID.Int64, gin.H{"reason": req.Reason})
+			services.CatatAudit(tx, middleware.Meta(c), "void", "stock_movements", stockID.Int64, gin.H{"reason": req.Reason})
 		}
 		if cashID.Valid {
 			tx.Exec("UPDATE cash_transactions SET is_void = TRUE, void_reason = ? WHERE id = ?", req.Reason, cashID.Int64)
-			services.CatatAudit(tx, cl.UserID, "void", "cash_transactions", cashID.Int64, gin.H{"reason": req.Reason})
+			services.CatatAudit(tx, middleware.Meta(c), "void", "cash_transactions", cashID.Int64, gin.H{"reason": req.Reason})
 		}
 
 		if err := tx.Commit(); err != nil {
@@ -851,7 +851,7 @@ func LegacyCuciKirim(db *sql.DB) gin.HandlerFunc {
 			utils.Gagal(c, err)
 			return
 		}
-		services.CatatAudit(tx, cl.UserID, "cuci_kirim", "washing_jobs", int64(id), gin.H{"pencuci": nama})
+		services.CatatAudit(tx, middleware.Meta(c), "cuci_kirim", "washing_jobs", int64(id), gin.H{"pencuci": nama})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
@@ -865,7 +865,7 @@ func LegacyCuciKirim(db *sql.DB) gin.HandlerFunc {
 
 func LegacyCuciSelesaiJobV2(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl, ok := middleware.HanyaPJ(c)
+		_, ok := middleware.HanyaPJ(c)
 		if !ok {
 			return
 		}
@@ -918,7 +918,7 @@ func LegacyCuciSelesaiJobV2(db *sql.DB) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "tidak ada barang dalam proses cuci"})
 			return
 		}
-		if err := services.SelesaiCuci(tx, ids, tgl, cl.UserID, boID); err != nil {
+		if err := services.SelesaiCuci(tx, ids, tgl, middleware.Meta(c), boID); err != nil {
 			utils.Gagal(c, err)
 			return
 		}
@@ -985,7 +985,7 @@ func LegacyCucianBarang(db *sql.DB) gin.HandlerFunc {
 // selesai untuk barang yang dicentang
 func LegacyCuciSelesaiBarang(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl, ok := middleware.HanyaAdminOwner(c)
+		_, ok := middleware.HanyaAdminOwner(c)
 		if !ok {
 			return
 		}
@@ -1029,7 +1029,7 @@ func LegacyCuciSelesaiBarang(db *sql.DB) gin.HandlerFunc {
 				return
 			}
 		}
-		if err := services.SelesaiCuci(tx, services.Kunci(items), tgl, cl.UserID, boID); err != nil {
+		if err := services.SelesaiCuci(tx, services.Kunci(items), tgl, middleware.Meta(c), boID); err != nil {
 			utils.Gagal(c, err)
 			return
 		}
@@ -1044,7 +1044,7 @@ func LegacyCuciSelesaiBarang(db *sql.DB) gin.HandlerFunc {
 // selesai untuk semua barang yang tersisa di satu pekerjaan cuci
 func LegacyCuciSelesaiJob(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl, ok := middleware.HanyaAdminOwner(c)
+		_, ok := middleware.HanyaAdminOwner(c)
 		if !ok {
 			return
 		}
@@ -1097,7 +1097,7 @@ func LegacyCuciSelesaiJob(db *sql.DB) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "tidak ada barang dalam proses cuci"})
 			return
 		}
-		if err := services.SelesaiCuci(tx, ids, tgl, cl.UserID, boID); err != nil {
+		if err := services.SelesaiCuci(tx, ids, tgl, middleware.Meta(c), boID); err != nil {
 			utils.Gagal(c, err)
 			return
 		}

@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"database/sql"
+	"log"
 	"net/http"
 	"strings"
 
@@ -69,7 +70,7 @@ func AkunList(db *sql.DB) gin.HandlerFunc {
 
 func AkunCreate(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl, ok := middleware.HanyaSuperAdmin(c)
+		_, ok := middleware.HanyaSuperAdmin(c)
 		if !ok {
 			return
 		}
@@ -83,7 +84,7 @@ func AkunCreate(db *sql.DB) gin.HandlerFunc {
 			balasKesalahan(c, err)
 			return
 		}
-		catatAuditAkun(db, cl.UserID, "akun_tambah", 0, gin.H{"username": req.Username, "role": req.Role, "location_id": req.LocationID})
+		catatAuditAkun(c, db, "akun_tambah", "users", 0, gin.H{"username": req.Username, "role": req.Role, "location_id": req.LocationID})
 		c.JSON(http.StatusCreated, gin.H{"message": "akun " + req.Username + " dibuat"})
 	}
 }
@@ -128,8 +129,9 @@ func AkunUpdate(db *sql.DB) gin.HandlerFunc {
 
 		var username, roleLama string
 		var aktifLama bool
-		if err := tx.QueryRow("SELECT username, role, is_active FROM users WHERE id = ? FOR UPDATE", id).
-			Scan(&username, &roleLama, &aktifLama); err != nil {
+		var lokasiLama sql.NullInt64
+		if err := tx.QueryRow("SELECT username, role, is_active, location_id FROM users WHERE id = ? FOR UPDATE", id).
+			Scan(&username, &roleLama, &aktifLama, &lokasiLama); err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "akun tidak ditemukan"})
 			return
 		}
@@ -147,13 +149,19 @@ func AkunUpdate(db *sql.DB) gin.HandlerFunc {
 			utils.Gagal(c, err)
 			return
 		}
-		services.CatatAudit(tx, cl.UserID, "akun_ubah", "users", int64(id), gin.H{
-			"username": username, "role_lama": roleLama, "role": req.Role,
-			"location_id": req.LocationID, "is_active": req.IsActive,
-		})
+		services.CatatPerubahan(tx, middleware.Meta(c), "akun_ubah", "users", int64(id),
+			gin.H{"username": username, "role": roleLama, "location_id": lokasiLama.Int64, "is_active": aktifLama},
+			gin.H{"username": username, "role": req.Role, "location_id": lokasi, "is_active": req.IsActive},
+		)
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
 			return
+		}
+		// akun yang dinonaktifkan langsung keluar dari semua perangkat
+		if !req.IsActive && aktifLama {
+			if _, err := services.CabutSemuaSesi(db, id, ""); err != nil {
+				log.Printf("gagal mencabut sesi akun #%d: %v", id, err)
+			}
 		}
 		c.JSON(http.StatusOK, gin.H{"message": "akun " + username + " diperbarui"})
 	}
@@ -190,8 +198,13 @@ func AkunPassword(db *sql.DB) gin.HandlerFunc {
 			utils.Gagal(c, err)
 			return
 		}
+		// sesi lain akun itu diakhiri agar password lama tidak bisa dipakai lagi (sesi admin yang sedang dipakai tetap)
+		dicabut, err := services.CabutSemuaSesi(db, id, cl.ID)
+		if err != nil {
+			log.Printf("gagal mencabut sesi akun #%d: %v", id, err)
+		}
 		// password tidak pernah dicatat di audit
-		catatAuditAkun(db, cl.UserID, "akun_password", int64(id), gin.H{"username": username})
+		catatAuditAkun(c, db, "akun_password", "users", int64(id), gin.H{"username": username, "sesi_dicabut": dicabut})
 		c.JSON(http.StatusOK, gin.H{"message": "password " + username + " diganti"})
 	}
 }
@@ -200,7 +213,7 @@ func AkunPassword(db *sql.DB) gin.HandlerFunc {
 
 func LokasiCreate(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl, ok := middleware.HanyaSuperAdmin(c)
+		_, ok := middleware.HanyaSuperAdmin(c)
 		if !ok {
 			return
 		}
@@ -226,19 +239,19 @@ func LokasiCreate(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		id, _ := res.LastInsertId()
-		catatAuditAkun(db, cl.UserID, "lokasi_tambah", id, gin.H{"name": nama})
+		catatAuditAkun(c, db, "lokasi_tambah", "locations", id, gin.H{"name": nama})
 		c.JSON(http.StatusCreated, gin.H{"id": id, "message": "cabang " + nama + " ditambahkan"})
 	}
 }
 
 // catatAuditAkun menyimpan jejak audit untuk operasi yang tidak memakai transaksi.
-func catatAuditAkun(db *sql.DB, userID int, aksi string, recordID int64, data interface{}) {
+func catatAuditAkun(c *gin.Context, db *sql.DB, aksi, tabel string, recordID int64, data interface{}) {
 	tx, err := db.Begin()
 	if err != nil {
 		return
 	}
 	defer tx.Rollback()
-	if services.CatatAudit(tx, userID, aksi, "users", recordID, data) == nil {
+	if services.CatatAudit(tx, middleware.Meta(c), aksi, tabel, recordID, data) == nil {
 		tx.Commit()
 	}
 }

@@ -3,6 +3,7 @@ import { api } from '../../services/api'
 import { hariIni } from '../../utils/format'
 import { KATEGORI } from '../../constants/kategori'
 import PilihanLokasi from '../common/PilihanLokasi'
+import Spinner from '../common/Spinner'
 
 // Form input kas atau stok emas. Lokasi (locId) dipegang halaman karena dipakai juga oleh riwayat.
 // onMulai: bersihkan pesan; onSukses(res): setelah tersimpan; onError(msg).
@@ -82,6 +83,8 @@ export default function FormTransaksi({
     <form className="card" onSubmit={simpan}>
       <h3>{isKas ? 'Input Kas' : 'Input Stok Emas'}</h3>
 
+      <div className="form-section">
+      <div className="section-title">Transaksi</div>
       <div className="form-grid">
         {me.role !== 'cabang' && (
           <div>
@@ -118,7 +121,12 @@ export default function FormTransaksi({
           <label>Tanggal</label>
           <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} required />
         </div>
+      </div>
+      </div>
 
+      <div className="form-section">
+      <div className="section-title">{isKas ? 'Nominal' : 'Barang'}</div>
+      <div className="form-grid">
         {isKas ? (
           <div>
             <label>Nominal (Rp)</label>
@@ -150,6 +158,7 @@ export default function FormTransaksi({
           <input value={note} onChange={(e) => setNote(e.target.value)} />
         </div>
       </div>
+      </div>
 
       {isKas && direction === 'in' && category === 'omzet' && (
         <p className="muted">
@@ -164,7 +173,7 @@ export default function FormTransaksi({
         <p className="muted">Otomatis tercatat sebagai barang masuk di Back Office.</p>
       )}
 
-      <button disabled={loading}>{loading ? 'Menyimpan...' : 'Simpan'}</button>
+      <button disabled={loading}>{loading ? <><Spinner />Menyimpan...</> : 'Simpan'}</button>
     </form>
   )
 }

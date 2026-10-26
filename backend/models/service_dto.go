@@ -3,16 +3,16 @@ package models
 import "time"
 
 type ServiceReq struct {
-	LocationID    int     `json:"location_id"`
-	CustomerName  string  `json:"customer_name"`
-	CustomerPhone string  `json:"customer_phone"`
-	ItemName      string  `json:"item_name"`
-	Karat         string  `json:"karat"`
-	WeightGram    float64 `json:"weight_gram"`
-	Complaint     string  `json:"complaint"`
-	Note          string  `json:"note"`
-	ReceivedDate  string  `json:"received_date"`
-	Posisi        string  `json:"posisi"`
+	LocationID    int     `json:"location_id" binding:"gte=0"`
+	CustomerName  string  `json:"customer_name" binding:"max=100"`
+	CustomerPhone string  `json:"customer_phone" binding:"max=30"`
+	ItemName      string  `json:"item_name" binding:"max=100"`
+	Karat         string  `json:"karat" binding:"max=10"`
+	WeightGram    float64 `json:"weight_gram" binding:"lte=100000"`
+	Complaint     string  `json:"complaint" binding:"max=250"`
+	Note          string  `json:"note" binding:"max=200"`
+	ReceivedDate  string  `json:"received_date" binding:"max=10"`
+	Posisi        string  `json:"posisi" binding:"max=10"`
 }
 
 // ServiceListRow adalah satu baris respons JSON dari ServiceList.
@@ -51,15 +51,15 @@ type ServiceListRow struct {
 
 // ServiceAksiRequest adalah payload JSON untuk ServiceAksi.
 type ServiceAksiRequest struct {
-	Action      string  `json:"action"`
-	IDs         []int   `json:"ids"`
-	Date        string  `json:"date"`
-	ServiceName string  `json:"service_name"`
-	TargetLoc   int     `json:"target_location_id"`
-	WeightAfter float64 `json:"weight_after"`
-	Note        string  `json:"note"`
+	Action      string  `json:"action" binding:"max=30"`
+	IDs         []int   `json:"ids" binding:"max=1000,dive,gt=0"`
+	Date        string  `json:"date" binding:"max=10"`
+	ServiceName string  `json:"service_name" binding:"max=100"`
+	TargetLoc   int     `json:"target_location_id" binding:"gte=0"`
+	WeightAfter float64 `json:"weight_after" binding:"lte=100000"`
+	Note        string  `json:"note" binding:"max=200"`
 	// biaya service per barang (id barang service -> rupiah), wajib untuk aksi diambil; 0 = tanpa biaya
-	Fees map[int]float64 `json:"fees"`
+	Fees map[int]float64 `json:"fees" binding:"max=1000,dive,gte=0,lte=1000000000000"`
 }
 
 // ServiceRingkasRow adalah satu baris respons JSON dari ServiceRingkas.

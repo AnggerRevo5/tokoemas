@@ -1,13 +1,15 @@
 import { useState } from 'react'
-import { getToken, clearToken } from './services/api'
+import { api, adaSesi, hapusSesiLokal } from './services/api'
 import Login from './components/auth/Login'
 import AppShell from './components/layout/AppShell'
 
 export default function App() {
-  const [loggedIn, setLoggedIn] = useState(!!getToken())
+  const [loggedIn, setLoggedIn] = useState(adaSesi)
 
-  function logout() {
-    clearToken()
+  async function logout() {
+    // sesi dicabut di server; tampilan tetap keluar walau permintaan gagal
+    await api('/logout', { method: 'POST' }).catch(() => {})
+    hapusSesiLokal()
     setLoggedIn(false)
   }
 

@@ -64,6 +64,19 @@ docker compose run --rm backend buatuser namauser 'GANTI_DENGAN_PASSWORD_KUAT' c
 
 Sesudah Tunnel route disimpan dan aplikasi berjalan, buka domain tersebut melalui HTTPS.
 
+## Migrasi keamanan (019)
+
+Backend membutuhkan tabel `user_sessions` dan `security_events`, serta tiga kolom tambahan di `audit_logs`. Saat start, backend mencoba membuatnya sendiri (aditif, tidak mengubah data lama). Bila user database `app` tidak punya hak `CREATE`/`ALTER`, jalankan dulu sebagai admin database sebelum menjalankan backend versi baru:
+
+- Lewat phpMyAdmin: pilih database `toko_emas`, buka tab **Import**, pilih file `backend/migrations/019_keamanan.sql`, lalu **Go**.
+- Atau lewat terminal (sesuaikan nama container MariaDB; variabel password root diambil dari environment container itu):
+
+```sh
+docker exec -i mariadb sh -c 'exec mariadb -uroot -p"${MARIADB_ROOT_PASSWORD:-$MYSQL_ROOT_PASSWORD}" toko_emas' < backend/migrations/019_keamanan.sql
+```
+
+Sesudah versi ini terpasang, semua pengguna perlu login ulang satu kali (sesi kini disimpan di cookie aman, bukan di browser). Detail lengkap ada di `SECURITY_REPORT.md`.
+
 ## Operasi dan pemeliharaan
 
 ```sh

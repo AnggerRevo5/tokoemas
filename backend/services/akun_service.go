@@ -39,17 +39,36 @@ func RoleValid(role string) bool {
 	return false
 }
 
+// BcryptCost adalah tingkat kesulitan hash password. Hash lama dengan cost lebih rendah
+// diperbarui otomatis saat pemiliknya berhasil login.
+const BcryptCost = 12
+
+// maksPanjangPassword: bcrypt hanya memakai 72 byte pertama, jadi password lebih panjang ditolak.
+const maksPanjangPassword = 72
+
 // HashPassword memeriksa panjang password lalu mengenkripsinya.
 func HashPassword(password string) (string, error) {
 	if len(password) < minPanjangPassword {
 		return "", salah("password minimal 6 karakter")
 	}
-	h, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if len(password) > maksPanjangPassword {
+		return "", salah("password maksimal 72 karakter")
+	}
+	h, err := bcrypt.GenerateFromPassword([]byte(password), BcryptCost)
 	if err != nil {
 		return "", err
 	}
 	return string(h), nil
 }
+
+// PerluHashUlang bernilai true bila hash dibuat dengan cost lebih rendah dari BcryptCost.
+func PerluHashUlang(hash string) bool {
+	cost, err := bcrypt.Cost([]byte(hash))
+	return err == nil && cost < BcryptCost
+}
+
+// KesalahanIsian membuat kesalahan isian (dibalas 400) dari luar paket services.
+func KesalahanIsian(pesan string) error { return salah(pesan) }
 
 // LokasiUntukRole: role cabang wajib punya lokasi bertipe cabang, role lain tidak terikat lokasi (nil).
 func LokasiUntukRole(db *sql.DB, role string, locID int) (interface{}, error) {

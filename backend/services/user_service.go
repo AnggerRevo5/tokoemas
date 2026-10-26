@@ -63,7 +63,7 @@ func SeedUsers(db *sql.DB) {
 			continue
 		}
 
-		hash, err := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
+		hash, err := bcrypt.GenerateFromPassword([]byte(pw), BcryptCost)
 		if err != nil {
 			log.Println("gagal enkripsi password untuk", a.username)
 			continue
@@ -81,7 +81,7 @@ func SeedUsers(db *sql.DB) {
 }
 
 func CetakHash(pw string) {
-	h, err := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
+	h, err := bcrypt.GenerateFromPassword([]byte(pw), BcryptCost)
 	if err != nil {
 		fmt.Println("gagal:", err)
 		return

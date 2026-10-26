@@ -1,4 +1,5 @@
 import { NAMA_ROLE, menuUntuk } from '../../constants/roles'
+import BarisKosong from '../common/BarisKosong'
 
 export default function TabelAkun({ rows, meId, onUbah, onPassword, onToggleAktif }) {
   return (
@@ -15,9 +16,7 @@ export default function TabelAkun({ rows, meId, onUbah, onPassword, onToggleAkti
           </tr>
         </thead>
         <tbody>
-          {rows.length === 0 && (
-            <tr><td colSpan="6" className="muted">Belum ada akun</td></tr>
-          )}
+          {rows.length === 0 && <BarisKosong kolom="6">Belum ada akun</BarisKosong>}
           {rows.map((r) => (
             <tr key={r.id}>
               <td>

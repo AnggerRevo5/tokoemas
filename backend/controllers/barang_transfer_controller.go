@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -17,7 +18,10 @@ import (
 // toko mengantar barang ke back office (status dalam perjalanan)
 func BarangKirimBO(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl := c.MustGet("claims").(*models.Claims)
+		cl, ok := middleware.HanyaPeran(c, "cabang", "owner", "super_admin")
+		if !ok {
+			return
+		}
 		var req models.KirimBOReq
 		if err := c.ShouldBindJSON(&req); err != nil || len(req.ItemIDs) == 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "pilih minimal satu barang"})
@@ -46,7 +50,7 @@ func BarangKirimBO(db *sql.DB) gin.HandlerFunc {
 
 		items, err := services.AmbilBarang(tx, req.ItemIDs)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			balasKesalahan(c, err)
 			return
 		}
 		for _, it := range items {
@@ -72,7 +76,8 @@ func BarangKirimBO(db *sql.DB) gin.HandlerFunc {
 				return
 			}
 		}
-		services.CatatAudit(tx, cl.UserID, "kirim_bo", "items", 0, req)
+		services.CatatPerubahan(tx, middleware.Meta(c), "kirim_bo", "items", 0, keadaanBarang(items),
+			gin.H{"status": "dikirim", "request": req})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
@@ -122,7 +127,7 @@ func BarangTerimaBO(db *sql.DB) gin.HandlerFunc {
 
 		items, err := services.AmbilBarang(tx, req.ItemIDs)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			balasKesalahan(c, err)
 			return
 		}
 		for _, it := range items {
@@ -158,7 +163,8 @@ func BarangTerimaBO(db *sql.DB) gin.HandlerFunc {
 					return
 				}
 			}
-			services.CatatAudit(tx, cl.UserID, "belum_sampai", "items", 0, req)
+			services.CatatPerubahan(tx, middleware.Meta(c), "belum_sampai", "items", 0, keadaanBarang(items),
+				gin.H{"status": "dikirim", "belum_sampai": true, "request": req})
 			if err := tx.Commit(); err != nil {
 				utils.Gagal(c, err)
 				return
@@ -192,7 +198,8 @@ func BarangTerimaBO(db *sql.DB) gin.HandlerFunc {
 				return
 			}
 		}
-		services.CatatAudit(tx, cl.UserID, "terima_bo", "items", 0, req)
+		services.CatatPerubahan(tx, middleware.Meta(c), "terima_bo", "items", 0, keadaanBarang(items),
+			gin.H{"status": "tersedia", "location_id": boID, "request": req})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
@@ -204,7 +211,7 @@ func BarangTerimaBO(db *sql.DB) gin.HandlerFunc {
 
 func BarangOper(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl, ok := middleware.HanyaAdminOwner(c)
+		_, ok := middleware.HanyaAdminOwner(c)
 		if !ok {
 			return
 		}
@@ -241,7 +248,7 @@ func BarangOper(db *sql.DB) gin.HandlerFunc {
 
 		items, err := services.AmbilBarang(tx, req.ItemIDs)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			balasKesalahan(c, err)
 			return
 		}
 		for _, it := range items {
@@ -264,7 +271,8 @@ func BarangOper(db *sql.DB) gin.HandlerFunc {
 				return
 			}
 		}
-		services.CatatAudit(tx, cl.UserID, "oper_toko", "items", 0, req)
+		services.CatatPerubahan(tx, middleware.Meta(c), "oper_toko", "items", 0, keadaanBarang(items),
+			gin.H{"status": "dikirim", "tujuan": req.TargetLocationID, "request": req})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
@@ -362,6 +370,10 @@ func BarangTerimaToko(db *sql.DB) gin.HandlerFunc {
 				return
 			}
 		}
+		lama := gin.H{}
+		for _, b := range list {
+			lama[strconv.Itoa(b.ID)] = gin.H{"status": b.Status, "location_id": b.Loc, "tujuan": b.Tujuan}
+		}
 
 		if req.Result == "belum" {
 			for _, b := range list {
@@ -371,7 +383,8 @@ func BarangTerimaToko(db *sql.DB) gin.HandlerFunc {
 					return
 				}
 			}
-			services.CatatAudit(tx, cl.UserID, "belum_diterima_toko", "items", 0, req)
+			services.CatatPerubahan(tx, middleware.Meta(c), "belum_diterima_toko", "items", 0, lama,
+				gin.H{"status": "dikirim", "belum_sampai": true, "request": req})
 			if err := tx.Commit(); err != nil {
 				utils.Gagal(c, err)
 				return
@@ -406,7 +419,8 @@ func BarangTerimaToko(db *sql.DB) gin.HandlerFunc {
 				return
 			}
 		}
-		services.CatatAudit(tx, cl.UserID, "terima_toko", "items", 0, req)
+		services.CatatPerubahan(tx, middleware.Meta(c), "terima_toko", "items", 0, lama,
+			gin.H{"status": "tersedia", "location_id": cl.LocationID, "request": req})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
@@ -531,6 +545,10 @@ func BarangTerimaKembali(db *sql.DB) gin.HandlerFunc {
 				return
 			}
 		}
+		lama := gin.H{}
+		for _, b := range list {
+			lama[strconv.Itoa(b.ID)] = gin.H{"status": b.Status, "kembali_jenis": b.Jenis}
+		}
 
 		if req.Result == "belum" {
 			for _, b := range list {
@@ -539,7 +557,8 @@ func BarangTerimaKembali(db *sql.DB) gin.HandlerFunc {
 					return
 				}
 			}
-			services.CatatAudit(tx, cl.UserID, "belum_diterima_kembali", "items", 0, req)
+			services.CatatPerubahan(tx, middleware.Meta(c), "belum_diterima_kembali", "items", 0, lama,
+				gin.H{"status": "kembali", "belum_sampai": true, "request": req})
 			if err := tx.Commit(); err != nil {
 				utils.Gagal(c, err)
 				return
@@ -568,7 +587,8 @@ func BarangTerimaKembali(db *sql.DB) gin.HandlerFunc {
 				return
 			}
 		}
-		services.CatatAudit(tx, cl.UserID, "terima_kembali", "items", 0, req)
+		services.CatatPerubahan(tx, middleware.Meta(c), "terima_kembali", "items", 0, lama,
+			gin.H{"status": "tersedia", "location_id": boID, "request": req})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)

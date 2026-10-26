@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -9,13 +10,29 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// Gagal membalas 500 dengan pesan umum. Detail kesalahan (query, nama tabel, dsb.) hanya ditulis
+// ke log server agar tidak bocor ke pengguna.
 func Gagal(c *gin.Context, err error) {
-	c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	log.Printf("kesalahan server pada %s %s: %v", c.Request.Method, c.FullPath(), err)
+	c.JSON(http.StatusInternalServerError, gin.H{"error": "terjadi kesalahan di server, coba lagi atau hubungi admin"})
+}
+
+// TanggalOpsional memeriksa filter tanggal dari query (boleh kosong).
+func TanggalOpsional(c *gin.Context, nama ...string) bool {
+	for _, n := range nama {
+		if v := c.Query(n); v != "" {
+			if _, err := time.Parse("2006-01-02", v); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "format tanggal harus YYYY-MM-DD"})
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func BacaAlasan(c *gin.Context) (string, bool) {
 	var req struct {
-		Reason string `json:"reason"`
+		Reason string `json:"reason" binding:"max=250"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.Reason) == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "alasan pembatalan wajib diisi"})

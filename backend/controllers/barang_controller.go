@@ -16,7 +16,11 @@ import (
 
 func BarangJual(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl := c.MustGet("claims").(*models.Claims)
+		// penjualan barang stok oleh toko (barang di toko sendiri) atau owner/admin; PJ menjual lewat menu Lebur
+		cl, ok := middleware.HanyaPeran(c, "cabang", "owner", "super_admin")
+		if !ok {
+			return
+		}
 		var req models.JualReq
 		if err := c.ShouldBindJSON(&req); err != nil || len(req.Items) == 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "pilih minimal satu barang"})
@@ -60,7 +64,7 @@ func BarangJual(db *sql.DB) gin.HandlerFunc {
 
 		items, err := services.AmbilBarang(tx, idsJual)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			balasKesalahan(c, err)
 			return
 		}
 		for _, it := range items {
@@ -134,9 +138,10 @@ func BarangJual(db *sql.DB) gin.HandlerFunc {
 					return
 				}
 			}
-			services.CatatAudit(tx, cl.UserID, "create_auto", "cash_transactions", kasID, gin.H{"penjualan": len(kj.IDs), "total": kj.Total})
+			services.CatatAudit(tx, middleware.Meta(c), "create_auto", "cash_transactions", kasID, gin.H{"penjualan": len(kj.IDs), "total": kj.Total})
 		}
-		services.CatatAudit(tx, cl.UserID, "jual", "items", 0, req)
+		services.CatatPerubahan(tx, middleware.Meta(c), "jual", "items", 0, keadaanBarang(items),
+			gin.H{"status": "terjual", "harga_jual": harga, "request": req})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
@@ -263,12 +268,12 @@ func BarangCreate(db *sql.DB) gin.HandlerFunc {
 				locID, "out", "pembelian_customer", totalBeli, note, tgl, cl.UserID,
 			)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				utils.Gagal(c, err)
 				return
 			}
 			id, _ := res.LastInsertId()
 			cashID = id
-			services.CatatAudit(tx, cl.UserID, "create_auto", "cash_transactions", id, gin.H{"pembelian_customer": len(req.Items), "total": totalBeli})
+			services.CatatAudit(tx, middleware.Meta(c), "create_auto", "cash_transactions", id, gin.H{"pembelian_customer": len(req.Items), "total": totalBeli})
 		}
 
 		var lastID int64
@@ -282,7 +287,7 @@ func BarangCreate(db *sql.DB) gin.HandlerFunc {
 				it.Jenis, sql.NullString{String: it.Brand, Valid: it.Brand != ""}, kondisi, it.HargaBeli, cashID,
 			)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				utils.Gagal(c, err)
 				return
 			}
 			id, _ := res.LastInsertId()
@@ -293,11 +298,11 @@ func BarangCreate(db *sql.DB) gin.HandlerFunc {
 			}
 			if _, err := tx.Exec(services.SQLStokItem, locID, "in", req.Category, it.ItemName, it.WeightGram, it.Karat,
 				it.Note, tgl, cl.UserID, id); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				utils.Gagal(c, err)
 				return
 			}
 		}
-		services.CatatAudit(tx, cl.UserID, "create", "items", lastID, gin.H{"jumlah_barang": len(req.Items), "request": req})
+		services.CatatAudit(tx, middleware.Meta(c), "create", "items", lastID, gin.H{"jumlah_barang": len(req.Items), "request": req})
 
 		if err := tx.Commit(); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal menyimpan"})
@@ -315,7 +320,7 @@ func BarangCreate(db *sql.DB) gin.HandlerFunc {
 
 func BarangVoid(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl, ok := middleware.HanyaSuperAdmin(c)
+		_, ok := middleware.HanyaSuperAdmin(c)
 		if !ok {
 			return
 		}
@@ -362,7 +367,7 @@ func BarangVoid(db *sql.DB) gin.HandlerFunc {
 
 		tx.Exec("UPDATE stock_movements SET is_void = TRUE, void_reason = ? WHERE item_id = ?", reason, id)
 		tx.Exec("UPDATE items SET is_void = TRUE, void_reason = ? WHERE id = ?", reason, id)
-		services.CatatAudit(tx, cl.UserID, "void", "items", int64(id), gin.H{"reason": reason})
+		services.CatatAudit(tx, middleware.Meta(c), "void", "items", int64(id), gin.H{"reason": reason})
 
 		if cashID.Valid && harga > 0 {
 			var amt float64
@@ -373,7 +378,7 @@ func BarangVoid(db *sql.DB) gin.HandlerFunc {
 				} else {
 					tx.Exec("UPDATE cash_transactions SET amount = ? WHERE id = ?", baru, cashID.Int64)
 				}
-				services.CatatAudit(tx, cl.UserID, "koreksi_kas", "cash_transactions", cashID.Int64,
+				services.CatatAudit(tx, middleware.Meta(c), "koreksi_kas", "cash_transactions", cashID.Int64,
 					gin.H{"dari": amt, "menjadi": baru, "alasan": reason})
 			}
 		}
@@ -431,7 +436,7 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 
 		rows, err := db.Query(q, args...)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			utils.Gagal(c, err)
 			return
 		}
 		defer rows.Close()
@@ -447,7 +452,7 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 				&r.LocationID, &r.Lokasi, &r.OriginID, &r.Asal, &r.Status, &r.EntryDate, &r.Note,
 				&kirim, &r.BelumSampai, &r.BelumNote, &r.Pencuci, &cuciTgl, &r.TujuanID, &r.Tujuan,
 				&hargaJual, &tglJual); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				utils.Gagal(c, err)
 				return
 			}
 			if kirim.Valid {

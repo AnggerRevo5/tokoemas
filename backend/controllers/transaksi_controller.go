@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"toko-emas/middleware"
 	"toko-emas/models"
 	"toko-emas/services"
 	"toko-emas/utils"
@@ -86,23 +87,23 @@ func StokCreate(db *sql.DB) gin.HandlerFunc {
 
 		res, err := tx.Exec(q, locID, req.Direction, req.Category, req.ItemName, req.WeightGram, req.Karat, req.Qty, req.Note, tgl, cl.UserID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			utils.Gagal(c, err)
 			return
 		}
 		id, _ := res.LastInsertId()
-		services.CatatAudit(tx, cl.UserID, "create", "stock_movements", id, req)
+		services.CatatAudit(tx, middleware.Meta(c), "create", "stock_movements", id, req)
 
 		msg := "stok tersimpan"
 		if targetID != 0 {
 			res2, err := tx.Exec(q, targetID, "in", targetKat, req.ItemName, req.WeightGram, req.Karat, req.Qty, targetNote, tgl, cl.UserID)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				utils.Gagal(c, err)
 				return
 			}
 			id2, _ := res2.LastInsertId()
 			tx.Exec("UPDATE stock_movements SET related_id = ? WHERE id = ?", id2, id)
 			tx.Exec("UPDATE stock_movements SET related_id = ? WHERE id = ?", id, id2)
-			services.CatatAudit(tx, cl.UserID, "create_auto", "stock_movements", id2, gin.H{"dari_stok_id": id})
+			services.CatatAudit(tx, middleware.Meta(c), "create_auto", "stock_movements", id2, gin.H{"dari_stok_id": id})
 			msg = "stok tersimpan dan otomatis tercatat di tujuan"
 		}
 
@@ -169,11 +170,11 @@ func KasCreate(db *sql.DB) gin.HandlerFunc {
 			locID, req.Direction, req.Category, req.Amount, req.Note, tgl, cl.UserID,
 		)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			utils.Gagal(c, err)
 			return
 		}
 		id, _ := res.LastInsertId()
-		services.CatatAudit(tx, cl.UserID, "create", "cash_transactions", id, req)
+		services.CatatAudit(tx, middleware.Meta(c), "create", "cash_transactions", id, req)
 
 		// Otomatis: transfer kas cabang -> pemasukan "dari_toko" di back office
 		if req.Category == "transfer_bo" {
@@ -188,12 +189,12 @@ func KasCreate(db *sql.DB) gin.HandlerFunc {
 				boID, "in", "dari_toko", req.Amount, req.Note, tgl, id, cl.UserID,
 			)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				utils.Gagal(c, err)
 				return
 			}
 			id2, _ := res2.LastInsertId()
 			tx.Exec("UPDATE cash_transactions SET related_id = ? WHERE id = ?", id2, id)
-			services.CatatAudit(tx, cl.UserID, "create_auto", "cash_transactions", id2, gin.H{"dari_transfer_id": id})
+			services.CatatAudit(tx, middleware.Meta(c), "create_auto", "cash_transactions", id2, gin.H{"dari_transfer_id": id})
 		}
 
 		if err := tx.Commit(); err != nil {
@@ -207,6 +208,9 @@ func KasCreate(db *sql.DB) gin.HandlerFunc {
 func KasList(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		cl := c.MustGet("claims").(*models.Claims)
+		if !utils.TanggalOpsional(c, "from", "to") {
+			return
+		}
 		q := "SELECT id, location_id, direction, category, amount, IFNULL(note,''), transaction_date, created_at FROM cash_transactions WHERE is_void = FALSE"
 		args := []interface{}{}
 
@@ -229,7 +233,7 @@ func KasList(db *sql.DB) gin.HandlerFunc {
 
 		rows, err := db.Query(q, args...)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			utils.Gagal(c, err)
 			return
 		}
 		defer rows.Close()
@@ -238,7 +242,7 @@ func KasList(db *sql.DB) gin.HandlerFunc {
 		for rows.Next() {
 			var r models.KasListRow
 			if err := rows.Scan(&r.ID, &r.LocationID, &r.Direction, &r.Category, &r.Amount, &r.Note, &r.Date, &r.CreatedAt); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				utils.Gagal(c, err)
 				return
 			}
 			out = append(out, r)
@@ -252,6 +256,9 @@ func KasList(db *sql.DB) gin.HandlerFunc {
 func StokList(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		cl := c.MustGet("claims").(*models.Claims)
+		if !utils.TanggalOpsional(c, "from", "to") {
+			return
+		}
 		q := `SELECT id, location_id, direction, category, item_name, weight_gram, IFNULL(karat,''), qty, IFNULL(note,''), transaction_date
 		      FROM stock_movements WHERE is_void = FALSE`
 		args := []interface{}{}
@@ -275,7 +282,7 @@ func StokList(db *sql.DB) gin.HandlerFunc {
 
 		rows, err := db.Query(q, args...)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			utils.Gagal(c, err)
 			return
 		}
 		defer rows.Close()
@@ -284,7 +291,7 @@ func StokList(db *sql.DB) gin.HandlerFunc {
 		for rows.Next() {
 			var r models.StokListRow
 			if err := rows.Scan(&r.ID, &r.LocationID, &r.Direction, &r.Category, &r.ItemName, &r.WeightGram, &r.Karat, &r.Qty, &r.Note, &r.Date); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				utils.Gagal(c, err)
 				return
 			}
 			out = append(out, r)

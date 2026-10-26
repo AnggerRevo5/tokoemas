@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -24,7 +25,7 @@ func barangDiBO(c *gin.Context, tx *sql.Tx, ids []int, boID int) (map[int]models
 	}
 	items, err := services.AmbilBarang(tx, ids)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		balasKesalahan(c, err)
 		return nil, false
 	}
 	for _, it := range items {
@@ -48,6 +49,15 @@ func barangDiBO(c *gin.Context, tx *sql.Tx, ids []int, boID int) (map[int]models
 		return nil, false
 	}
 	return items, true
+}
+
+// keadaanBarang meringkas status dan lokasi barang sebelum diubah (nilai "sebelum" di audit).
+func keadaanBarang(items map[int]models.ItemRow) gin.H {
+	out := gin.H{}
+	for id, it := range items {
+		out[strconv.Itoa(id)] = gin.H{"status": it.Status, "location_id": it.Location}
+	}
+	return out
 }
 
 // ---------- CUCI ----------

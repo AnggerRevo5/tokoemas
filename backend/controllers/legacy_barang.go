@@ -105,7 +105,7 @@ func LegacyBarangCreate(db *sql.DB) gin.HandlerFunc {
 				}
 			}
 		}
-		services.CatatAudit(tx, cl.UserID, "create", "items", lastID, gin.H{"jumlah_barang": total, "request": req})
+		services.CatatAudit(tx, middleware.Meta(c), "create", "items", lastID, gin.H{"jumlah_barang": total, "request": req})
 
 		if err := tx.Commit(); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal menyimpan"})
@@ -296,7 +296,7 @@ func LegacyBarangPindah(db *sql.DB) gin.HandlerFunc {
 				return
 			}
 		}
-		services.CatatAudit(tx, cl.UserID, req.Action, "items", 0, req)
+		services.CatatAudit(tx, middleware.Meta(c), req.Action, "items", 0, req)
 
 		if err := tx.Commit(); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal menyimpan"})
@@ -392,7 +392,7 @@ func LegacyCuciMulai(db *sql.DB) gin.HandlerFunc {
 					return
 				}
 			}
-			services.CatatAudit(tx, cl.UserID, "cuci_mulai", "washing_jobs", jobID, gin.H{"jumlah": len(g), "pencuci": washer})
+			services.CatatAudit(tx, middleware.Meta(c), "cuci_mulai", "washing_jobs", jobID, gin.H{"jumlah": len(g), "pencuci": washer})
 			jobs++
 		}
 
@@ -500,7 +500,7 @@ func LegacyCuciSelesaiItems(db *sql.DB) gin.HandlerFunc {
 			utils.Gagal(c, err)
 			return
 		}
-		services.CatatAudit(tx, cl.UserID, "cuci_selesai", "washing_jobs", int64(id), gin.H{"jumlah": len(list)})
+		services.CatatAudit(tx, middleware.Meta(c), "cuci_selesai", "washing_jobs", int64(id), gin.H{"jumlah": len(list)})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
@@ -512,7 +512,7 @@ func LegacyCuciSelesaiItems(db *sql.DB) gin.HandlerFunc {
 
 func LegacyCuciVoidItems(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl, ok := middleware.HanyaSuperAdmin(c)
+		_, ok := middleware.HanyaSuperAdmin(c)
 		if !ok {
 			return
 		}
@@ -560,7 +560,7 @@ func LegacyCuciVoidItems(db *sql.DB) gin.HandlerFunc {
 			tx.Exec("UPDATE items SET status = 'tersedia', washing_job_id = NULL WHERE id = ?", itemID)
 		}
 		tx.Exec("UPDATE washing_jobs SET is_void = TRUE, void_reason = ? WHERE id = ?", reason, id)
-		services.CatatAudit(tx, cl.UserID, "void", "washing_jobs", int64(id), gin.H{"reason": reason})
+		services.CatatAudit(tx, middleware.Meta(c), "void", "washing_jobs", int64(id), gin.H{"reason": reason})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
@@ -671,7 +671,7 @@ func LegacyLeburBaru(db *sql.DB) gin.HandlerFunc {
 				return
 			}
 		}
-		services.CatatAudit(tx, cl.UserID, "create", "melt_records", meltID, req)
+		services.CatatAudit(tx, middleware.Meta(c), "create", "melt_records", meltID, req)
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
@@ -687,7 +687,7 @@ func LegacyLeburBaru(db *sql.DB) gin.HandlerFunc {
 
 func LegacyLeburVoidItems(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl, ok := middleware.HanyaSuperAdmin(c)
+		_, ok := middleware.HanyaSuperAdmin(c)
 		if !ok {
 			return
 		}
@@ -732,10 +732,10 @@ func LegacyLeburVoidItems(db *sql.DB) gin.HandlerFunc {
 		}
 		if cashID.Valid {
 			tx.Exec("UPDATE cash_transactions SET is_void = TRUE, void_reason = ? WHERE id = ?", reason, cashID.Int64)
-			services.CatatAudit(tx, cl.UserID, "void", "cash_transactions", cashID.Int64, gin.H{"reason": reason})
+			services.CatatAudit(tx, middleware.Meta(c), "void", "cash_transactions", cashID.Int64, gin.H{"reason": reason})
 		}
 		tx.Exec("UPDATE melt_records SET is_void = TRUE, void_reason = ? WHERE id = ?", reason, id)
-		services.CatatAudit(tx, cl.UserID, "void", "melt_records", int64(id), gin.H{"reason": reason})
+		services.CatatAudit(tx, middleware.Meta(c), "void", "melt_records", int64(id), gin.H{"reason": reason})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
@@ -749,7 +749,7 @@ func LegacyLeburVoidItems(db *sql.DB) gin.HandlerFunc {
 
 func LegacyBarangVoid(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl, ok := middleware.HanyaSuperAdmin(c)
+		_, ok := middleware.HanyaSuperAdmin(c)
 		if !ok {
 			return
 		}
@@ -793,7 +793,7 @@ func LegacyBarangVoid(db *sql.DB) gin.HandlerFunc {
 
 		tx.Exec("UPDATE stock_movements SET is_void = TRUE, void_reason = ? WHERE item_id = ?", reason, id)
 		tx.Exec("UPDATE items SET is_void = TRUE, void_reason = ? WHERE id = ?", reason, id)
-		services.CatatAudit(tx, cl.UserID, "void", "items", int64(id), gin.H{"reason": reason})
+		services.CatatAudit(tx, middleware.Meta(c), "void", "items", int64(id), gin.H{"reason": reason})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)

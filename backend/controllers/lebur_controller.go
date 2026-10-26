@@ -83,7 +83,7 @@ func LeburKembali(db *sql.DB) gin.HandlerFunc {
 			utils.Gagal(c, err)
 			return
 		}
-		services.CatatAudit(tx, cl.UserID, "lebur_batal_kembali", "melt_batches", int64(id), gin.H{"alasan": alasan, "dikembalikan": len(ids)})
+		services.CatatAudit(tx, middleware.Meta(c), "lebur_batal_kembali", "melt_batches", int64(id), gin.H{"alasan": alasan, "dikembalikan": len(ids)})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
@@ -166,7 +166,7 @@ func LeburMulai(db *sql.DB) gin.HandlerFunc {
 				return
 			}
 		}
-		services.CatatAudit(tx, cl.UserID, "lebur_mulai", "melt_batches", batchID, gin.H{"jumlah": len(ids), "berat": berat, "modal": modal})
+		services.CatatAudit(tx, middleware.Meta(c), "lebur_mulai", "melt_batches", batchID, gin.H{"jumlah": len(ids), "berat": berat, "modal": modal})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
@@ -250,7 +250,7 @@ func LeburCatatLeburan(db *sql.DB) gin.HandlerFunc {
 			utils.Gagal(c, err)
 			return
 		}
-		services.CatatAudit(tx, cl.UserID, "leburan_kotor", "melt_batches", int64(id), req)
+		services.CatatAudit(tx, middleware.Meta(c), "leburan_kotor", "melt_batches", int64(id), req)
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
@@ -346,7 +346,7 @@ func LeburCatatCukim(db *sql.DB) gin.HandlerFunc {
 			utils.Gagal(c, err)
 			return
 		}
-		services.CatatAudit(tx, cl.UserID, "cukim", "melt_batches", int64(id), req)
+		services.CatatAudit(tx, middleware.Meta(c), "cukim", "melt_batches", int64(id), req)
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
@@ -360,7 +360,7 @@ func LeburCatatCukim(db *sql.DB) gin.HandlerFunc {
 
 func LeburUndo(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl, ok := middleware.HanyaSuperAdmin(c)
+		_, ok := middleware.HanyaSuperAdmin(c)
 		if !ok {
 			return
 		}
@@ -441,7 +441,7 @@ func LeburUndo(db *sql.DB) gin.HandlerFunc {
 			msg = fmt.Sprintf("lebur dibatalkan, %d barang kembali tersedia di back office", len(ids))
 		}
 
-		services.CatatAudit(tx, cl.UserID, "lebur_undo", "melt_batches", int64(id), gin.H{"dari_tahap": status, "alasan": reason})
+		services.CatatAudit(tx, middleware.Meta(c), "lebur_undo", "melt_batches", int64(id), gin.H{"dari_tahap": status, "alasan": reason})
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
 			return

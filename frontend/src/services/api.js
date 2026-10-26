@@ -1,19 +1,41 @@
-const TOKEN_KEY = 'token'
+// Sesi login disimpan backend di cookie HttpOnly (tidak bisa dibaca JavaScript).
+// Cookie te_csrf boleh dibaca: nilainya dikirim ulang di header X-CSRF-Token untuk request yang mengubah data.
+const COOKIE_CSRF = 'te_csrf'
+const TOKEN_LAMA = 'token'
 
-export const getToken = () => localStorage.getItem(TOKEN_KEY)
-export const setToken = (t) => localStorage.setItem(TOKEN_KEY, t)
-export const clearToken = () => localStorage.removeItem(TOKEN_KEY)
+// hapus token lama yang dulu disimpan di localStorage (sebelum pindah ke cookie)
+try {
+  localStorage.removeItem(TOKEN_LAMA)
+} catch {
+  // abaikan bila penyimpanan tidak tersedia
+}
+
+const bacaCookie = (nama) => {
+  const awal = `${nama}=`
+  const c = document.cookie.split('; ').find((x) => x.startsWith(awal))
+  return c ? decodeURIComponent(c.slice(awal.length)) : ''
+}
+
+// true bila browser masih memegang sesi login (dipakai untuk menentukan tampilan awal)
+export const adaSesi = () => bacaCookie(COOKIE_CSRF) !== ''
+
+// hapus penanda sesi di browser (cookie sesi HttpOnly dihapus oleh backend)
+export const hapusSesiLokal = () => {
+  document.cookie = `${COOKIE_CSRF}=; Max-Age=0; Path=/; SameSite=Strict`
+}
 
 export async function api(path, options = {}) {
   const headers = { 'Content-Type': 'application/json' }
-  const token = getToken()
-  if (token) headers.Authorization = `Bearer ${token}`
+  const method = (options.method || 'GET').toUpperCase()
+  if (method !== 'GET' && method !== 'HEAD') {
+    headers['X-CSRF-Token'] = bacaCookie(COOKIE_CSRF)
+  }
 
-  const res = await fetch(`/api${path}`, { ...options, headers })
+  const res = await fetch(`/api${path}`, { ...options, headers, credentials: 'same-origin' })
   const data = await res.json().catch(() => ({}))
 
   if (res.status === 401 && path !== '/login') {
-    clearToken()
+    hapusSesiLokal()
     window.location.reload()
   }
   if (!res.ok) throw new Error(data.error || 'Terjadi kesalahan')
@@ -21,9 +43,7 @@ export async function api(path, options = {}) {
 }
 
 export async function unduh(path, namaFile) {
-  const res = await fetch(`/api${path}`, {
-    headers: { Authorization: `Bearer ${getToken()}` },
-  })
+  const res = await fetch(`/api${path}`, { credentials: 'same-origin' })
   if (!res.ok) {
     const d = await res.json().catch(() => ({}))
     throw new Error(d.error || 'Gagal mengunduh')

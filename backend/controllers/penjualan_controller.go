@@ -77,10 +77,10 @@ func PenjualanBatal(db *sql.DB) gin.HandlerFunc {
 		}
 		if cashID.Valid {
 			tx.Exec("UPDATE cash_transactions SET is_void = TRUE, void_reason = ? WHERE id = ?", reason, cashID.Int64)
-			services.CatatAudit(tx, cl.UserID, "void", "cash_transactions", cashID.Int64, gin.H{"reason": reason})
+			services.CatatAudit(tx, middleware.Meta(c), "void", "cash_transactions", cashID.Int64, gin.H{"reason": reason})
 		}
 		tx.Exec("UPDATE penadah_sales SET is_void = TRUE, void_reason = ? WHERE id = ?", reason, id)
-		services.CatatAudit(tx, cl.UserID, "penjualan_batal", "penadah_sales", int64(id), gin.H{"reason": reason, "oleh": cl.Role})
+		services.CatatAudit(tx, middleware.Meta(c), "penjualan_batal", "penadah_sales", int64(id), gin.H{"reason": reason, "oleh": cl.Role})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
@@ -143,6 +143,10 @@ func PenjualanPenadah(db *sql.DB) gin.HandlerFunc {
 		var req models.PenjualanPenadahRequest
 		if err := c.ShouldBindJSON(&req); err != nil || len(req.ItemIDs) == 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "pilih minimal satu barang"})
+			return
+		}
+		if len(req.ItemIDs) > 300 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "maksimal 300 barang sekali proses"})
 			return
 		}
 		penadah := strings.TrimSpace(req.PenadahName)
@@ -271,7 +275,7 @@ func PenjualanPenadah(db *sql.DB) gin.HandlerFunc {
 				tx.Exec("UPDATE melt_batches SET status = 'terjual' WHERE cukim_item_id = ? AND is_void = FALSE", b.ID)
 			}
 		}
-		services.CatatAudit(tx, cl.UserID, "jual_penadah", "penadah_sales", saleID, gin.H{"penadah": penadah, "harga_jual": req.SaleTotal, "modal": modal})
+		services.CatatAudit(tx, middleware.Meta(c), "jual_penadah", "penadah_sales", saleID, gin.H{"penadah": penadah, "harga_jual": req.SaleTotal, "modal": modal})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
@@ -290,6 +294,9 @@ func PenjualanPenadah(db *sql.DB) gin.HandlerFunc {
 func PenjualanList(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if _, ok := middleware.BolehLihatLebur(c); !ok {
+			return
+		}
+		if !utils.TanggalOpsional(c, "from", "to") {
 			return
 		}
 		q := `SELECT s.id, s.sale_date, s.penadah_name, s.item_count, s.weight_gram, s.modal, s.sale_total,
@@ -343,7 +350,7 @@ func PenjualanList(db *sql.DB) gin.HandlerFunc {
 
 func PenjualanVoid(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl, ok := middleware.HanyaSuperAdmin(c)
+		_, ok := middleware.HanyaSuperAdmin(c)
 		if !ok {
 			return
 		}
@@ -397,10 +404,10 @@ func PenjualanVoid(db *sql.DB) gin.HandlerFunc {
 		}
 		if cashID.Valid {
 			tx.Exec("UPDATE cash_transactions SET is_void = TRUE, void_reason = ? WHERE id = ?", reason, cashID.Int64)
-			services.CatatAudit(tx, cl.UserID, "void", "cash_transactions", cashID.Int64, gin.H{"reason": reason})
+			services.CatatAudit(tx, middleware.Meta(c), "void", "cash_transactions", cashID.Int64, gin.H{"reason": reason})
 		}
 		tx.Exec("UPDATE penadah_sales SET is_void = TRUE, void_reason = ? WHERE id = ?", reason, id)
-		services.CatatAudit(tx, cl.UserID, "void", "penadah_sales", int64(id), gin.H{"reason": reason})
+		services.CatatAudit(tx, middleware.Meta(c), "void", "penadah_sales", int64(id), gin.H{"reason": reason})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)

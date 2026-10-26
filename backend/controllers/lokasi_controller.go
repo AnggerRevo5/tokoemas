@@ -7,13 +7,14 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"toko-emas/models"
+	"toko-emas/utils"
 )
 
 func ListLokasi(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rows, err := db.Query("SELECT id, name, type FROM locations")
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			utils.Gagal(c, err)
 			return
 		}
 		defer rows.Close()
@@ -22,7 +23,7 @@ func ListLokasi(db *sql.DB) gin.HandlerFunc {
 		for rows.Next() {
 			var l models.Location
 			if err := rows.Scan(&l.ID, &l.Name, &l.Type); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				utils.Gagal(c, err)
 				return
 			}
 			result = append(result, l)

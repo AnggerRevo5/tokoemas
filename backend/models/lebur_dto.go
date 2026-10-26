@@ -4,31 +4,31 @@ import "time"
 
 // LeburKembaliRequest adalah payload JSON untuk LeburKembali.
 type LeburKembaliRequest struct {
-	Reason string `json:"reason"`
-	Date   string `json:"date"`
+	Reason string `json:"reason" binding:"max=250"`
+	Date   string `json:"date" binding:"max=10"`
 }
 
 // LeburMulaiRequest adalah payload JSON untuk LeburMulai.
 type LeburMulaiRequest struct {
-	ItemIDs   []int  `json:"item_ids"`
-	StartDate string `json:"start_date"`
-	Note      string `json:"note"`
+	ItemIDs   []int  `json:"item_ids" binding:"max=1000,dive,gt=0"`
+	StartDate string `json:"start_date" binding:"max=10"`
+	Note      string `json:"note" binding:"max=200"`
 }
 
 // LeburCatatLeburanRequest adalah payload JSON untuk LeburCatatLeburan.
 type LeburCatatLeburanRequest struct {
-	CutWeight     float64 `json:"cut_weight"`
-	LeburanWeight float64 `json:"leburan_weight"`
-	Date          string  `json:"date"`
-	Note          string  `json:"note"`
+	CutWeight     float64 `json:"cut_weight" binding:"lte=100000"`
+	LeburanWeight float64 `json:"leburan_weight" binding:"lte=100000"`
+	Date          string  `json:"date" binding:"max=10"`
+	Note          string  `json:"note" binding:"max=200"`
 }
 
 // LeburCatatCukimRequest adalah payload JSON untuk LeburCatatCukim.
 type LeburCatatCukimRequest struct {
-	CukimWeight float64 `json:"cukim_weight"`
-	Karat       string  `json:"karat"`
-	Date        string  `json:"date"`
-	Note        string  `json:"note"`
+	CukimWeight float64 `json:"cukim_weight" binding:"lte=100000"`
+	Karat       string  `json:"karat" binding:"max=10"`
+	Date        string  `json:"date" binding:"max=10"`
+	Note        string  `json:"note" binding:"max=200"`
 }
 
 // LeburListRow adalah satu baris respons JSON dari LeburList.
