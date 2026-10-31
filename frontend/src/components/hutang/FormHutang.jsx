@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { api } from '../../services/api'
 import { hariIni } from '../../utils/format'
 import { JENIS_KREDITUR } from '../../constants/hutang'
+import Spinner from '../common/Spinner'
 
 // Form terima dana baru atau catat hutang tanpa uang masuk.
 // onMulai: bersihkan pesan; onSukses(res): setelah tersimpan; onError(msg).
@@ -58,6 +59,8 @@ export default function FormHutang({ onMulai, onSukses, onError }) {
           : 'Untuk hutang yang tidak membawa uang tunai, misalnya barang dari pabrik yang belum dibayar. Kas tidak berubah.'}
       </p>
 
+      <div className="form-section">
+      <div className="section-title">Pemberi dana</div>
       <div className="form-grid">
         <div>
           <label>Jenis pencatatan</label>
@@ -78,6 +81,12 @@ export default function FormHutang({ onMulai, onSukses, onError }) {
           <label>Nama</label>
           <input value={nama} onChange={(e) => setNama(e.target.value)} required />
         </div>
+      </div>
+      </div>
+
+      <div className="form-section">
+      <div className="section-title">Nominal dan waktu</div>
+      <div className="form-grid">
         <div>
           <label>Nominal (Rp)</label>
           <input type="number" min="1" value={pokok} onChange={(e) => setPokok(e.target.value)} required />
@@ -95,9 +104,10 @@ export default function FormHutang({ onMulai, onSukses, onError }) {
           <input value={note} onChange={(e) => setNote(e.target.value)} />
         </div>
       </div>
+      </div>
 
       <button disabled={loading}>
-        {loading ? 'Menyimpan...' : mode === 'dana' ? 'Simpan: kas masuk dan hutang tercatat' : 'Simpan hutang'}
+        {loading ? <><Spinner />Menyimpan...</> : mode === 'dana' ? 'Simpan: kas masuk dan hutang tercatat' : 'Simpan hutang'}
       </button>
     </form>
   )

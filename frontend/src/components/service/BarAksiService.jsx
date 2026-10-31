@@ -2,6 +2,16 @@ import { useState } from 'react'
 import { api } from '../../services/api'
 import { hariIni, gram, rupiah } from '../../utils/format'
 import PilihanLokasi from '../common/PilihanLokasi'
+import { m } from 'motion/react'
+import { STATUS_SERVICE } from '../../constants/service'
+import AngkaBerjalan from '../common/AngkaBerjalan'
+import Spinner from '../common/Spinner'
+import Stepper from '../common/Stepper'
+
+// urutan langkah sesuai urutan STATUS_SERVICE
+const KODE_LANGKAH = Object.keys(STATUS_SERVICE)
+const LANGKAH = Object.values(STATUS_SERVICE).map(([l]) => l)
+const formatRupiah = (v) => rupiah(Math.round(v))
 
 // Bar aksi untuk barang service yang dipilih: tombol langkah dan form konfirmasinya.
 // aksi/onAksi dipegang halaman. onMulai: bersihkan pesan; onSelesai(message); onError(msg); onBatalPilih().
@@ -54,8 +64,19 @@ export default function BarAksiService({
   }
 
   return (
-    <div className="card action-bar" style={{ marginTop: 16 }}>
+    <m.div
+      className="card action-bar"
+      style={{ marginTop: 16 }}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+    >
       <div><b>{terpilih.length}</b> barang service dipilih</div>
+      {statusPilih && (
+        <div className="stepper-wadah">
+          <Stepper langkah={LANGKAH} aktif={KODE_LANGKAH.indexOf(statusPilih)} />
+        </div>
+      )}
       {!statusPilih && <div className="muted">Pilih barang dengan status yang sama.</div>}
       {statusPilih && aksiTersedia.length === 0 && (
         <div className="muted">Tidak ada langkah yang bisa kamu lakukan untuk status ini.</div>
@@ -148,9 +169,14 @@ export default function BarAksiService({
                   ))}
                 </tbody>
               </table>
-              <p className="muted">
-                Total biaya (masuk ke kas toko): <b>{rupiah(terpilih.reduce((s, r) => s + (Number(biaya[r.id]) || 0), 0))}</b>
-              </p>
+              <div className="total-bar">
+                <span>
+                  Total biaya (masuk ke kas toko):{' '}
+                  <b className="utama">
+                    <AngkaBerjalan nilai={terpilih.reduce((s, r) => s + (Number(biaya[r.id]) || 0), 0)} format={formatRupiah} />
+                  </b>
+                </span>
+              </div>
             </div>
           )}
 
@@ -164,9 +190,9 @@ export default function BarAksiService({
             </p>
           )}
 
-          <button disabled={loading}>{loading ? 'Memproses...' : 'Konfirmasi'}</button>
+          <button disabled={loading}>{loading ? <><Spinner />Memproses...</> : 'Konfirmasi'}</button>
         </form>
       )}
-    </div>
+    </m.div>
   )
 }

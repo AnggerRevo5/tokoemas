@@ -5,6 +5,13 @@ import { KATEGORI } from '../../constants/kategori'
 import { NAMA_UMUM, MEREK_LM, KARAT_UMUM, KARAT_LAIN } from '../../constants/barang'
 import { barisBaru } from '../../utils/barang'
 import PilihanLokasi from '../common/PilihanLokasi'
+import { m } from 'motion/react'
+import { Plus, X } from 'lucide-react'
+import AngkaBerjalan from '../common/AngkaBerjalan'
+import Spinner from '../common/Spinner'
+
+const formatGram = (v) => String(gram(v))
+const formatRupiah = (v) => rupiah(Math.round(v))
 
 // Tombol dan form "Tambah barang masuk" (banyak baris sekaligus).
 // onMulai: bersihkan pesan; onSukses({ message, lokasiId, status }): setelah tersimpan; onError(msg).
@@ -135,18 +142,21 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
     <>
       <div style={{ marginBottom: 16 }}>
         <button type="button" className="ghost" onClick={() => setFormBuka(!formBuka)}>
-          {formBuka ? 'Tutup form' : '+ Tambah barang masuk'}
+          {formBuka ? <><X size={16} aria-hidden="true" />Tutup form</> : <><Plus size={16} aria-hidden="true" />Tambah barang masuk</>}
         </button>
       </div>
 
       {formBuka && (
-        <form
+        <m.form
           className="card"
           style={{ marginBottom: 16 }}
           onSubmit={simpanMasuk}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && e.target.tagName === 'INPUT') e.preventDefault()
           }}
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.22, ease: 'easeOut' }}
         >
           <h3>Tambah Barang Masuk</h3>
           <p className="muted">
@@ -154,6 +164,8 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
             (jenis, nama, dan kadar terisi otomatis).
           </p>
 
+          <div className="form-section">
+          <div className="section-title">Informasi masuk</div>
           <div className="form-grid">
             {!isCabang && (
               <div>
@@ -206,11 +218,12 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
             </p>
           )}
           {wajibHarga && (
-            <p className="muted">
+            <p className="muted" style={{ marginTop: 10 }}>
               Harga beli wajib diisi. Kas toko otomatis keluar sebesar total harga beli.
               {fPosisi === 'bo' && ' Barang berstatus dalam perjalanan sampai back office mengonfirmasi.'}
             </p>
           )}
+          </div>
 
           <datalist id="nama-umum">
             {NAMA_UMUM.map((n) => (
@@ -223,6 +236,8 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
             ))}
           </datalist>
 
+          <div className="form-section">
+          <div className="section-title">Daftar barang</div>
           <div ref={wadah}>
             <div className="baris-grid baris-head">
               <span>Jenis</span>
@@ -310,27 +325,24 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
           <button
             type="button"
             className="ghost"
-            style={{ marginTop: 10 }}
+            style={{ marginTop: 12 }}
             onClick={() => {
               tambahBaris()
               setFokus(true)
             }}
           >
-            + Tambah baris
+            <Plus size={16} aria-hidden="true" />Tambah baris
           </button>
+          </div>
 
-          <p className="muted">
-            Total: {baris.length} barang, {gram(totalGram)} gram
-            {totalBeli > 0 && <>, harga beli {rupiah(totalBeli)}</>}
-          </p>
+          <div className="total-bar">
+            <span>Total: <b>{baris.length}</b> barang</span>
+            <span><b className="utama"><AngkaBerjalan nilai={totalGram} format={formatGram} /></b> gram</span>
+            {totalBeli > 0 && <span>harga beli <b className="utama"><AngkaBerjalan nilai={totalBeli} format={formatRupiah} /></b></span>}
+          </div>
 
-<<<<<<< HEAD
-          <button disabled={loading}>{loading ? 'Menyimpan...' : 'Simpan semua'}</button>
-        </form>
-=======
           <button disabled={loading || bakiKurang}>{loading ? <><Spinner />Menyimpan...</> : 'Simpan semua'}</button>
         </m.form>
->>>>>>> 196f87a (fix fitur investor terbaru dan revmap ui interface terbaru)
       )}
     </>
   )

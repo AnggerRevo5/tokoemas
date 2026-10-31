@@ -1,5 +1,11 @@
 import { gram } from '../../utils/format'
 import { STATUS_CUCI } from '../../constants/cuci'
+import BarisKosong from '../common/BarisKosong'
+import Stepper from '../common/Stepper'
+
+// urutan langkah sesuai urutan STATUS_CUCI (tanpa status batal)
+const KODE_LANGKAH = Object.keys(STATUS_CUCI).filter((k) => k !== 'batal')
+const LANGKAH = KODE_LANGKAH.map((k) => STATUS_CUCI[k][0])
 
 export default function TabelDaftarCuci({ rows, bisaCatat, bisaVoid, onAksi }) {
   return (
@@ -17,9 +23,7 @@ export default function TabelDaftarCuci({ rows, bisaCatat, bisaVoid, onAksi }) {
           </tr>
         </thead>
         <tbody>
-          {rows.length === 0 && (
-            <tr><td colSpan="7" className="muted">Belum ada data</td></tr>
-          )}
+          {rows.length === 0 && <BarisKosong kolom="7">Belum ada data</BarisKosong>}
           {rows.map((r) => (
             <tr key={r.id}>
               <td>
@@ -49,6 +53,7 @@ export default function TabelDaftarCuci({ rows, bisaCatat, bisaVoid, onAksi }) {
                 <span className={STATUS_CUCI[r.status][1]}>{STATUS_CUCI[r.status][0]}</span>
                 {r.finish_date && <div className="muted">{r.finish_date.slice(0, 10)}</div>}
                 {r.status === 'batal' && r.cancel_reason && <div className="muted">{r.cancel_reason}</div>}
+                <Stepper ringkas langkah={LANGKAH} aktif={KODE_LANGKAH.indexOf(r.status)} batal={r.status === 'batal'} />
               </td>
               <td>
                 {bisaCatat && r.status === 'menunggu' && (

@@ -1,5 +1,11 @@
 import { rupiah, gram } from '../../utils/format'
 import { TAHAP_LEBUR } from '../../constants/lebur'
+import BarisKosong from '../common/BarisKosong'
+import Stepper from '../common/Stepper'
+
+// urutan langkah sesuai urutan TAHAP_LEBUR (tanpa status batal)
+const KODE_LANGKAH = Object.keys(TAHAP_LEBUR).filter((k) => k !== 'batal')
+const LANGKAH = KODE_LANGKAH.map((k) => TAHAP_LEBUR[k][0])
 
 // rantai berat: awal → setelah dipotong → leburan kotor → cukim
 const rantai = (b) =>
@@ -16,17 +22,15 @@ export default function TabelLebur({ batches, bisaCatat, bisaUndo, onAksi }) {
           <tr>
             <th>Lebur</th>
             <th>Barang</th>
-            <th>Berat (g)</th>
-            <th>Modal</th>
+            <th className="num">Berat (g)</th>
+            <th className="num">Modal</th>
             <th>Tahap</th>
             <th>Penjualan</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
-          {batches.length === 0 && (
-            <tr><td colSpan="7" className="muted">Belum ada data</td></tr>
-          )}
+          {batches.length === 0 && <BarisKosong kolom="7">Belum ada data</BarisKosong>}
           {batches.map((b) => (
             <tr key={b.id}>
               <td>
@@ -38,17 +42,18 @@ export default function TabelLebur({ batches, bisaCatat, bisaUndo, onAksi }) {
                 <div className="muted">{b.barang}</div>
                 {b.note && <div className="muted">{b.note}</div>}
               </td>
-              <td>
+              <td className="num">
                 {rantai(b)}
                 {b.susut !== null && b.susut !== undefined && (
                   <div className="muted">susut {gram(b.susut)} g</div>
                 )}
               </td>
-              <td>{b.modal > 0 ? rupiah(b.modal) : '-'}</td>
+              <td className="num">{b.modal > 0 ? rupiah(b.modal) : '-'}</td>
               <td>
                 <span className={TAHAP_LEBUR[b.status][1]}>{TAHAP_LEBUR[b.status][0]}</span>
                 {b.leburan_by && <div className="muted">leburan: {b.leburan_by}</div>}
                 {b.cukim_by && <div className="muted">cukim: {b.cukim_by}</div>}
+                <Stepper ringkas langkah={LANGKAH} aktif={KODE_LANGKAH.indexOf(b.status)} batal={b.status === 'batal'} />
               </td>
               <td>
                 {b.sale_total !== null && b.sale_total !== undefined ? (

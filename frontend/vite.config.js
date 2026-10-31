@@ -6,6 +6,8 @@ export default defineConfig({
   build: {
     // source map tidak dibuat untuk produksi agar kode sumber tidak ikut tersaji ke publik
     sourcemap: false,
+    // bundel tunggal ±500 kB (±150 kB gzip) setelah library animasi motion ditambahkan
+    chunkSizeWarningLimit: 650,
   },
   server: {
     proxy: {

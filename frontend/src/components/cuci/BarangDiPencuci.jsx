@@ -2,6 +2,14 @@ import { useState } from 'react'
 import { api } from '../../services/api'
 import { hariIni, gram, toggleId } from '../../utils/format'
 import { STATUS_CUCI } from '../../constants/cuci'
+import { AnimatePresence } from 'motion/react'
+import useAnimasiDaftar from '../../hooks/useAnimasiDaftar'
+import AngkaBerjalan from '../common/AngkaBerjalan'
+import BarisAnimasi from '../common/BarisAnimasi'
+import BarisKosong from '../common/BarisKosong'
+import Spinner from '../common/Spinner'
+
+const formatGram = (v) => String(gram(v))
 
 // Kartu "Barang di Pencuci": daftar barang, pilih yang sudah kembali, isi berat sesudah, lalu selesai cuci.
 // onMulai: bersihkan pesan; onSelesai(message): setelah tersimpan; onError(msg).
@@ -27,6 +35,7 @@ export default function BarangDiPencuci({ items, bisaCatat, onMulai, onSelesai, 
   const totalAwal = terpilih.reduce((s, r) => s + r.berat_awal, 0)
   const totalSesudah = terpilih.reduce((s, r) => s + (Number(nilaiSesudah(r)) || 0), 0)
   const semuaDipilih = bisaDipilih.length > 0 && bisaDipilih.every((r) => pilih[r.id])
+  const animasi = useAnimasiDaftar(tampilItems.map((r) => r.id))
 
   function toggleSemua() {
     if (semuaDipilih) {
@@ -87,18 +96,17 @@ export default function BarangDiPencuci({ items, bisaCatat, onMulai, onSelesai, 
               )}
               <th>No</th>
               <th>Barang</th>
-              <th>Berat awal</th>
+              <th className="num">Berat awal</th>
               <th>Asal</th>
               <th>Pencuci</th>
               <th>Cuci</th>
             </tr>
           </thead>
           <tbody>
-            {tampilItems.length === 0 && (
-              <tr><td colSpan="7" className="muted">Tidak ada barang yang sedang dicuci</td></tr>
-            )}
+            {tampilItems.length === 0 && <BarisKosong kolom="7">Tidak ada barang yang sedang dicuci</BarisKosong>}
+            <AnimatePresence initial={false} custom={animasi.instan}>
             {tampilItems.map((r) => (
-              <tr key={r.id}>
+              <BarisAnimasi key={r.id} layout={animasi.layout}>
                 {bisaCatat && (
                   <td>
                     <input
@@ -111,15 +119,16 @@ export default function BarangDiPencuci({ items, bisaCatat, onMulai, onSelesai, 
                 )}
                 <td>{r.item_no}</td>
                 <td>{r.item_name} {r.karat}</td>
-                <td>{r.job_status === 'proses' ? `${gram(r.berat_awal)} g` : <span className="muted">belum ditimbang</span>}</td>
+                <td className="num">{r.job_status === 'proses' ? `${gram(r.berat_awal)} g` : <span className="muted">belum ditimbang</span>}</td>
                 <td>{r.asal}</td>
                 <td>{r.washer_name || <span className="muted">Belum dikirim</span>}</td>
                 <td>
                   <span className={STATUS_CUCI[r.job_status][1]}>{STATUS_CUCI[r.job_status][0]}</span>
                   <div className="muted">#{r.job_id}</div>
                 </td>
-              </tr>
+              </BarisAnimasi>
             ))}
+            </AnimatePresence>
           </tbody>
         </table>
       </div>
@@ -134,9 +143,9 @@ export default function BarangDiPencuci({ items, bisaCatat, onMulai, onSelesai, 
               <thead>
                 <tr>
                   <th>Barang</th>
-                  <th>Berat awal</th>
+                  <th className="num">Berat awal</th>
                   <th>Berat sesudah (g)</th>
-                  <th>Susut</th>
+                  <th className="num">Susut</th>
                 </tr>
               </thead>
               <tbody>
@@ -145,7 +154,7 @@ export default function BarangDiPencuci({ items, bisaCatat, onMulai, onSelesai, 
                   return (
                     <tr key={r.id}>
                       <td>{r.item_no} {r.item_name} {r.karat}</td>
-                      <td>{gram(r.berat_awal)} g</td>
+                      <td className="num">{gram(r.berat_awal)} g</td>
                       <td>
                         <input
                           type="number"
@@ -157,15 +166,21 @@ export default function BarangDiPencuci({ items, bisaCatat, onMulai, onSelesai, 
                           required
                         />
                       </td>
-                      <td className={susut < 0 ? 'neg' : ''}>{gram(susut)} g</td>
+                      <td className={susut < 0 ? 'num neg' : 'num'}>{gram(susut)} g</td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
           </div>
-          <p className="muted">
-            Total: {gram(totalAwal)} g jadi {gram(totalSesudah)} g, susut {gram(totalAwal - totalSesudah)} g.
+          <div className="total-bar">
+            <span>
+              Total: <b><AngkaBerjalan nilai={totalAwal} format={formatGram} /></b> g jadi{' '}
+              <b className="utama"><AngkaBerjalan nilai={totalSesudah} format={formatGram} /></b> g, susut{' '}
+              <b><AngkaBerjalan nilai={totalAwal - totalSesudah} format={formatGram} /></b> g.
+            </span>
+          </div>
+          <p className="muted" style={{ marginTop: 8 }}>
             Barang dikembalikan ke back office dengan berat terbaru dan menunggu konfirmasi owner.
           </p>
           <div className="form-grid">
@@ -174,7 +189,7 @@ export default function BarangDiPencuci({ items, bisaCatat, onMulai, onSelesai, 
               <input type="date" value={tglItem} onChange={(e) => setTglItem(e.target.value)} required />
             </div>
           </div>
-          <button disabled={loading}>{loading ? 'Memproses...' : 'Selesai cuci'}</button>
+          <button disabled={loading}>{loading ? <><Spinner />Memproses...</> : 'Selesai cuci'}</button>
         </form>
       )}
     </div>
