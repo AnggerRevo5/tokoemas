@@ -240,6 +240,9 @@ func BarangCreate(db *sql.DB) gin.HandlerFunc {
 				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("baris %d: jenis barang tidak valid", baris)})
 				return
 			}
+			if it.Jenis != "perhiasan" {
+				it.TrayID = 0
+			}
 			if it.HargaBeli < 0 || (beliCustomer && it.HargaBeli <= 0) {
 				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("baris %d: harga beli wajib diisi", baris)})
 				return
@@ -253,6 +256,25 @@ func BarangCreate(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		defer tx.Rollback()
+
+		// kapasitas baki dicek di dalam transaksi supaya tidak bisa terlewati
+		perBaki := map[int]int{}
+		for _, it := range req.Items {
+			if it.TrayID > 0 {
+				perBaki[it.TrayID]++
+			}
+		}
+		for trayID, n := range perBaki {
+			sisa, err := services.SisaBaki(tx, trayID, locID)
+			if err != nil {
+				balasKesalahan(c, err)
+				return
+			}
+			if n > sisa {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("baki tidak cukup: sisa tempat %d, barang yang dimasukkan %d (maksimal %d per baki)", sisa, n, services.KapasitasBaki)})
+				return
+			}
+		}
 
 		var cashID interface{}
 		kasKeluar := 0.0
@@ -281,10 +303,11 @@ func BarangCreate(db *sql.DB) gin.HandlerFunc {
 			res, err := tx.Exec(
 				`INSERT INTO items
 				 (item_name, karat, weight_gram, origin_location_id, location_id, source_category, entry_date, note, created_by,
-				  jenis, brand, kondisi, harga_beli, purchase_cash_id)
-				 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+				  jenis, brand, kondisi, harga_beli, purchase_cash_id, tray_id)
+				 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 				it.ItemName, it.Karat, it.WeightGram, locID, locID, req.Category, tgl, it.Note, cl.UserID,
 				it.Jenis, sql.NullString{String: it.Brand, Valid: it.Brand != ""}, kondisi, it.HargaBeli, cashID,
+				sql.NullInt64{Int64: int64(it.TrayID), Valid: it.TrayID > 0},
 			)
 			if err != nil {
 				utils.Gagal(c, err)
@@ -402,12 +425,13 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 		             IF(i.status = 'cuci', IFNULL(w.washer_name,''), ''),
 		             IF(i.status = 'cuci', w.start_date, NULL),
 		             IFNULL(i.kirim_ke_location_id,0), IFNULL(k.name,''),
-		             i.harga_jual, i.tanggal_jual
+		             i.harga_jual, i.tanggal_jual, IFNULL(t.id,0), IFNULL(t.no,0), i.purchase_cash_id IS NOT NULL
 		      FROM items i
 		      JOIN locations l ON l.id = i.location_id
 		      JOIN locations o ON o.id = i.origin_location_id
 		      LEFT JOIN locations k ON k.id = i.kirim_ke_location_id
 		      LEFT JOIN washing_jobs w ON w.id = i.washing_job_id
+		      LEFT JOIN trays t ON t.id = i.tray_id AND t.location_id = i.location_id
 		      WHERE i.is_void = FALSE`
 		args := []interface{}{}
 
@@ -427,6 +451,10 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 		if j := c.Query("jenis"); j == "perhiasan" || j == "logam_mulia" || j == "hasil_lebur" {
 			q += " AND i.jenis = ?"
 			args = append(args, j)
+		}
+		if b := c.Query("baki_id"); b != "" && b != "0" {
+			q += " AND i.tray_id = ?"
+			args = append(args, b)
 		}
 		if s := strings.TrimSpace(c.Query("q")); s != "" {
 			q += " AND (i.item_name LIKE ? OR IFNULL(i.note,'') LIKE ? OR (i.status = 'cuci' AND IFNULL(w.washer_name,'') LIKE ?))"
@@ -451,7 +479,7 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 				&r.Jenis, &r.Brand, &r.Kondisi, &r.HargaBeli,
 				&r.LocationID, &r.Lokasi, &r.OriginID, &r.Asal, &r.Status, &r.EntryDate, &r.Note,
 				&kirim, &r.BelumSampai, &r.BelumNote, &r.Pencuci, &cuciTgl, &r.TujuanID, &r.Tujuan,
-				&hargaJual, &tglJual); err != nil {
+				&hargaJual, &tglJual, &r.BakiID, &r.BakiNo, &r.DariCustomer); err != nil {
 				utils.Gagal(c, err)
 				return
 			}

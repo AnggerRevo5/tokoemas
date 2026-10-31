@@ -34,6 +34,12 @@ func main() {
 	if err := services.SiapkanSkemaKeamanan(db); err != nil {
 		log.Fatal(err)
 	}
+	if err := services.SiapkanSkemaBaki(db); err != nil {
+		log.Fatal(err)
+	}
+	if err := services.SiapkanSkemaInvestor(db); err != nil {
+		log.Fatal(err)
+	}
 	services.SeedUsers(db)
 
 	// Mode khusus: membuat akun lewat terminal

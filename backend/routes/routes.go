@@ -54,6 +54,13 @@ func Setup(r *gin.Engine, db *sql.DB) {
 	// /barang/selesai-cuci ditutup: langsung mengembalikan barang ke stok tanpa konfirmasi owner
 	// (tidak dipakai frontend; alur yang berlaku adalah /cucian/selesai lalu /barang/terima-kembali).
 	auth.POST("/barang/void/:id", controllers.BarangVoid(db))
+	auth.PUT("/barang/:id", controllers.BarangEdit(db))
+
+	// Baki perhiasan
+	auth.GET("/baki", controllers.BakiList(db))
+	auth.POST("/baki", controllers.BakiCreate(db))
+	auth.POST("/baki/pindah", controllers.BakiPindah(db))
+	auth.POST("/baki/:id/hapus", controllers.BakiHapus(db))
 
 	// Cuci
 	auth.POST("/cuci", controllers.CuciMulai(db))
@@ -86,6 +93,14 @@ func Setup(r *gin.Engine, db *sql.DB) {
 	auth.POST("/hutang/:id/bayar", controllers.HutangBayar(db))
 	auth.POST("/dana/terima", controllers.HutangTerimaDana(db))
 	auth.POST("/dana/void/:id", controllers.HutangVoid(db))
+
+	// Investor: setoran pokok, bunga 1% per bulan, penarikan (Owner dan Super Admin)
+	auth.GET("/investor", controllers.InvestorList(db))
+	auth.POST("/investor", controllers.InvestorCreate(db))
+	auth.GET("/investor/:id", controllers.InvestorDetail(db))
+	auth.POST("/investor/:id/gerak", controllers.InvestorGerak(db))
+	auth.POST("/investor/:id/ambil", controllers.InvestorAmbil(db))
+	auth.POST("/investor-gerak/:id/void", controllers.InvestorGerakVoid(db))
 
 	// Laporan
 	auth.GET("/laporan/labarugi", controllers.LabaRugi(db))

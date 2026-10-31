@@ -222,9 +222,98 @@ button.mini.danger-fill:hover:not(:disabled) { background: var(--accent-hover); 
 .void-box input { margin-top: 8px; }
 .void-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 
+<<<<<<< HEAD
 .action-bar { border-left: 4px solid var(--accent); }
 .aksi-tombol { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .panel-aksi { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+=======
+/* ---------- Popup konfirmasi ---------- */
+.popup-latar {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: var(--overlay);
+}
+.popup {
+  width: 100%;
+  max-width: 560px;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-top: 3px solid var(--gold);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+.popup-isi { margin-top: 10px; }
+.popup-isi input { margin-top: 8px; }
+
+/* card Kelola investor: varian popup yang lebih lebar, isinya bisa di-scroll */
+.popup.popup-lebar { max-width: 880px; }
+.popup-kepala { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.popup-kepala h3 { margin: 0; }
+.popup-tutup { flex: 0 0 auto; padding: 4px 10px; }
+.tab-mini { display: flex; gap: 8px; margin: 20px 0 12px; }
+.tab-mini button { background: var(--surface-2); color: var(--muted); }
+.tab-mini button.aktif { color: var(--gold-text); background: var(--gold-soft); font-weight: 600; }
+@media (max-width: 720px) {
+  .popup-latar.latar-lebar { padding: 8px; }
+  .popup.popup-lebar { max-height: calc(100vh - 16px); padding: 14px; }
+}
+.link-barang { all: unset; cursor: pointer; color: var(--gold-text); font-weight: 600; }
+.link-barang:hover { text-decoration: underline; }
+.link-barang:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.tabel-spek { width: 100%; font-size: 13.5px; }
+.tabel-spek th, .tabel-spek td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+.tabel-spek tbody th { width: 110px; color: var(--muted); font-weight: 500; }
+.tabel-spek tr.berubah td { color: var(--gold-text); font-weight: 600; background: var(--gold-soft); }
+.baki-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.baki-pilih { position: relative; }
+.baki-pemicu { display: inline-flex; align-items: center; gap: 6px; }
+.baki-daftar {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  width: min(360px, calc(100vw - 48px));
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+}
+.baki-cari { width: 100%; }
+.baki-saring { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.baki-gulung { max-height: 280px; overflow-y: auto; }
+.baki-lokasi { margin: 8px 0 2px; font-size: 12px; font-weight: 600; color: var(--gold-text); }
+.baki-chip { display: flex; gap: 4px; align-items: center; }
+.baki-chip .baki-baris { flex: 1; }
+.baki-baris {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 7px 10px;
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+  font-weight: 500;
+}
+.baki-baris:hover { background: var(--surface-2); }
+.baki-baris.aktif { color: var(--gold-text); background: var(--gold-soft); font-weight: 600; }
+.baki-kosong { margin: 8px 4px; }
+
+.aksi-tombol { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.panel-aksi { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+>>>>>>> 196f87a (fix fitur investor terbaru dan revmap ui interface terbaru)
 
 /* ---------- Label status dan angka (satu warna) ---------- */
 .tag {

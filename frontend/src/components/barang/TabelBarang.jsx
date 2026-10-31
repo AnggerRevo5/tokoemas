@@ -3,7 +3,7 @@ import { STATUS_LABEL, STATUS_CLASS } from '../../constants/barang'
 import { bisaPilih } from '../../utils/barang'
 
 export default function TabelBarang({
-  rows, pilih, onToggle, semuaDipilih, onToggleSemua, bisaVoid, onBatal,
+  rows, pilih, onToggle, semuaDipilih, onToggleSemua, bisaVoid, onBatal, onEdit, onPindah,
 }) {
   return (
     <div className="table-wrap">
@@ -15,7 +15,12 @@ export default function TabelBarang({
             </th>
             <th>No</th>
             <th>Barang</th>
+<<<<<<< HEAD
             <th>Berat</th>
+=======
+            <th>Baki</th>
+            <th className="num">Berat</th>
+>>>>>>> 196f87a (fix fitur investor terbaru dan revmap ui interface terbaru)
             <th>Kondisi</th>
             <th>Harga beli</th>
             <th>Harga jual</th>
@@ -24,13 +29,18 @@ export default function TabelBarang({
             <th>Asal</th>
             <th>Status</th>
             <th>Masuk</th>
-            {bisaVoid && <th></th>}
+            <th></th>
           </tr>
         </thead>
         <tbody>
+<<<<<<< HEAD
           {rows.length === 0 && (
             <tr><td colSpan="13" className="muted">Belum ada barang</td></tr>
           )}
+=======
+          {rows.length === 0 && <BarisKosong kolom="14">Belum ada barang</BarisKosong>}
+          <AnimatePresence initial={false} custom={animasi.instan}>
+>>>>>>> 196f87a (fix fitur investor terbaru dan revmap ui interface terbaru)
           {rows.map((r) => (
             <tr key={r.id}>
               <td>
@@ -42,8 +52,22 @@ export default function TabelBarang({
                 />
               </td>
               <td>{r.item_no}</td>
+<<<<<<< HEAD
               <td>{r.item_name} {r.karat}</td>
               <td>{r.weight_gram} g</td>
+=======
+              <td>
+                {r.status === 'tersedia' && r.jenis !== 'hasil_lebur' ? (
+                  <button type="button" className="link-barang" onClick={() => onEdit(r)} title="Klik untuk edit barang">
+                    {r.item_name} {r.karat}
+                  </button>
+                ) : (
+                  <>{r.item_name} {r.karat}</>
+                )}
+              </td>
+              <td>{r.baki_no > 0 ? `Baki ${r.baki_no}` : '-'}</td>
+              <td className="num">{r.weight_gram} g</td>
+>>>>>>> 196f87a (fix fitur investor terbaru dan revmap ui interface terbaru)
               <td>
                 <span className={r.kondisi === 'kotor' ? 'tag warn' : 'tag in'}>
                   {r.kondisi === 'kotor' ? 'Kotor' : 'Bersih'}
@@ -92,6 +116,7 @@ export default function TabelBarang({
                 )}
               </td>
               <td>{r.entry_date.slice(0, 10)}</td>
+<<<<<<< HEAD
               {bisaVoid && (
                 <td>
                   {(r.status === 'tersedia' || r.status === 'dikirim') && (
@@ -102,6 +127,26 @@ export default function TabelBarang({
                 </td>
               )}
             </tr>
+=======
+              <td>
+                {r.status === 'tersedia' && r.jenis !== 'hasil_lebur' && (
+                  <button type="button" className="mini" onClick={() => onEdit(r)}>
+                    Edit
+                  </button>
+                )}
+                {r.status === 'tersedia' && r.jenis === 'perhiasan' && (
+                  <button type="button" className="mini" style={{ marginLeft: 6 }} onClick={() => onPindah(r)}>
+                    Pindah
+                  </button>
+                )}
+                {bisaVoid && (r.status === 'tersedia' || r.status === 'dikirim') && (
+                  <button type="button" className="mini" style={{ marginLeft: 6 }} onClick={() => onBatal(r)}>
+                    Batalkan
+                  </button>
+                )}
+              </td>
+            </BarisAnimasi>
+>>>>>>> 196f87a (fix fitur investor terbaru dan revmap ui interface terbaru)
           ))}
         </tbody>
       </table>

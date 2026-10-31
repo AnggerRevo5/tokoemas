@@ -22,6 +22,29 @@ type BarangSatu struct {
 	WeightGram float64 `json:"weight_gram" binding:"lte=100000"`
 	HargaBeli  float64 `json:"harga_beli" binding:"lte=1000000000000"`
 	Note       string  `json:"note" binding:"max=200"`
+	TrayID     int     `json:"tray_id" binding:"gte=0"`
+}
+
+// BarangEditReq adalah payload JSON untuk BarangEdit. TrayID 0 = tanpa baki.
+type BarangEditReq struct {
+	ItemName   string  `json:"item_name" binding:"max=100"`
+	Brand      string  `json:"brand" binding:"max=50"`
+	Karat      string  `json:"karat" binding:"max=10"`
+	WeightGram float64 `json:"weight_gram" binding:"lte=100000"`
+	HargaBeli  float64 `json:"harga_beli" binding:"gte=0,lte=1000000000000"`
+	Note       string  `json:"note" binding:"max=200"`
+	TrayID     int     `json:"tray_id" binding:"gte=0"`
+}
+
+// BakiBaruReq adalah payload JSON untuk BakiCreate.
+type BakiBaruReq struct {
+	LocationID int `json:"location_id" binding:"gte=0"`
+}
+
+// PindahBakiReq adalah payload JSON untuk BakiPindah.
+type PindahBakiReq struct {
+	ItemIDs []int `json:"item_ids" binding:"max=1000,dive,gt=0"`
+	TrayID  int   `json:"tray_id" binding:"gte=0"`
 }
 
 type BarangMasukReq struct {
@@ -35,31 +58,34 @@ type BarangMasukReq struct {
 
 // BarangListRow adalah satu baris respons JSON dari BarangList.
 type BarangListRow struct {
-	ID          int        `json:"id"`
-	ItemNo      string     `json:"item_no"`
-	ItemName    string     `json:"item_name"`
-	Karat       string     `json:"karat"`
-	WeightGram  float64    `json:"weight_gram"`
-	Jenis       string     `json:"jenis"`
-	Brand       string     `json:"brand"`
-	Kondisi     string     `json:"kondisi"`
-	HargaBeli   float64    `json:"harga_beli"`
-	LocationID  int        `json:"location_id"`
-	Lokasi      string     `json:"lokasi"`
-	OriginID    int        `json:"origin_location_id"`
-	Asal        string     `json:"asal"`
-	Status      string     `json:"status"`
-	EntryDate   time.Time  `json:"entry_date"`
-	Note        string     `json:"note"`
-	KirimTgl    *time.Time `json:"kirim_tgl"`
-	BelumSampai bool       `json:"belum_sampai"`
-	BelumNote   string     `json:"belum_sampai_note"`
-	Pencuci     string     `json:"pencuci"`
-	CuciTgl     *time.Time `json:"cuci_tgl"`
-	TujuanID    int        `json:"tujuan_id"`
-	Tujuan      string     `json:"tujuan"`
-	HargaJual   *float64   `json:"harga_jual"`
-	TanggalJual *time.Time `json:"tanggal_jual"`
+	ID           int        `json:"id"`
+	ItemNo       string     `json:"item_no"`
+	ItemName     string     `json:"item_name"`
+	Karat        string     `json:"karat"`
+	WeightGram   float64    `json:"weight_gram"`
+	Jenis        string     `json:"jenis"`
+	Brand        string     `json:"brand"`
+	Kondisi      string     `json:"kondisi"`
+	HargaBeli    float64    `json:"harga_beli"`
+	LocationID   int        `json:"location_id"`
+	Lokasi       string     `json:"lokasi"`
+	OriginID     int        `json:"origin_location_id"`
+	Asal         string     `json:"asal"`
+	Status       string     `json:"status"`
+	EntryDate    time.Time  `json:"entry_date"`
+	Note         string     `json:"note"`
+	KirimTgl     *time.Time `json:"kirim_tgl"`
+	BelumSampai  bool       `json:"belum_sampai"`
+	BelumNote    string     `json:"belum_sampai_note"`
+	Pencuci      string     `json:"pencuci"`
+	CuciTgl      *time.Time `json:"cuci_tgl"`
+	TujuanID     int        `json:"tujuan_id"`
+	Tujuan       string     `json:"tujuan"`
+	HargaJual    *float64   `json:"harga_jual"`
+	TanggalJual  *time.Time `json:"tanggal_jual"`
+	BakiID       int        `json:"baki_id"`
+	BakiNo       int        `json:"baki_no"`
+	DariCustomer bool       `json:"dari_customer"`
 }
 
 type KirimBOReq struct {

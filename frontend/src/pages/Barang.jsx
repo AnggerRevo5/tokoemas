@@ -3,9 +3,14 @@ import { api } from '../services/api'
 import { toggleId } from '../utils/format'
 import { bisaPilih, tentukanMode, aksiUntukMode } from '../utils/barang'
 import Pesan from '../components/common/Pesan'
-import KotakBatal from '../components/common/KotakBatal'
+import Popup from '../components/common/Popup'
 import NotifBanner from '../components/barang/NotifBanner'
 import FormBarangMasuk from '../components/barang/FormBarangMasuk'
+import FormEditBarang from '../components/barang/FormEditBarang'
+import PanelBaki from '../components/barang/PanelBaki'
+import PindahBaki from '../components/barang/PindahBaki'
+import PindahSatu from '../components/barang/PindahSatu'
+import SpesifikasiBarang from '../components/barang/SpesifikasiBarang'
 import FilterBarang from '../components/barang/FilterBarang'
 import BarAksiBarang from '../components/barang/BarAksiBarang'
 import TabelBarang from '../components/barang/TabelBarang'
@@ -25,9 +30,14 @@ export default function Barang({ me, onUbah }) {
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
   const [aksi, setAksi] = useState(null)
+  const [baki, setBaki] = useState({ rows: [], kapasitas: 100 })
+  const [bakiF, setBakiF] = useState('')
+  const [editItem, setEditItem] = useState(null)
+  const [pindahItem, setPindahItem] = useState(null)
 
-  const [voidId, setVoidId] = useState(null)
+  const [voidItem, setVoidItem] = useState(null)
   const [alasan, setAlasan] = useState('')
+  const [loadingBatal, setLoadingBatal] = useState(false)
 
   const tipeLok = (id) => (locations.find((l) => l.id === Number(id)) || {}).type
   const cabangList = locations.filter((l) => l.type === 'cabang')
@@ -46,6 +56,7 @@ export default function Barang({ me, onUbah }) {
     if (locId === '') return
     const p = new URLSearchParams({ location_id: locId, status })
     if (jenisF !== 'semua') p.set('jenis', jenisF)
+    if (bakiF) p.set('baki_id', bakiF)
     if (cari.trim()) p.set('q', cari.trim())
     api(`/barang?${p.toString()}`)
       .then((d) => {
@@ -59,8 +70,9 @@ export default function Barang({ me, onUbah }) {
         })
       })
       .catch((e) => setError(e.message))
+    api(`/baki?location_id=${locId}`).then(setBaki).catch(() => {})
     api('/barang/notif').then(setNotif).catch(() => {})
-  }, [locId, status, jenisF, cari])
+  }, [locId, status, jenisF, cari, bakiF])
 
   useEffect(() => {
     muat()
@@ -73,6 +85,11 @@ export default function Barang({ me, onUbah }) {
   const semuaDipilih = bisaDipilih.length > 0 && bisaDipilih.every((r) => pilih[r.id])
 
   const mode = tentukanMode(terpilih, tipeLok)
+  // pindah baki: semua yang dicentang perhiasan tersedia di satu lokasi yang punya baki
+  const lokasiPindah = terpilih.length > 0 && terpilih.every(
+    (r) => r.jenis === 'perhiasan' && r.status === 'tersedia' && r.location_id === terpilih[0].location_id,
+  ) ? terpilih[0].location_id : null
+  const bakiPindah = lokasiPindah ? baki.rows.filter((b) => b.location_id === lokasiPindah) : []
   const aksiTersedia = aksiUntukMode(mode, { isCabang, adaLM })
 
   useEffect(() => {
@@ -100,28 +117,33 @@ export default function Barang({ me, onUbah }) {
     if (onUbah) onUbah()
   }
 
-  function mulaiBatal(id) {
-    setVoidId(id)
+  function mulaiBatal(r) {
+    setVoidItem(r)
     setAlasan('')
     resetPesan()
   }
 
   async function konfirmasiBatal() {
     if (!alasan.trim()) {
-      setError('Alasan pembatalan wajib diisi')
+      setError('Alasan menghapus wajib diisi')
       return
     }
     setError('')
+    setLoadingBatal(true)
     try {
-      const res = await api(`/barang/void/${voidId}`, {
+      const res = await api(`/barang/void/${voidItem.id}`, {
         method: 'POST',
         body: JSON.stringify({ reason: alasan }),
       })
       setInfo(res.message)
-      setVoidId(null)
+      if (editItem && editItem.id === voidItem.id) setEditItem(null)
+      setVoidItem(null)
       selesai()
     } catch (err) {
+      setVoidItem(null)
       setError(err.message)
+    } finally {
+      setLoadingBatal(false)
     }
   }
 
@@ -144,6 +166,7 @@ export default function Barang({ me, onUbah }) {
         locations={locations}
         onMulai={resetPesan}
         onSukses={({ message, lokasiId, status: statusBaru }) => {
+          setBakiF('')
           setInfo(message)
           if (!isCabang) setLocId(lokasiId)
           setStatus(statusBaru)
@@ -158,6 +181,7 @@ export default function Barang({ me, onUbah }) {
         locId={locId}
         onLocId={(v) => {
           setLocId(v)
+          setBakiF('')
           setPilih({})
         }}
         status={status}
@@ -168,6 +192,37 @@ export default function Barang({ me, onUbah }) {
         onCari={setCari}
         data={data}
       />
+
+      <PanelBaki
+        baki={baki.rows}
+        kapasitas={baki.kapasitas}
+        bakiF={bakiF}
+        onPilih={setBakiF}
+        lokasiId={locId}
+        bolehTambah={locId !== '' && locId !== '0'}
+        onUbah={(pesan) => {
+          resetPesan()
+          setInfo(pesan)
+          muat()
+        }}
+        onError={setError}
+      />
+
+      {editItem && (
+        <FormEditBarang
+          key={editItem.id}
+          item={editItem}
+          baki={baki.rows.filter((b) => b.location_id === editItem.location_id)}
+          kapasitas={baki.kapasitas}
+          onSelesai={(pesan) => {
+            setInfo(pesan)
+            setEditItem(null)
+            selesai()
+          }}
+          onTutup={() => setEditItem(null)}
+          onHapus={bisaVoid ? mulaiBatal : undefined}
+        />
+      )}
 
       {terpilih.length > 0 && (
         <BarAksiBarang
@@ -195,18 +250,58 @@ export default function Barang({ me, onUbah }) {
         />
       )}
 
+      {bakiPindah.length > 0 && (
+        <PindahBaki
+          terpilih={terpilih}
+          baki={bakiPindah}
+          kapasitas={baki.kapasitas}
+          onSelesai={(pesan) => {
+            resetPesan()
+            setInfo(pesan)
+            setPilih({})
+            selesai()
+          }}
+          onError={setError}
+        />
+      )}
+
+      {pindahItem && (
+        <PindahSatu
+          item={pindahItem}
+          baki={baki.rows.filter((b) => b.location_id === pindahItem.location_id)}
+          kapasitas={baki.kapasitas}
+          onSelesai={(pesan) => {
+            resetPesan()
+            setInfo(pesan)
+            setPindahItem(null)
+            selesai()
+          }}
+          onTutup={() => setPindahItem(null)}
+          onError={setError}
+        />
+      )}
+
+      {voidItem && (
+        <Popup
+          judul={`Hapus barang ${voidItem.item_no}?`}
+          labelKonfirmasi="Ya, hapus barang"
+          danger
+          loading={loadingBatal}
+          onKonfirmasi={konfirmasiBatal}
+          onTutup={() => setVoidItem(null)}
+        >
+          <p className="muted">Barang dihapus dari stok (salah input). Periksa lagi spesifikasinya:</p>
+          <SpesifikasiBarang item={voidItem} />
+          <label style={{ display: 'block', marginTop: 12 }}>Alasan menghapus</label>
+          <input
+            value={alasan}
+            onChange={(e) => setAlasan(e.target.value)}
+            placeholder="Contoh: salah input berat"
+          />
+        </Popup>
+      )}
+
       <div className="card" style={{ marginTop: 16 }}>
-        {voidId && (
-          <KotakBatal onKonfirmasi={konfirmasiBatal} onTutup={() => setVoidId(null)}>
-            <div>Batalkan barang #{voidId} (salah input). Tulis alasannya:</div>
-            <input
-              value={alasan}
-              onChange={(e) => setAlasan(e.target.value)}
-              placeholder="Contoh: salah input berat"
-              autoFocus
-            />
-          </KotakBatal>
-        )}
 
         <TabelBarang
           rows={data.rows}
@@ -216,6 +311,14 @@ export default function Barang({ me, onUbah }) {
           onToggleSemua={toggleSemua}
           bisaVoid={bisaVoid}
           onBatal={mulaiBatal}
+          onPindah={(r) => {
+            resetPesan()
+            setPindahItem(r)
+          }}
+          onEdit={(r) => {
+            resetPesan()
+            setEditItem(r)
+          }}
         />
       </div>
     </div>

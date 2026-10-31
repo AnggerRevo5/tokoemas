@@ -8,6 +8,7 @@ import AreaKonten from './AreaKonten'
 import Dashboard from '../dashboard/Dashboard'
 import Transaksi from '../../pages/Transaksi'
 import Hutang from '../../pages/Hutang'
+import Investor from '../../pages/Investor'
 import LabaRugi from '../../pages/LabaRugi'
 import Laporan from '../../pages/Laporan'
 import Cuci from '../../pages/Cuci'
@@ -111,6 +112,7 @@ export default function AppShell({ onLogout }) {
           {tab === 'lebur' && bukanCabang && <Lebur me={me} />}
           {tab === 'laporan' && bukanCabang && bukanPJ && <Laporan me={me} />}
           {tab === 'hutang' && bukanCabang && bukanPJ && <Hutang me={me} />}
+          {tab === 'investor' && bukanCabang && bukanPJ && <Investor />}
           {tab === 'labarugi' && bukanCabang && bukanPJ && <LabaRugi />}
           {tab === 'akun' && me.role === 'super_admin' && <Akun me={me} />}
         </AreaKonten>

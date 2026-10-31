@@ -24,7 +24,7 @@ const GRUP_MENU = [
   { kode: 'dashboard', judul: 'Dashboard', menu: ['dashboard'] },
   { kode: 'transaksi', judul: 'Transaksi', menu: ['kas', 'stok'] },
   { kode: 'produksi', judul: 'Produksi', menu: ['cuci', 'lebur', 'service'] },
-  { kode: 'keuangan', judul: 'Keuangan', menu: ['hutang', 'labarugi', 'laporan'] },
+  { kode: 'keuangan', judul: 'Keuangan', menu: ['hutang', 'investor', 'labarugi', 'laporan'] },
   { kode: 'pengaturan', judul: 'Pengaturan', menu: ['akun'] },
 ]
 
@@ -40,7 +40,7 @@ export function menuUntuk(role) {
     ['service', 'Service'],
   ]
   if (role !== 'cabang') {
-    menu.push(['lebur', 'Lebur'], ['laporan', 'Laporan'], ['hutang', 'Hutang'], ['labarugi', 'Laba Rugi'])
+    menu.push(['lebur', 'Lebur'], ['laporan', 'Laporan'], ['hutang', 'Hutang'], ['investor', 'Investor'], ['labarugi', 'Laba Rugi'])
   }
   if (role === 'super_admin') {
     menu.push(['akun', 'Akun'])

@@ -16,6 +16,9 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
   const [fTgl, setFTgl] = useState(hariIni())
   const [fNote, setFNote] = useState('')
   const [fPosisi, setFPosisi] = useState('toko')
+  const [fBaki, setFBaki] = useState('')
+  const [bakiList, setBakiList] = useState([])
+  const [kapasitas, setKapasitas] = useState(100)
   const [baris, setBaris] = useState([barisBaru()])
   const [fokus, setFokus] = useState(false)
   const wadah = useRef(null)
@@ -34,6 +37,23 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
   useEffect(() => {
     if (fOpsi.length) setFKat(fOpsi[0][0])
   }, [fTipe])
+
+  // daftar baki di lokasi tujuan; otomatis memilih baki pertama yang masih punya tempat
+  useEffect(() => {
+    if (!formBuka || !fLoc) return
+    api(`/baki?location_id=${fLoc}`)
+      .then((d) => {
+        const list = d.rows.filter((b) => b.location_id === Number(fLoc))
+        setBakiList(list)
+        setKapasitas(d.kapasitas)
+        setFBaki((lama) => {
+          if (lama && list.some((b) => String(b.id) === lama && b.isi < d.kapasitas)) return lama
+          const luang = list.find((b) => b.isi < d.kapasitas)
+          return luang ? String(luang.id) : ''
+        })
+      })
+      .catch(() => {})
+  }, [formBuka, fLoc])
 
   useEffect(() => {
     if (fokus && wadah.current) {
@@ -64,6 +84,11 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
     setFokus(true)
   }
 
+  const bakiDipilih = bakiList.find((b) => String(b.id) === fBaki)
+  const sisaBaki = bakiDipilih ? kapasitas - bakiDipilih.isi : 0
+  const jumlahPerhiasan = baris.filter((b) => b.jenis === 'perhiasan').length
+  const bakiKurang = bakiDipilih && jumlahPerhiasan > sisaBaki
+
   const totalGram = baris.reduce((s, b) => s + Number(b.weight_gram || 0), 0)
   const totalBeli = baris.reduce((s, b) => s + Number(b.harga_beli || 0), 0)
 
@@ -88,6 +113,7 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
             weight_gram: Number(b.weight_gram),
             harga_beli: Number(b.harga_beli || 0),
             note: b.note,
+            tray_id: b.jenis === 'perhiasan' ? Number(fBaki || 0) : 0,
           })),
         }),
       })
@@ -153,6 +179,17 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
               </div>
             )}
             <div>
+              <label>Masukkan perhiasan ke baki</label>
+              <select value={fBaki} onChange={(e) => setFBaki(e.target.value)}>
+                <option value="">Tanpa baki</option>
+                {bakiList.map((b) => (
+                  <option key={b.id} value={b.id} disabled={b.isi >= kapasitas}>
+                    Baki {b.no} ({b.isi}/{kapasitas}{b.isi >= kapasitas ? ', penuh' : ''})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
               <label>Tanggal</label>
               <input type="date" value={fTgl} onChange={(e) => setFTgl(e.target.value)} required />
             </div>
@@ -162,6 +199,12 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
             </div>
           </div>
 
+          {bakiKurang && (
+            <p className="neg" style={{ marginTop: 10 }}>
+              Baki {bakiDipilih.no} hanya punya sisa tempat {sisaBaki}, sedangkan ada {jumlahPerhiasan} perhiasan.
+              Kurangi barang, pilih baki lain, atau tambah baki baru di bawah daftar stok.
+            </p>
+          )}
           {wajibHarga && (
             <p className="muted">
               Harga beli wajib diisi. Kas toko otomatis keluar sebesar total harga beli.
@@ -281,8 +324,13 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
             {totalBeli > 0 && <>, harga beli {rupiah(totalBeli)}</>}
           </p>
 
+<<<<<<< HEAD
           <button disabled={loading}>{loading ? 'Menyimpan...' : 'Simpan semua'}</button>
         </form>
+=======
+          <button disabled={loading || bakiKurang}>{loading ? <><Spinner />Menyimpan...</> : 'Simpan semua'}</button>
+        </m.form>
+>>>>>>> 196f87a (fix fitur investor terbaru dan revmap ui interface terbaru)
       )}
     </>
   )
