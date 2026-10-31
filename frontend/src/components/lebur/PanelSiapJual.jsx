@@ -4,6 +4,8 @@ import { rupiah, gram, hariIni, toggleId } from '../../utils/format'
 import AngkaBerjalan from '../common/AngkaBerjalan'
 import BarisKosong from '../common/BarisKosong'
 import Spinner from '../common/Spinner'
+import PilihMetodeBayar from '../common/PilihMetodeBayar'
+import { BIAYA_KOSONG, nominalBiaya } from '../../utils/biaya'
 
 const formatRupiah = (v) => rupiah(Math.round(v))
 
@@ -16,6 +18,8 @@ export default function PanelSiapJual({ siap, bisaCatat, onMulai, onSukses, onEr
   const [hargaJual, setHargaJual] = useState('')
   const [jualTgl, setJualTgl] = useState(hariIni())
   const [jualNote, setJualNote] = useState('')
+  const [metode, setMetode] = useState('tunai')
+  const [biaya, setBiaya] = useState(BIAYA_KOSONG)
 
   const terpilih = siap.filter((r) => pilih[r.id])
   const nCukim = terpilih.filter((r) => r.jenis === 'hasil_lebur').length
@@ -29,6 +33,10 @@ export default function PanelSiapJual({ siap, bisaCatat, onMulai, onSukses, onEr
   async function jual(e) {
     e.preventDefault()
     onMulai()
+    if (metode === 'qris' && nominalBiaya(hargaJual, biaya) > Number(hargaJual)) {
+      onError('Potongan tidak boleh melebihi harga jual')
+      return
+    }
     setLoading(true)
     try {
       const res = await api('/penjualan', {
@@ -39,12 +47,16 @@ export default function PanelSiapJual({ siap, bisaCatat, onMulai, onSukses, onEr
           sale_total: Number(hargaJual),
           sale_date: jualTgl,
           note: jualNote,
+          metode,
+          biaya: metode === 'qris' ? nominalBiaya(hargaJual, biaya) : 0,
         }),
       })
       setPilih({})
       setPenadah('')
       setHargaJual('')
       setJualNote('')
+      setMetode('tunai')
+      setBiaya(BIAYA_KOSONG)
       onSukses(`${res.message} (untung atau rugi ${rupiah(res.untung)})`)
     } catch (err) {
       onError(err.message)
@@ -117,6 +129,14 @@ export default function PanelSiapJual({ siap, bisaCatat, onMulai, onSukses, onEr
               <input value={jualNote} onChange={(e) => setJualNote(e.target.value)} />
             </div>
           </div>
+          <PilihMetodeBayar
+            metode={metode}
+            onMetode={setMetode}
+            total={hargaJual}
+            biaya={biaya}
+            onBiaya={setBiaya}
+            tujuanTunai="kas back office"
+          />
           {hargaJual && (
             <div className="total-bar">
               <span className={untungPreview < 0 ? 'neg' : ''}>

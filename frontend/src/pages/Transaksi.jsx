@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../services/api'
 import Pesan from '../components/common/Pesan'
-import KotakBatal from '../components/common/KotakBatal'
+import Popup from '../components/common/Popup'
 import FormTransaksi from '../components/transaksi/FormTransaksi'
 import TabelTransaksi from '../components/transaksi/TabelTransaksi'
+import PenjualanDariKas from '../components/transaksi/PenjualanDariKas'
+import CardGadai from '../components/barang/CardGadai'
 
 export default function Transaksi({ jenis, me }) {
   const isKas = jenis === 'kas'
@@ -16,6 +18,8 @@ export default function Transaksi({ jenis, me }) {
   const [info, setInfo] = useState('')
   const [voidId, setVoidId] = useState(null)
   const [voidReason, setVoidReason] = useState('')
+  const [kasJual, setKasJual] = useState(null)
+  const [gadaiItem, setGadaiItem] = useState(null)
 
   const lokasi = locations.find((l) => l.id === Number(locId))
 
@@ -44,6 +48,20 @@ export default function Transaksi({ jenis, me }) {
     setVoidReason('')
     setError('')
     setInfo('')
+  }
+
+  // kas dari gadai diubah lewat card gadainya: ambil gadai lalu barangnya
+  async function bukaGadai(r) {
+    setError('')
+    setInfo('')
+    try {
+      const g = await api(`/gadai/${r.gadai_id}`)
+      const d = await api(`/barang?item_id=${g.item_id}&status=semua`)
+      if (d.rows.length === 0) throw new Error('Barang gadai tidak ditemukan')
+      setGadaiItem(d.rows[0])
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
   async function konfirmasiBatal() {
@@ -90,18 +108,57 @@ export default function Transaksi({ jenis, me }) {
         <h3>Riwayat{lokasi ? ` - ${lokasi.name}` : ''}</h3>
 
         {voidId && (
-          <KotakBatal onKonfirmasi={konfirmasiBatal} onTutup={() => setVoidId(null)}>
-            <div>Batalkan transaksi #{voidId}. Tulis alasannya:</div>
+          <Popup
+            judul={`Batalkan transaksi #${voidId}?`}
+            labelKonfirmasi="Ya, batalkan"
+            danger
+            nonaktif={!voidReason.trim()}
+            onKonfirmasi={konfirmasiBatal}
+            onTutup={() => setVoidId(null)}
+          >
+            <p className="muted">Transaksi ini akan dibatalkan dan tidak dihitung lagi. Tulis alasannya:</p>
             <input
               value={voidReason}
               onChange={(e) => setVoidReason(e.target.value)}
               placeholder="Contoh: salah input nominal"
               autoFocus
             />
-          </KotakBatal>
+          </Popup>
         )}
 
-        <TabelTransaksi rows={rows} isKas={isKas} bisaVoid={bisaVoid} onBatal={mulaiBatal} />
+        {gadaiItem && (
+          <CardGadai
+            key={gadaiItem.id}
+            item={gadaiItem}
+            me={me}
+            onUbah={(pesan) => {
+              setInfo(pesan)
+              muat()
+            }}
+            onTutup={() => setGadaiItem(null)}
+          />
+        )}
+
+        {kasJual && (
+          <PenjualanDariKas
+            kas={kasJual}
+            me={me}
+            onUbah={(pesan) => {
+              setInfo(pesan)
+              muat()
+            }}
+            onTutup={() => setKasJual(null)}
+          />
+        )}
+
+        <TabelTransaksi
+          rows={rows}
+          isKas={isKas}
+          bisaVoid={bisaVoid}
+          onBatal={mulaiBatal}
+          onJual={isKas ? (r) => { setError(''); setInfo(''); setKasJual(r) } : undefined}
+          onGadai={isKas ? bukaGadai : undefined}
+        />
       </div>
     </div>
   )

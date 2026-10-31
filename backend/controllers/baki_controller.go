@@ -19,6 +19,7 @@ import (
 type bakiRow struct {
 	ID         int    `json:"id"`
 	No         int    `json:"no"`
+	Name       string `json:"name"`
 	LocationID int    `json:"location_id"`
 	Lokasi     string `json:"lokasi"`
 	Isi        int    `json:"isi"`
@@ -28,9 +29,9 @@ type bakiRow struct {
 func BakiList(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		cl := c.MustGet("claims").(*models.Claims)
-		q := `SELECT t.id, t.no, t.location_id, l.name,
+		q := `SELECT t.id, t.no, t.name, t.location_id, l.name,
 		             (SELECT COUNT(*) FROM items i WHERE i.tray_id = t.id AND i.location_id = t.location_id
-		              AND i.is_void = FALSE AND i.status NOT IN ('terjual','lebur','hasil'))
+		              AND i.is_void = FALSE AND i.status NOT IN ('terjual','lebur','hasil','tidak_ditebus'))
 		      FROM trays t JOIN locations l ON l.id = t.location_id`
 		args := []interface{}{}
 		if cl.Role == "cabang" {
@@ -51,7 +52,7 @@ func BakiList(db *sql.DB) gin.HandlerFunc {
 		out := []bakiRow{}
 		for rows.Next() {
 			r := bakiRow{Kapasitas: services.KapasitasBaki}
-			if err := rows.Scan(&r.ID, &r.No, &r.LocationID, &r.Lokasi, &r.Isi); err != nil {
+			if err := rows.Scan(&r.ID, &r.No, &r.Name, &r.LocationID, &r.Lokasi, &r.Isi); err != nil {
 				utils.Gagal(c, err)
 				return
 			}
@@ -59,6 +60,21 @@ func BakiList(db *sql.DB) gin.HandlerFunc {
 		}
 		c.JSON(http.StatusOK, gin.H{"rows": out, "kapasitas": services.KapasitasBaki})
 	}
+}
+
+// ---------- NAMA BAKI ----------
+
+// rapikanNamaBaki merapikan spasi dan memastikan nama baki terisi (maksimal 50 karakter).
+func rapikanNamaBaki(s string) (string, bool) {
+	s = strings.Join(strings.Fields(s), " ")
+	return s, s != "" && len([]rune(s)) <= 50
+}
+
+// namaBakiDipakai: nama baki harus unik per lokasi (huruf besar dan kecil dianggap sama).
+func namaBakiDipakai(tx *sql.Tx, lokasi int, nama string, kecuali int) bool {
+	var n int
+	tx.QueryRow("SELECT COUNT(*) FROM trays WHERE location_id = ? AND LOWER(name) = LOWER(?) AND id <> ?", lokasi, nama, kecuali).Scan(&n)
+	return n > 0
 }
 
 // ---------- TAMBAH BAKI ----------
@@ -75,6 +91,11 @@ func BakiCreate(db *sql.DB) gin.HandlerFunc {
 		if !ok {
 			return
 		}
+		nama, ok := rapikanNamaBaki(req.Name)
+		if !ok {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "nama baki wajib diisi (maksimal 50 karakter)"})
+			return
+		}
 
 		tx, err := db.Begin()
 		if err != nil {
@@ -88,7 +109,11 @@ func BakiCreate(db *sql.DB) gin.HandlerFunc {
 			utils.Gagal(c, err)
 			return
 		}
-		// nomor baki = nomor terkecil yang belum dipakai, jadi nomor baki yang pernah dihapus muncul lagi
+		if namaBakiDipakai(tx, locID, nama, 0) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("nama baki %q sudah dipakai di lokasi ini", nama)})
+			return
+		}
+		// nomor hanya penanda internal (nomor terkecil yang belum dipakai); yang tampil ke pengguna adalah nama
 		dipakai, err := services.AmbilIDs(tx, "SELECT no FROM trays WHERE location_id = ? ORDER BY no", locID)
 		if err != nil {
 			utils.Gagal(c, err)
@@ -101,18 +126,18 @@ func BakiCreate(db *sql.DB) gin.HandlerFunc {
 			}
 			no++
 		}
-		res, err := tx.Exec("INSERT INTO trays (location_id, no, created_by) VALUES (?,?,?)", locID, no, cl.UserID)
+		res, err := tx.Exec("INSERT INTO trays (location_id, no, name, created_by) VALUES (?,?,?,?)", locID, no, nama, cl.UserID)
 		if err != nil {
 			utils.Gagal(c, err)
 			return
 		}
 		id, _ := res.LastInsertId()
-		services.CatatAudit(tx, middleware.Meta(c), "create", "trays", id, gin.H{"location_id": locID, "no": no})
+		services.CatatAudit(tx, middleware.Meta(c), "create", "trays", id, gin.H{"location_id": locID, "no": no, "name": nama})
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
 			return
 		}
-		c.JSON(http.StatusCreated, gin.H{"message": fmt.Sprintf("Baki %d ditambahkan", no), "id": id, "no": no})
+		c.JSON(http.StatusCreated, gin.H{"message": fmt.Sprintf("Baki %s ditambahkan", nama), "id": id, "no": no, "name": nama})
 	}
 }
 
@@ -137,7 +162,8 @@ func BakiHapus(db *sql.DB) gin.HandlerFunc {
 		defer tx.Rollback()
 
 		var loc, no int
-		if err := tx.QueryRow("SELECT location_id, no FROM trays WHERE id = ? FOR UPDATE", id).Scan(&loc, &no); err != nil {
+		var nama string
+		if err := tx.QueryRow("SELECT location_id, no, name FROM trays WHERE id = ? FOR UPDATE", id).Scan(&loc, &no, &nama); err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "baki tidak ditemukan"})
 			return
 		}
@@ -151,7 +177,7 @@ func BakiHapus(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		if sisa < services.KapasitasBaki {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Baki %d masih berisi %d barang; pindahkan dulu isinya", no, services.KapasitasBaki-sisa)})
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Baki %s masih berisi %d barang; pindahkan dulu isinya", nama, services.KapasitasBaki-sisa)})
 			return
 		}
 		// barang lama (terjual/dilebur/pindah lokasi) yang masih menunjuk baki ini dilepas
@@ -163,12 +189,68 @@ func BakiHapus(db *sql.DB) gin.HandlerFunc {
 			utils.Gagal(c, err)
 			return
 		}
-		services.CatatPerubahan(tx, middleware.Meta(c), "delete", "trays", int64(id), gin.H{"location_id": loc, "no": no}, nil)
+		services.CatatPerubahan(tx, middleware.Meta(c), "delete", "trays", int64(id), gin.H{"location_id": loc, "no": no, "name": nama}, nil)
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Baki %d dihapus", no)})
+		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Baki %s dihapus", nama)})
+	}
+}
+
+// ---------- UBAH NAMA BAKI ----------
+
+func BakiRename(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		cl, ok := middleware.HanyaPeran(c, "cabang", "owner", "super_admin")
+		if !ok {
+			return
+		}
+		id, ok := utils.IDParam(c)
+		if !ok {
+			return
+		}
+		var req models.BakiNamaReq
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "data tidak valid"})
+			return
+		}
+		nama, ok := rapikanNamaBaki(req.Name)
+		if !ok {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "nama baki wajib diisi (maksimal 50 karakter)"})
+			return
+		}
+		tx, err := db.Begin()
+		if err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		defer tx.Rollback()
+
+		var loc int
+		var lama string
+		if err := tx.QueryRow("SELECT location_id, name FROM trays WHERE id = ? FOR UPDATE", id).Scan(&loc, &lama); err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "baki tidak ditemukan"})
+			return
+		}
+		if cl.Role == "cabang" && loc != cl.LocationID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "bukan baki di lokasi kamu"})
+			return
+		}
+		if namaBakiDipakai(tx, loc, nama, id) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("nama baki %q sudah dipakai di lokasi ini", nama)})
+			return
+		}
+		if _, err := tx.Exec("UPDATE trays SET name = ? WHERE id = ?", nama, id); err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		services.CatatPerubahan(tx, middleware.Meta(c), "rename", "trays", int64(id), gin.H{"name": lama}, gin.H{"name": nama})
+		if err := tx.Commit(); err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Baki %s diubah namanya menjadi %s", lama, nama)})
 	}
 }
 
@@ -197,8 +279,9 @@ func BakiPindah(db *sql.DB) gin.HandlerFunc {
 		}
 		defer tx.Rollback()
 
-		var loc, no int
-		if err := tx.QueryRow("SELECT location_id, no FROM trays WHERE id = ?", req.TrayID).Scan(&loc, &no); err != nil {
+		var loc int
+		var nama string
+		if err := tx.QueryRow("SELECT location_id, name FROM trays WHERE id = ?", req.TrayID).Scan(&loc, &nama); err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "baki tujuan tidak ditemukan"})
 			return
 		}
@@ -224,9 +307,9 @@ func BakiPindah(db *sql.DB) gin.HandlerFunc {
 			args = append(args, it.ID)
 		}
 		var bukanPerhiasan, sudahDiSana int
-		tx.QueryRow("SELECT COUNT(*) FROM items WHERE jenis <> 'perhiasan' AND id IN ("+utils.Placeholders(len(args))+")", args...).Scan(&bukanPerhiasan)
+		tx.QueryRow("SELECT COUNT(*) FROM items WHERE jenis NOT IN ('perhiasan', 'logam_mulia') AND id IN ("+utils.Placeholders(len(args))+")", args...).Scan(&bukanPerhiasan)
 		if bukanPerhiasan > 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "hanya perhiasan yang bisa dimasukkan ke baki"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "hanya perhiasan dan logam mulia (emas atau perak) yang bisa dimasukkan ke baki"})
 			return
 		}
 		tx.QueryRow("SELECT COUNT(*) FROM items WHERE tray_id = ? AND id IN ("+utils.Placeholders(len(args))+")",
@@ -239,7 +322,7 @@ func BakiPindah(db *sql.DB) gin.HandlerFunc {
 		}
 		masuk := len(items) - sudahDiSana
 		if masuk > sisa {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Baki %d hanya punya sisa tempat %d, barang yang dipindah %d", no, sisa, masuk)})
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Baki %s hanya punya sisa tempat %d, barang yang dipindah %d", nama, sisa, masuk)})
 			return
 		}
 
@@ -266,7 +349,7 @@ func BakiPindah(db *sql.DB) gin.HandlerFunc {
 			utils.Gagal(c, err)
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%d barang dipindah ke Baki %d", len(items), no)})
+		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%d barang dipindah ke Baki %s", len(items), nama)})
 	}
 }
 
@@ -303,16 +386,16 @@ func BarangEdit(db *sql.DB) gin.HandlerFunc {
 		defer tx.Rollback()
 
 		var lama struct {
-			Name, Karat, Brand, Note, Jenis, Status string
-			Weight, Harga                           float64
-			Loc, Tray                               int
-			Cash                                    sql.NullInt64
+			Name, Karat, Brand, Note, Jenis, Status, Bahan string
+			Weight, Harga                                  float64
+			Loc, Tray                                      int
+			Cash                                           sql.NullInt64
 		}
 		err = tx.QueryRow(
-			`SELECT item_name, IFNULL(karat,''), IFNULL(brand,''), IFNULL(note,''), jenis, status,
+			`SELECT item_name, IFNULL(karat,''), IFNULL(brand,''), IFNULL(note,''), jenis, status, bahan,
 			        weight_gram, harga_beli, location_id, IFNULL(tray_id,0), purchase_cash_id
 			 FROM items WHERE id = ? AND is_void = FALSE FOR UPDATE`, id).
-			Scan(&lama.Name, &lama.Karat, &lama.Brand, &lama.Note, &lama.Jenis, &lama.Status,
+			Scan(&lama.Name, &lama.Karat, &lama.Brand, &lama.Note, &lama.Jenis, &lama.Status, &lama.Bahan,
 				&lama.Weight, &lama.Harga, &lama.Loc, &lama.Tray, &lama.Cash)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "barang tidak ditemukan"})
@@ -335,7 +418,9 @@ func BarangEdit(db *sql.DB) gin.HandlerFunc {
 				return
 			}
 			brand, karat, nama = req.Brand, "24K", "Logam mulia "+req.Brand
-			req.TrayID = 0
+			if lama.Bahan == "perak" {
+				karat, nama = "999", "Logam mulia perak "+req.Brand
+			}
 		case "perhiasan":
 			if nama == "" {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "nama perhiasan wajib diisi"})

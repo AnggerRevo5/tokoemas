@@ -7,6 +7,8 @@ import Popup from '../components/common/Popup'
 import NotifBanner from '../components/barang/NotifBanner'
 import FormBarangMasuk from '../components/barang/FormBarangMasuk'
 import FormEditBarang from '../components/barang/FormEditBarang'
+import CardGadai from '../components/barang/CardGadai'
+import CardPenjualan from '../components/barang/CardPenjualan'
 import PanelBaki from '../components/barang/PanelBaki'
 import PindahBaki from '../components/barang/PindahBaki'
 import PindahSatu from '../components/barang/PindahSatu'
@@ -14,6 +16,8 @@ import SpesifikasiBarang from '../components/barang/SpesifikasiBarang'
 import FilterBarang from '../components/barang/FilterBarang'
 import BarAksiBarang from '../components/barang/BarAksiBarang'
 import TabelBarang from '../components/barang/TabelBarang'
+
+const LANGKAH_MUAT = 200
 
 export default function Barang({ me, onUbah }) {
   const isCabang = me.role === 'cabang'
@@ -24,7 +28,8 @@ export default function Barang({ me, onUbah }) {
   const [status, setStatus] = useState('tersedia')
   const [jenisF, setJenisF] = useState('semua')
   const [cari, setCari] = useState('')
-  const [data, setData] = useState({ rows: [], jumlah: 0, total_gram: 0, total_beli: 0, total_jual: 0 })
+  const [data, setData] = useState({ rows: [], jumlah: 0, ditampilkan: 0, ada_lagi: false, batas: 200, total_gram: 0, total_gram_perak: 0, total_beli: 0, total_jual: 0 })
+  const [batas, setBatas] = useState(LANGKAH_MUAT) // jumlah barang yang diminta; naik tiap tombol Muat lagi
   const [notif, setNotif] = useState({ menunggu: 0, belum_sampai: 0, keluar: 0 })
   const [pilih, setPilih] = useState({})
   const [error, setError] = useState('')
@@ -34,6 +39,9 @@ export default function Barang({ me, onUbah }) {
   const [bakiF, setBakiF] = useState('')
   const [editItem, setEditItem] = useState(null)
   const [pindahItem, setPindahItem] = useState(null)
+  const [gadaiItem, setGadaiItem] = useState(null)
+  const [jualItem, setJualItem] = useState(null)
+  const [gadaiMap, setGadaiMap] = useState({}) // gadai yang berjalan per id barang
 
   const [voidItem, setVoidItem] = useState(null)
   const [alasan, setAlasan] = useState('')
@@ -54,7 +62,7 @@ export default function Barang({ me, onUbah }) {
 
   const muat = useCallback(() => {
     if (locId === '') return
-    const p = new URLSearchParams({ location_id: locId, status })
+    const p = new URLSearchParams({ location_id: locId, status, limit: String(batas) })
     if (jenisF !== 'semua') p.set('jenis', jenisF)
     if (bakiF) p.set('baki_id', bakiF)
     if (cari.trim()) p.set('q', cari.trim())
@@ -71,8 +79,11 @@ export default function Barang({ me, onUbah }) {
       })
       .catch((e) => setError(e.message))
     api(`/baki?location_id=${locId}`).then(setBaki).catch(() => {})
+    api(`/gadai?location_id=${locId}`)
+      .then((d) => setGadaiMap(Object.fromEntries(d.map((x) => [x.item_id, x]))))
+      .catch(() => {})
     api('/barang/notif').then(setNotif).catch(() => {})
-  }, [locId, status, jenisF, cari, bakiF])
+  }, [locId, status, jenisF, cari, bakiF, batas])
 
   useEffect(() => {
     muat()
@@ -85,16 +96,19 @@ export default function Barang({ me, onUbah }) {
   const semuaDipilih = bisaDipilih.length > 0 && bisaDipilih.every((r) => pilih[r.id])
 
   const mode = tentukanMode(terpilih, tipeLok)
-  // pindah baki: semua yang dicentang perhiasan tersedia di satu lokasi yang punya baki
+  // pindah baki: semua yang dicentang perhiasan atau logam mulia tersedia di satu lokasi yang punya baki
   const lokasiPindah = terpilih.length > 0 && terpilih.every(
-    (r) => r.jenis === 'perhiasan' && r.status === 'tersedia' && r.location_id === terpilih[0].location_id,
+    (r) => (r.jenis === 'perhiasan' || r.jenis === 'logam_mulia') && r.status === 'tersedia' && r.location_id === terpilih[0].location_id,
   ) ? terpilih[0].location_id : null
   const bakiPindah = lokasiPindah ? baki.rows.filter((b) => b.location_id === lokasiPindah) : []
-  const aksiTersedia = aksiUntukMode(mode, { isCabang, adaLM })
+  // gadai: satu logam mulia tersedia, oleh akun cabang atau Super Admin
+  const bisaGadai = (isCabang || me.role === 'super_admin') && terpilih.length === 1 &&
+    terpilih[0].jenis === 'logam_mulia' && terpilih[0].bahan !== 'perak' && terpilih[0].status === 'tersedia'
+  const aksiTersedia = aksiUntukMode(mode, { isCabang, adaLM, bisaGadai })
 
   useEffect(() => {
     if (aksi && !aksiTersedia.some(([k]) => k === aksi)) setAksi(null)
-  }, [mode, adaLM])
+  }, [mode, adaLM, bisaGadai])
 
   function toggleSemua() {
     if (semuaDipilih) {
@@ -183,13 +197,23 @@ export default function Barang({ me, onUbah }) {
           setLocId(v)
           setBakiF('')
           setPilih({})
+          setBatas(LANGKAH_MUAT)
         }}
         status={status}
-        onStatus={setStatus}
+        onStatus={(v) => {
+          setStatus(v)
+          setBatas(LANGKAH_MUAT)
+        }}
         jenisF={jenisF}
-        onJenis={setJenisF}
+        onJenis={(v) => {
+          setJenisF(v)
+          setBatas(LANGKAH_MUAT)
+        }}
         cari={cari}
-        onCari={setCari}
+        onCari={(v) => {
+          setCari(v)
+          setBatas(LANGKAH_MUAT)
+        }}
         data={data}
       />
 
@@ -281,6 +305,32 @@ export default function Barang({ me, onUbah }) {
         />
       )}
 
+      {gadaiItem && (
+        <CardGadai
+          key={gadaiItem.id}
+          item={gadaiItem}
+          me={me}
+          onUbah={(pesan) => {
+            setInfo(pesan)
+            selesai()
+          }}
+          onTutup={() => setGadaiItem(null)}
+        />
+      )}
+
+      {jualItem && (
+        <CardPenjualan
+          key={jualItem.id}
+          item={jualItem}
+          me={me}
+          onUbah={(pesan) => {
+            setInfo(pesan)
+            selesai()
+          }}
+          onTutup={() => setJualItem(null)}
+        />
+      )}
+
       {voidItem && (
         <Popup
           judul={`Hapus barang ${voidItem.item_no}?`}
@@ -311,6 +361,15 @@ export default function Barang({ me, onUbah }) {
           onToggleSemua={toggleSemua}
           bisaVoid={bisaVoid}
           onBatal={mulaiBatal}
+          gadaiMap={gadaiMap}
+          onJual={(r) => {
+            resetPesan()
+            setJualItem(r)
+          }}
+          onGadai={(r) => {
+            resetPesan()
+            setGadaiItem(r)
+          }}
           onPindah={(r) => {
             resetPesan()
             setPindahItem(r)
@@ -320,6 +379,19 @@ export default function Barang({ me, onUbah }) {
             setEditItem(r)
           }}
         />
+        {data.jumlah > 0 && (
+          <div className="aksi-tombol" style={{ marginTop: 12, alignItems: 'center' }}>
+            <span className="muted">Menampilkan {data.ditampilkan} dari {data.jumlah} barang.</span>
+            {data.ada_lagi && data.batas < 2000 && (
+              <button type="button" className="mini primary" onClick={() => setBatas((b) => b + LANGKAH_MUAT)}>
+                Muat {LANGKAH_MUAT} lagi
+              </button>
+            )}
+            {data.ada_lagi && data.batas >= 2000 && (
+              <span className="muted">Persempit dengan filter atau pencarian untuk melihat sisanya.</span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

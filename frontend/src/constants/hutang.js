@@ -1,8 +1,9 @@
+// dana investor dicatat lewat menu Investor, jadi tidak ada di pilihan hutang baru
 export const JENIS_KREDITUR = [
-  ['investor', 'Investor'],
   ['bank_pegadaian', 'Bank / Pegadaian'],
   ['perorangan', 'Perorangan'],
   ['pabrik', 'Pabrik'],
 ]
 
-export const labelJenis = Object.fromEntries(JENIS_KREDITUR)
+// hutang investor lama (sebelum ada menu Investor) tetap tampil dengan labelnya
+export const labelJenis = { investor: 'Investor', ...Object.fromEntries(JENIS_KREDITUR) }

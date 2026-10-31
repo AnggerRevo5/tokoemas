@@ -8,6 +8,8 @@ type InvestorBaruReq struct {
 	StartDate   string  `json:"start_date" binding:"max=10"`
 	Amount      int64   `json:"amount" binding:"lte=1000000000000"`
 	RatePercent float64 `json:"rate_percent" binding:"gte=0,lte=100"`
+	// CatatKas: bila true, setoran pertama juga dicatat sebagai kas masuk back office.
+	CatatKas bool `json:"catat_kas"`
 }
 
 // InvestorGerakReq adalah payload JSON untuk InvestorGerak.
@@ -16,6 +18,8 @@ type InvestorGerakReq struct {
 	Amount int64  `json:"amount" binding:"lte=1000000000000"`
 	TxDate string `json:"tx_date" binding:"max=10"`
 	Note   string `json:"note" binding:"max=200"`
+	// CatatKas: bila true, catatan ini juga dicatat di kas back office (setor masuk; tarik pokok dan bayar bunga keluar).
+	CatatKas bool `json:"catat_kas"`
 }
 
 // InvestorAmbilReq adalah payload JSON untuk InvestorAmbil: pokok dan bunga yang diambil sekaligus.
@@ -25,6 +29,8 @@ type InvestorAmbilReq struct {
 	Bunga  int64  `json:"bunga" binding:"lte=1000000000000"`
 	TxDate string `json:"tx_date" binding:"max=10"`
 	Note   string `json:"note" binding:"max=200"`
+	// CatatKas: bila true, pokok dan bunga yang diambil juga dicatat sebagai pengeluaran kas back office.
+	CatatKas bool `json:"catat_kas"`
 }
 
 // InvestorRingkasan adalah satu investor beserta angka ringkasnya.
@@ -45,15 +51,16 @@ type InvestorRingkasan struct {
 
 // InvestorGerakRow adalah satu baris riwayat uang investor.
 type InvestorGerakRow struct {
-	ID         int    `json:"id"`
-	Jenis      string `json:"jenis"`
-	Amount     int64  `json:"amount"`
-	TxDate     string `json:"tx_date"`
-	Note       string `json:"note"`
-	IsVoid     bool   `json:"is_void"`
-	VoidReason string `json:"void_reason"`
-	Pencatat   string `json:"pencatat"`
-	CreatedAt  string `json:"created_at"`
+	ID          int    `json:"id"`
+	Jenis       string `json:"jenis"`
+	Amount      int64  `json:"amount"`
+	TxDate      string `json:"tx_date"`
+	Note        string `json:"note"`
+	IsVoid      bool   `json:"is_void"`
+	VoidReason  string `json:"void_reason"`
+	Pencatat    string `json:"pencatat"`
+	CreatedAt   string `json:"created_at"`
+	KasTercatat bool   `json:"kas_tercatat"` // pembayaran bunga ini sudah dicatat di kas back office
 }
 
 // InvestorBungaRow adalah bunga satu siklus.

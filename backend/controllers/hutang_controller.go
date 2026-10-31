@@ -15,7 +15,8 @@ import (
 	"toko-emas/utils"
 )
 
-var jenisHutang = map[string]bool{"investor": true, "perorangan": true, "pabrik": true, "bank_pegadaian": true}
+// Dana investor dicatat lewat menu Investor (kas ikut otomatis), jadi tidak ada lagi di sini.
+var jenisHutang = map[string]bool{"perorangan": true, "pabrik": true, "bank_pegadaian": true}
 
 func HutangCreate(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -106,9 +107,6 @@ func HutangTerimaDana(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		kategori := "pinjaman"
-		if req.CreditorType == "investor" {
-			kategori = "investor"
-		}
 		note := strings.TrimSpace(req.Note)
 
 		tx, err := db.Begin()

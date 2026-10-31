@@ -7,13 +7,13 @@ function barisSpesifikasi(r) {
   const lm = r.jenis === 'logam_mulia'
   return [
     ['No', r.item_no],
-    ['Jenis', JENIS[r.jenis] || r.jenis],
+    ['Jenis', lm && r.bahan === 'perak' ? 'Logam mulia perak' : JENIS[r.jenis] || r.jenis],
     lm ? ['Merek', r.brand || '-'] : ['Nama', r.item_name],
     ['Kadar', r.karat || '-'],
     ['Berat', `${gram(r.weight_gram)} g`],
     ['Harga beli', r.harga_beli > 0 ? rupiah(r.harga_beli) : '-'],
     ['Kondisi', r.kondisi === 'kotor' ? 'Kotor' : 'Bersih'],
-    ['Baki', lm ? 'Tidak memakai baki' : r.baki_no > 0 ? `Baki ${r.baki_no}` : 'Tanpa baki'],
+    ['Baki', r.baki_nama || 'Tanpa baki'],
     ['Lokasi', r.lokasi],
     ['Keterangan', r.note || '-'],
   ]
@@ -61,7 +61,7 @@ export function DaftarSpesifikasi({ items }) {
               <td>{r.item_name}</td>
               <td>{r.karat}</td>
               <td className="num">{gram(r.weight_gram)} g</td>
-              <td>{r.baki_no > 0 ? `Baki ${r.baki_no}` : 'Tanpa baki'}</td>
+              <td>{r.baki_nama || 'Tanpa baki'}</td>
             </tr>
           ))}
         </tbody>

@@ -7,7 +7,7 @@ import BarisAnimasi from '../common/BarisAnimasi'
 import BarisKosong from '../common/BarisKosong'
 
 export default function TabelBarang({
-  rows, pilih, onToggle, semuaDipilih, onToggleSemua, bisaVoid, onBatal, onEdit, onPindah,
+  rows, pilih, onToggle, semuaDipilih, onToggleSemua, bisaVoid, onBatal, onEdit, onPindah, gadaiMap = {}, onGadai, onJual,
 }) {
   const animasi = useAnimasiDaftar(rows.map((r) => r.id))
   return (
@@ -52,11 +52,19 @@ export default function TabelBarang({
                   <button type="button" className="link-barang" onClick={() => onEdit(r)} title="Klik untuk edit barang">
                     {r.item_name} {r.karat}
                   </button>
+                ) : (r.status === 'digadai' || r.status === 'tidak_ditebus') && onGadai ? (
+                  <button type="button" className="link-barang" onClick={() => onGadai(r)} title="Klik untuk melihat gadai">
+                    {r.item_name} {r.karat}
+                  </button>
+                ) : r.status === 'terjual' && r.metode && onJual ? (
+                  <button type="button" className="link-barang" onClick={() => onJual(r)} title="Klik untuk mengubah atau membatalkan penjualan">
+                    {r.item_name} {r.karat}
+                  </button>
                 ) : (
                   <>{r.item_name} {r.karat}</>
                 )}
               </td>
-              <td>{r.baki_no > 0 ? `Baki ${r.baki_no}` : '-'}</td>
+              <td>{r.baki_nama || '-'}</td>
               <td className="num">{r.weight_gram} g</td>
               <td>
                 <span className={r.kondisi === 'kotor' ? 'tag warn' : 'tag in'}>
@@ -72,6 +80,7 @@ export default function TabelBarang({
                   </div>
                 )}
                 {r.tanggal_jual && <div className="muted">{r.tanggal_jual.slice(0, 10)}</div>}
+                {r.metode && <div className="muted">{r.metode === 'qris' ? 'QRIS/Debit' : 'Tunai'}</div>}
               </td>
               <td>{r.note}</td>
               <td>{r.lokasi}</td>
@@ -97,6 +106,13 @@ export default function TabelBarang({
                     {r.pencuci && r.cuci_tgl && `, sejak ${r.cuci_tgl.slice(0, 10)}`}
                   </div>
                 )}
+                {r.status === 'digadai' && gadaiMap[r.id] && (
+                  <div className={gadaiMap[r.id].terlambat ? 'neg' : 'muted'}>
+                    {gadaiMap[r.id].status === 'lunas'
+                      ? 'lunas, ambil di pegadaian'
+                      : `sisa ${gadaiMap[r.id].sisa_bulan} bln, ${rupiah(gadaiMap[r.id].sisa)}, jatuh tempo ${gadaiMap[r.id].jatuh_tempo_berikut}${gadaiMap[r.id].terlambat ? ' (terlambat)' : ''}`}
+                  </div>
+                )}
                 {r.status === 'hasil' && <div className="muted">dikelola di menu Lebur</div>}
                 {r.status === 'kembali' && (
                   <div className="muted">
@@ -112,9 +128,19 @@ export default function TabelBarang({
                     Edit
                   </button>
                 )}
-                {r.status === 'tersedia' && r.jenis === 'perhiasan' && (
+                {r.status === 'tersedia' && (r.jenis === 'perhiasan' || r.jenis === 'logam_mulia') && (
                   <button type="button" className="mini" style={{ marginLeft: 6 }} onClick={() => onPindah(r)}>
                     Pindah
+                  </button>
+                )}
+                {r.status === 'terjual' && r.metode && onJual && (
+                  <button type="button" className="mini" onClick={() => onJual(r)}>
+                    Ubah penjualan
+                  </button>
+                )}
+                {(r.status === 'digadai' || r.status === 'tidak_ditebus') && onGadai && (
+                  <button type="button" className="mini" onClick={() => onGadai(r)}>
+                    Gadai
                   </button>
                 )}
                 {bisaVoid && (r.status === 'tersedia' || r.status === 'dikirim') && (

@@ -35,6 +35,7 @@ function IsiKelola({ data, onSimpan, onPesan }) {
   const [bunganya, setBunganya] = useState('')
   const [tanggal, setTanggal] = useState(hariIni())
   const [note, setNote] = useState('')
+  const [catatKas, setCatatKas] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -50,11 +51,11 @@ function IsiKelola({ data, onSimpan, onPesan }) {
         jenis === 'ambil'
           ? await api(`/investor/${inv.id}/ambil`, {
               method: 'POST',
-              body: JSON.stringify({ pokok: Number(pokok) || 0, bunga: Number(bunganya) || 0, tx_date: tanggal, note }),
+              body: JSON.stringify({ pokok: Number(pokok) || 0, bunga: Number(bunganya) || 0, tx_date: tanggal, note, catat_kas: catatKas }),
             })
           : await api(`/investor/${inv.id}/gerak`, {
               method: 'POST',
-              body: JSON.stringify({ jenis, amount: Number(jumlah), tx_date: tanggal, note }),
+              body: JSON.stringify({ jenis, amount: Number(jumlah), tx_date: tanggal, note, catat_kas: catatKas }),
             })
       setJumlah('')
       setPokok('')
@@ -151,6 +152,12 @@ function IsiKelola({ data, onSimpan, onPesan }) {
             <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} />
           </div>
         </div>
+        <label className="cek-item" style={{ margin: '10px 0' }}>
+          <input type="checkbox" checked={catatKas} onChange={(e) => setCatatKas(e.target.checked)} />
+          {jenis === 'setor'
+            ? 'Catat setoran ini juga sebagai kas masuk back office'
+            : 'Catat juga sebagai pengeluaran kas back office'}
+        </label>
         {jenis === 'ambil' && (Number(pokok) > 0 || Number(bunganya) > 0) && (
           <p>Total yang diserahkan ke investor: <b>{rupiah((Number(pokok) || 0) + (Number(bunganya) || 0))}</b></p>
         )}
@@ -199,6 +206,7 @@ function IsiKelola({ data, onSimpan, onPesan }) {
                   <td>
                     {r.note}
                     <div className="muted">dicatat {r.pencatat} - {r.created_at}</div>
+                    {r.kas_tercatat && !r.is_void && <div className="muted">tercatat di kas back office</div>}
                     {r.is_void && <div className="muted">Dibatalkan: {r.void_reason}</div>}
                   </td>
                   <td>

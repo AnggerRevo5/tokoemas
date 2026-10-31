@@ -773,6 +773,17 @@ tbody tr.baris-kosong:hover { background: transparent; }
 .baris-head { margin-top: 14px; font-size: 11.5px; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 
 .cek-grup { display: flex; flex-wrap: wrap; gap: 10px 24px; margin-bottom: 8px; }
+/* pilihan laporan: kartu sama lebar dalam grid, yang dicentang diberi warna emas */
+.cek-grup.cek-kisi { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; margin: 6px 0 16px; }
+.cek-kartu {
+  display: flex; align-items: center; gap: 10px; margin: 0; padding: 10px 12px; min-height: 44px;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface);
+  color: var(--text); font-size: 14px; font-weight: 450; line-height: 1.3; cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.cek-kartu:hover { border-color: var(--border-strong); }
+.cek-kartu:has(input:checked) { border-color: color-mix(in srgb, var(--gold) 65%, transparent); background: var(--gold-soft); }
+.cek-kartu input { flex: 0 0 auto; margin: 0; }
 .cek-item { display: flex; align-items: center; gap: 10px; margin: 0; color: var(--text); font-size: 14px; font-weight: 450; cursor: pointer; }
 
 .cetak-area td { white-space: normal; vertical-align: top; }

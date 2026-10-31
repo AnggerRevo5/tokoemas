@@ -12,7 +12,8 @@ type SaldoRow struct {
 	LocationID int     `json:"location_id"`
 	Name       string  `json:"name"`
 	SaldoKas   float64 `json:"saldo_kas"`
-	StokGram   float64 `json:"stok_gram"`
+	StokGram   float64 `json:"stok_gram"`  // gram emas
+	StokPerak  float64 `json:"stok_perak"` // gram perak
 	StokPcs    int     `json:"stok_pcs"`
 }
 
@@ -48,6 +49,14 @@ type KasListRow struct {
 	Note       string    `json:"note"`
 	Date       time.Time `json:"transaction_date"`
 	CreatedAt  time.Time `json:"created_at"`
+	// KasLain: baris ini tercatat di kas lokasi lain (penjualan QRIS/Debit cabang masuk kas back office);
+	// ditampilkan hanya sebagai riwayat dan tidak mengubah kas lokasi yang dilihat. NamaKas = nama kas tempat uangnya.
+	KasLain bool   `json:"di_kas_lain"`
+	NamaKas string `json:"nama_kas"`
+	// DariPenjualan: kas ini dibuat oleh penjualan dari menu Stok, jadi diubah atau dibatalkan lewat penjualannya.
+	DariPenjualan bool `json:"dari_penjualan"`
+	// GadaiID: kas ini dibuat oleh gadai (dana, pokok, atau biaya); diubah lewat card gadainya. 0 bila bukan.
+	GadaiID int `json:"gadai_id"`
 }
 
 // StokListRow adalah satu baris respons JSON dari StokList.

@@ -17,18 +17,18 @@ func LabelArah(a string) string {
 	return "Keluar"
 }
 
-var OpMasuk = map[string]bool{"omzet": true, "jual_barang": true, "jual_aset": true, "biaya_service": true}
+var OpMasuk = map[string]bool{"omzet": true, "jual_barang": true, "jual_qris": true, "jual_aset": true, "biaya_service": true}
 
-var OpKeluar = map[string]bool{"pengeluaran_toko": true, "pembelian_customer": true, "operasional": true, "bulanan_investor": true}
+var OpKeluar = map[string]bool{"pengeluaran_toko": true, "pembelian_customer": true, "operasional": true, "bulanan_investor": true, "biaya_qris": true, "gadai_biaya": true}
 
-var DanaNonOp = map[string]bool{"investor": true, "pinjaman": true, "bayar_hutang": true}
+var DanaNonOp = map[string]bool{"investor": true, "pinjaman": true, "bayar_hutang": true, "gadai_dana": true, "gadai_pokok": true, "tarik_investor": true}
 
-var DaftarLaporan = []string{"kas", "labarugi", "hutang", "penjualan", "cuci", "lebur", "stok"}
+var DaftarLaporan = []string{"kas", "labarugi", "hutang", "penjualan", "penjualan_toko", "penjualan_toko_ringkas", "investor", "investor_mutasi", "gadai", "cuci", "lebur", "stok"}
 
 var namaKategori = map[string]string{
 	"omzet": "Hasil jual (omzet)", "biaya_service": "Biaya service", "tambah_kas": "Tambahan kas", "pengeluaran_toko": "Pengeluaran toko",
 	"pembelian_customer": "Pembelian dari customer", "transfer_bo": "Transfer kas ke back office",
-	"dari_toko": "Pemasukan dari toko", "jual_barang": "Pemasukan dari jual barang",
+	"dari_toko": "Pemasukan dari toko", "jual_barang": "Pemasukan dari jual barang", "jual_qris": "Penjualan QRIS/Debit", "biaya_qris": "Potongan QRIS/Debit",
 	"investor": "Pemasukan dari investor", "pinjaman": "Pinjaman", "jual_aset": "Penjualan aset",
 	"kembali_cabang": "Barang kembali cabang", "kas_toko": "Kas toko", "bulanan_investor": "Bulanan investor",
 	"operasional": "Pengeluaran operasional", "bayar_hutang": "Pembayaran hutang",
@@ -37,6 +37,8 @@ var namaKategori = map[string]string{
 	"kembali_bo": "Dikembalikan ke back office", "cuci": "Masuk proses cuci", "cucian": "Selesai cuci",
 	"lebur": "Masuk proses lebur", "leburan_kotor": "Leburan kotor", "murnikan": "Dimurnikan jadi cukim",
 	"cukim": "Cukim", "jual_penadah": "Jual ke penadah", "laku": "Laku", "pegadaian": "Pegadaian", "jual": "Jual",
+	"gadai_dana": "Dana gadai diterima", "gadai_pokok": "Pembayaran pokok gadai", "gadai_biaya": "Biaya gadai (bunga dan denda)",
+	"gadai_kembali": "Kembali dari gadai", "tarik_investor": "Penarikan pokok investor",
 }
 
 func labelK(k string) string {
@@ -388,6 +390,46 @@ func TabelHutang(db *sql.DB) (models.TabelLaporan, error) {
 		sumP += pokok
 		sumT += terbayar
 		t.Baris = append(t.Baris, []interface{}{nama, jenis[tipe], pokok, terbayar, pokok - terbayar, fmtTgl(mulai), tt, st})
+	}
+
+	// dana investor dikelola di menu Investor; di sini hanya ikut dihitung sebagai kewajiban:
+	// pokok yang masih ditanggung, dengan bunga yang belum dibayar disebut di kolom status.
+	type infoInv struct {
+		id    int
+		nama  string
+		acuan time.Time
+		bp    int64
+	}
+	ri, err := db.Query("SELECT id, name, start_date, rate_bp FROM investors ORDER BY id")
+	if err != nil {
+		return t, err
+	}
+	var daftarInv []infoInv
+	for ri.Next() {
+		var x infoInv
+		if err := ri.Scan(&x.id, &x.nama, &x.acuan, &x.bp); err != nil {
+			ri.Close()
+			return t, err
+		}
+		x.acuan = TanggalSaja(x.acuan)
+		daftarInv = append(daftarInv, x)
+	}
+	ri.Close()
+	hari := HariIniWIB()
+	for _, x := range daftarInv {
+		gerak, err := GerakInvestor(db, x.id)
+		if err != nil {
+			return t, err
+		}
+		pokokInv := Pokok(gerak, hari)
+		if pokokInv <= 0 {
+			continue
+		}
+		belum := TotalBunga(HitungBunga(x.acuan, x.bp, gerak, hari)) - Dibayar(gerak)
+		berikut := SiklusBerikut(x.acuan, x.bp, gerak, hari)
+		sumP += float64(pokokInv)
+		t.Baris = append(t.Baris, []interface{}{x.nama, "Investor (menu Investor)", float64(pokokInv), 0.0, float64(pokokInv),
+			fmtTgl(x.acuan), fmtTgl(berikut.JatuhTempo), "Bunga belum dibayar " + FmtRp(float64(belum))})
 	}
 	t.Baris = append(t.Baris, []interface{}{"TOTAL", "", sumP, sumT, sumP - sumT, "", "", ""})
 	t.Tebal = []int{len(t.Baris) - 1}

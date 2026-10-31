@@ -5,6 +5,7 @@ import Pesan from '../components/common/Pesan'
 import KotakBatal from '../components/common/KotakBatal'
 import FormHutang from '../components/hutang/FormHutang'
 import TabelHutang from '../components/hutang/TabelHutang'
+import RingkasInvestor from '../components/hutang/RingkasInvestor'
 
 export default function Hutang({ me }) {
   const bisaVoid = me && me.role === 'super_admin'
@@ -93,6 +94,8 @@ export default function Hutang({ me }) {
   return (
     <div>
       <Pesan error={error} info={info} warn={warn && `${warn}. Pembayaran tetap tersimpan.`} />
+
+      <RingkasInvestor />
 
       <FormHutang
         onMulai={resetPesan}

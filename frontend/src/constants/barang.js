@@ -14,6 +14,8 @@ export const STATUS_LABEL = {
   hasil: 'Hasil lebur',
   kembali: 'Dikembalikan ke back office',
   terjual: 'Terjual',
+  digadai: 'Digadai',
+  tidak_ditebus: 'Tidak ditebus',
 }
 
 export const STATUS_CLASS = {
@@ -24,6 +26,8 @@ export const STATUS_CLASS = {
   hasil: 'tag gray',
   kembali: 'tag warn',
   terjual: 'tag gray',
+  digadai: 'tag warn',
+  tidak_ditebus: 'tag gray',
 }
 
 // penjelasan singkat di bawah form aksi barang
@@ -42,5 +46,7 @@ export const KETERANGAN_AKSI = {
     'Stok back office berkurang dan barang masuk proses lebur. PJ lalu mencatat berat setelah dipotong, leburan kotor, dan cukim di menu Lebur. Modal dihitung dari jumlah harga beli.',
   cuci:
     'Stok back office berkurang dan barang masuk antrean cuci. PJ yang mengirimnya ke pencuci dan mencatat saat selesai di menu Cuci. Barang yang selesai berstatus Bersih.',
+  gadai:
+    'Dana yang diterima masuk ke kas toko ini dan barang berstatus Digadai sampai lunas. Cicilan tiap bulan dikonfirmasi dari card barang (klik nama barangnya).',
   jual: 'Isi harga jual tiap barang. Total harga jual otomatis masuk ke kas toko ini (menu Kas), tidak perlu diinput lagi.',
 }

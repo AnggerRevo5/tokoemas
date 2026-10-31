@@ -40,6 +40,16 @@ func main() {
 	if err := services.SiapkanSkemaInvestor(db); err != nil {
 		log.Fatal(err)
 	}
+	if err := services.SiapkanSkemaMetode(db); err != nil {
+		log.Fatal(err)
+	}
+	if err := services.SiapkanSkemaGadai(db); err != nil {
+		log.Fatal(err)
+	}
+	if err := services.SiapkanSkemaBahan(db); err != nil {
+		log.Fatal(err)
+	}
+	services.SiapkanIndeks(db)
 	services.SeedUsers(db)
 
 	// Mode khusus: membuat akun lewat terminal

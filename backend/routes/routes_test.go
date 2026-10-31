@@ -140,6 +140,9 @@ func TestPembatasanRole(t *testing.T) {
 	if w := kirim(t, r, http.MethodGet, "/kas"); w.Code != http.StatusForbidden {
 		t.Errorf("pj: /kas harus tetap 403, dapat %d", w.Code)
 	}
+	if w := kirim(t, r, http.MethodGet, "/gadai"); w.Code != http.StatusForbidden {
+		t.Errorf("pj: /gadai harus 403, dapat %d", w.Code)
+	}
 	if w := kirim(t, r, http.MethodGet, "/locations"); w.Code != http.StatusOK {
 		t.Errorf("pj: /locations harus tetap 200, dapat %d", w.Code)
 	}

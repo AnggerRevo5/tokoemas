@@ -128,6 +128,16 @@ func siapkanLaporan(c *gin.Context, db *sql.DB) (string, string, []models.TabelL
 			t, err = services.TabelHutang(db)
 		case "labarugi":
 			t, err = services.TabelLabaRugi(db, dari, sampai)
+		case "penjualan_toko":
+			t, err = services.TabelPenjualanToko(db, dari, sampai, loc)
+		case "penjualan_toko_ringkas":
+			t, err = services.TabelPenjualanTokoRingkas(db, dari, sampai, loc)
+		case "gadai":
+			t, err = services.TabelGadai(db, dari, sampai, loc)
+		case "investor":
+			t, err = services.TabelInvestor(db, dari, sampai)
+		case "investor_mutasi":
+			t, err = services.TabelInvestorMutasi(db, dari, sampai)
 		default:
 			c.JSON(http.StatusBadRequest, gin.H{"error": "jenis laporan tidak dikenal"})
 			return "", "", nil, false

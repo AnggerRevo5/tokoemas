@@ -9,7 +9,7 @@ import Spinner from '../common/Spinner'
 export default function FormHutang({ onMulai, onSukses, onError }) {
   const [loading, setLoading] = useState(false)
   const [mode, setMode] = useState('dana')
-  const [jenis, setJenis] = useState('investor')
+  const [jenis, setJenis] = useState('perorangan')
   const [nama, setNama] = useState('')
   const [pokok, setPokok] = useState('')
   const [mulai, setMulai] = useState(hariIni())
@@ -47,7 +47,7 @@ export default function FormHutang({ onMulai, onSukses, onError }) {
 
   function ubahMode(m) {
     setMode(m)
-    setJenis(m === 'dana' ? 'investor' : 'pabrik')
+    setJenis(m === 'dana' ? 'perorangan' : 'pabrik')
   }
 
   return (
@@ -55,7 +55,7 @@ export default function FormHutang({ onMulai, onSukses, onError }) {
       <h3>{mode === 'dana' ? 'Terima Dana Baru' : 'Catat Hutang Tanpa Uang Masuk'}</h3>
       <p className="muted">
         {mode === 'dana'
-          ? 'Sekali simpan: kas back office bertambah dan hutang tercatat atas nama pemberi dana.'
+          ? 'Sekali simpan: kas back office bertambah dan hutang tercatat atas nama pemberi dana. Dana dari investor dicatat lewat menu Investor, bukan di sini.'
           : 'Untuk hutang yang tidak membawa uang tunai, misalnya barang dari pabrik yang belum dibayar. Kas tidak berubah.'}
       </p>
 

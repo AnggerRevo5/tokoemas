@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -47,6 +48,19 @@ func BarangJual(db *sql.DB) gin.HandlerFunc {
 		}
 		tgl, ok := utils.ParseTanggal(c, req.Date)
 		if !ok {
+			return
+		}
+		metode, okMetode := services.NormalMetode(req.Metode)
+		if !okMetode {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "metode pembayaran tidak dikenal"})
+			return
+		}
+		var totalHarga float64
+		for _, h := range harga {
+			totalHarga += h
+		}
+		if err := services.ValidasiBiaya(metode, req.Biaya, totalHarga); err != nil {
+			balasKesalahan(c, err)
 			return
 		}
 		boID, err := services.IDBackOffice(db)
@@ -115,18 +129,31 @@ func BarangJual(db *sql.DB) gin.HandlerFunc {
 		}
 		for _, lokasi := range urutLokasi {
 			kj := perLokasi[lokasi]
-			kategoriKas := "omzet"
+			// tunai: kas lokasi yang menjual. QRIS/Debit: kas back office; untuk toko cabang diberi kategori
+			// tersendiri dan asal cabangnya dicatat agar omzet cabang tetap bisa dilacak.
+			kasLokasi, kategoriKas := lokasi, "omzet"
 			if lokasi == boID {
 				kategoriKas = "jual_barang"
 			}
 			catatanKas := fmt.Sprintf("Penjualan %d barang", len(kj.IDs))
+			var asal sql.NullInt64
+			if metode == services.MetodeQRIS {
+				catatanKas += " (" + services.LabelMetode(metode) + ")"
+				if lokasi != boID {
+					var namaAsal string
+					tx.QueryRow("SELECT name FROM locations WHERE id = ?", lokasi).Scan(&namaAsal)
+					kasLokasi, kategoriKas = boID, services.KategoriJualQRIS
+					asal = sql.NullInt64{Int64: int64(lokasi), Valid: true}
+					catatanKas += " dari " + namaAsal
+				}
+			}
 			if req.Note != "" {
 				catatanKas += ": " + req.Note
 			}
 			res, err := tx.Exec(
-				`INSERT INTO cash_transactions (location_id, direction, category, amount, note, transaction_date, created_by)
-				 VALUES (?, 'in', ?, ?, ?, ?, ?)`,
-				lokasi, kategoriKas, kj.Total, catatanKas, tgl, cl.UserID)
+				`INSERT INTO cash_transactions (location_id, direction, category, amount, note, transaction_date, created_by, metode, asal_location_id)
+				 VALUES (?, 'in', ?, ?, ?, ?, ?, ?, ?)`,
+				kasLokasi, kategoriKas, kj.Total, catatanKas, tgl, cl.UserID, metode, asal)
 			if err != nil {
 				utils.Gagal(c, err)
 				return
@@ -138,13 +165,36 @@ func BarangJual(db *sql.DB) gin.HandlerFunc {
 					return
 				}
 			}
-			services.CatatAudit(tx, middleware.Meta(c), "create_auto", "cash_transactions", kasID, gin.H{"penjualan": len(kj.IDs), "total": kj.Total})
+			services.CatatAudit(tx, middleware.Meta(c), "create_auto", "cash_transactions", kasID, gin.H{"penjualan": len(kj.IDs), "total": kj.Total, "metode": metode})
+		}
+		if req.Biaya > 0 {
+			catatBiaya := "Potongan " + services.LabelMetode(metode) + fmt.Sprintf(" penjualan %d barang", len(items))
+			res, err := tx.Exec(
+				`INSERT INTO cash_transactions (location_id, direction, category, amount, note, transaction_date, created_by, metode)
+				 VALUES (?, 'out', ?, ?, ?, ?, ?, ?)`,
+				boID, services.KategoriBiayaQRIS, req.Biaya, catatBiaya, tgl, cl.UserID, metode)
+			if err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			biayaID, _ := res.LastInsertId()
+			for _, itemID := range idsJual {
+				if _, err := tx.Exec("UPDATE items SET jual_biaya_cash_id = ? WHERE id = ?", biayaID, itemID); err != nil {
+					utils.Gagal(c, err)
+					return
+				}
+			}
+			services.CatatAudit(tx, middleware.Meta(c), "create_auto", "cash_transactions", biayaID, gin.H{"biaya": req.Biaya, "metode": metode})
 		}
 		services.CatatPerubahan(tx, middleware.Meta(c), "jual", "items", 0, keadaanBarang(items),
 			gin.H{"status": "terjual", "harga_jual": harga, "request": req})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
+			return
+		}
+		if metode == services.MetodeQRIS {
+			c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%d barang terjual (%s), kas back office bertambah %s", len(items), services.LabelMetode(metode), utils.RupiahTeks(totalSemua-req.Biaya))})
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%d barang terjual, kas bertambah %s", len(items), utils.RupiahTeks(totalSemua))})
@@ -211,6 +261,11 @@ func BarangCreate(db *sql.DB) gin.HandlerFunc {
 			}
 			it.Brand = strings.TrimSpace(it.Brand)
 			it.ItemName = strings.TrimSpace(it.ItemName)
+			bahanReq := strings.TrimSpace(it.Bahan)
+			it.Bahan = "emas"
+			if strings.EqualFold(bahanReq, "perak") {
+				it.Bahan = "perak"
+			}
 
 			if it.WeightGram <= 0 {
 				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("baris %d: berat wajib diisi", baris)})
@@ -224,6 +279,10 @@ func BarangCreate(db *sql.DB) gin.HandlerFunc {
 				}
 				it.Karat = "24K"
 				it.ItemName = "Logam mulia " + it.Brand
+				if it.Bahan == "perak" {
+					it.Karat = "999"
+					it.ItemName = "Logam mulia perak " + it.Brand
+				}
 			case "perhiasan":
 				if it.ItemName == "" {
 					c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("baris %d: nama perhiasan wajib diisi", baris)})
@@ -240,8 +299,11 @@ func BarangCreate(db *sql.DB) gin.HandlerFunc {
 				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("baris %d: jenis barang tidak valid", baris)})
 				return
 			}
-			if it.Jenis != "perhiasan" {
-				it.TrayID = 0
+			if it.Jenis != "perhiasan" && it.Jenis != "logam_mulia" {
+				it.TrayID = 0 // baki untuk perhiasan dan logam mulia (emas atau perak)
+			}
+			if it.Jenis != "logam_mulia" {
+				it.Bahan = "emas"
 			}
 			if it.HargaBeli < 0 || (beliCustomer && it.HargaBeli <= 0) {
 				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("baris %d: harga beli wajib diisi", baris)})
@@ -303,11 +365,11 @@ func BarangCreate(db *sql.DB) gin.HandlerFunc {
 			res, err := tx.Exec(
 				`INSERT INTO items
 				 (item_name, karat, weight_gram, origin_location_id, location_id, source_category, entry_date, note, created_by,
-				  jenis, brand, kondisi, harga_beli, purchase_cash_id, tray_id)
-				 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+				  jenis, brand, kondisi, harga_beli, purchase_cash_id, tray_id, bahan)
+				 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 				it.ItemName, it.Karat, it.WeightGram, locID, locID, req.Category, tgl, it.Note, cl.UserID,
 				it.Jenis, sql.NullString{String: it.Brand, Valid: it.Brand != ""}, kondisi, it.HargaBeli, cashID,
-				sql.NullInt64{Int64: int64(it.TrayID), Valid: it.TrayID > 0},
+				sql.NullInt64{Int64: int64(it.TrayID), Valid: it.TrayID > 0}, it.Bahan,
 			)
 			if err != nil {
 				utils.Gagal(c, err)
@@ -418,51 +480,85 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		cl := c.MustGet("claims").(*models.Claims)
 
-		q := `SELECT i.id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''), i.weight_gram,
+		kolom := `SELECT i.id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''), i.weight_gram,
 		             i.jenis, IFNULL(i.brand,''), i.kondisi, i.harga_beli,
 		             i.location_id, l.name, i.origin_location_id, o.name, i.status, i.entry_date, IFNULL(i.note,''),
 		             i.kirim_tgl, i.belum_sampai, IFNULL(i.belum_sampai_note,''),
 		             IF(i.status = 'cuci', IFNULL(w.washer_name,''), ''),
 		             IF(i.status = 'cuci', w.start_date, NULL),
 		             IFNULL(i.kirim_ke_location_id,0), IFNULL(k.name,''),
-		             i.harga_jual, i.tanggal_jual, IFNULL(t.id,0), IFNULL(t.no,0), i.purchase_cash_id IS NOT NULL
-		      FROM items i
+		             i.harga_jual, i.tanggal_jual, IFNULL(t.id,0), IFNULL(t.no,0), IFNULL(t.name,''), i.purchase_cash_id IS NOT NULL,
+		             IFNULL(jc.metode,''), i.bahan`
+		dari := `FROM items i
 		      JOIN locations l ON l.id = i.location_id
 		      JOIN locations o ON o.id = i.origin_location_id
 		      LEFT JOIN locations k ON k.id = i.kirim_ke_location_id
 		      LEFT JOIN washing_jobs w ON w.id = i.washing_job_id
 		      LEFT JOIN trays t ON t.id = i.tray_id AND t.location_id = i.location_id
+		      LEFT JOIN cash_transactions jc ON jc.id = i.jual_cash_id
 		      WHERE i.is_void = FALSE`
 		args := []interface{}{}
 
 		if cl.Role == "cabang" {
-			q += " AND (i.location_id = ? OR i.kirim_ke_location_id = ?)"
+			dari += " AND (i.location_id = ? OR i.kirim_ke_location_id = ?)"
 			args = append(args, cl.LocationID, cl.LocationID)
 		} else if loc := c.Query("location_id"); loc != "" && loc != "0" {
-			q += " AND i.location_id = ?"
+			dari += " AND i.location_id = ?"
 			args = append(args, loc)
 		}
 		if s := c.Query("status"); s == "dikirim" {
-			q += " AND i.status IN ('dikirim','kembali')"
+			dari += " AND i.status IN ('dikirim','kembali')"
 		} else if s != "" && s != "semua" {
-			q += " AND i.status = ?"
+			dari += " AND i.status = ?"
 			args = append(args, s)
 		}
-		if j := c.Query("jenis"); j == "perhiasan" || j == "logam_mulia" || j == "hasil_lebur" {
-			q += " AND i.jenis = ?"
+		switch j := c.Query("jenis"); j {
+		case "perhiasan", "hasil_lebur":
+			dari += " AND i.jenis = ?"
 			args = append(args, j)
+		case "logam_mulia": // logam mulia emas
+			dari += " AND i.jenis = 'logam_mulia' AND i.bahan = 'emas'"
+		case "logam_mulia_perak":
+			dari += " AND i.jenis = 'logam_mulia' AND i.bahan = 'perak'"
+		}
+		if v := c.Query("item_id"); v != "" {
+			dari += " AND i.id = ?"
+			args = append(args, v)
+		}
+		// barang yang membentuk satu catatan kas penjualan (dipakai menu Kas untuk mengubah penjualan)
+		if k := c.Query("kas_id"); k != "" {
+			dari += " AND (i.jual_cash_id = ? OR i.jual_biaya_cash_id = ?)"
+			args = append(args, k, k)
 		}
 		if b := c.Query("baki_id"); b != "" && b != "0" {
-			q += " AND i.tray_id = ?"
+			dari += " AND i.tray_id = ?"
 			args = append(args, b)
 		}
 		if s := strings.TrimSpace(c.Query("q")); s != "" {
-			q += " AND (i.item_name LIKE ? OR IFNULL(i.note,'') LIKE ? OR (i.status = 'cuci' AND IFNULL(w.washer_name,'') LIKE ?))"
+			dari += " AND (i.item_name LIKE ? OR IFNULL(i.note,'') LIKE ? OR (i.status = 'cuci' AND IFNULL(w.washer_name,'') LIKE ?))"
 			args = append(args, "%"+s+"%", "%"+s+"%", "%"+s+"%")
 		}
-		q += " ORDER BY i.id DESC LIMIT 500"
 
-		rows, err := db.Query(q, args...)
+		// jumlah barang dan total berat/harga dihitung dari seluruh barang yang cocok, bukan hanya baris yang tampil
+		var jumlah int
+		var totalGram, totalPerak, totalBeli, totalJual float64
+		if err := db.QueryRow(
+			"SELECT COUNT(*), IFNULL(SUM(IF(i.bahan = 'perak', 0, i.weight_gram)),0), IFNULL(SUM(IF(i.bahan = 'perak', i.weight_gram, 0)),0),"+
+				" IFNULL(SUM(i.harga_beli),0), IFNULL(SUM(i.harga_jual),0) "+dari, args...,
+		).Scan(&jumlah, &totalGram, &totalPerak, &totalBeli, &totalJual); err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		// halaman: 200 barang per muat, ?limit= untuk memuat lebih banyak (maksimal 2000)
+		batas := 200
+		if v, err := strconv.Atoi(c.Query("limit")); err == nil && v > 0 {
+			batas = v
+		}
+		if batas > 2000 {
+			batas = 2000
+		}
+
+		rows, err := db.Query(kolom+" "+dari+" ORDER BY i.id DESC LIMIT ?", append(args, batas)...)
 		if err != nil {
 			utils.Gagal(c, err)
 			return
@@ -470,7 +566,6 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 		defer rows.Close()
 
 		out := []models.BarangListRow{}
-		var totalGram, totalBeli, totalJual float64
 		for rows.Next() {
 			var r models.BarangListRow
 			var kirim, cuciTgl, tglJual sql.NullTime
@@ -479,7 +574,7 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 				&r.Jenis, &r.Brand, &r.Kondisi, &r.HargaBeli,
 				&r.LocationID, &r.Lokasi, &r.OriginID, &r.Asal, &r.Status, &r.EntryDate, &r.Note,
 				&kirim, &r.BelumSampai, &r.BelumNote, &r.Pencuci, &cuciTgl, &r.TujuanID, &r.Tujuan,
-				&hargaJual, &tglJual, &r.BakiID, &r.BakiNo, &r.DariCustomer); err != nil {
+				&hargaJual, &tglJual, &r.BakiID, &r.BakiNo, &r.BakiNama, &r.DariCustomer, &r.Metode, &r.Bahan); err != nil {
 				utils.Gagal(c, err)
 				return
 			}
@@ -494,16 +589,14 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 			if hargaJual.Valid {
 				h := hargaJual.Float64
 				r.HargaJual = &h
-				totalJual += h
 			}
 			if tglJual.Valid {
 				t := tglJual.Time
 				r.TanggalJual = &t
 			}
-			totalGram += r.WeightGram
-			totalBeli += r.HargaBeli
 			out = append(out, r)
 		}
-		c.JSON(http.StatusOK, gin.H{"rows": out, "jumlah": len(out), "total_gram": totalGram, "total_beli": totalBeli, "total_jual": totalJual})
+		c.JSON(http.StatusOK, gin.H{"rows": out, "jumlah": jumlah, "ditampilkan": len(out), "ada_lagi": len(out) < jumlah, "batas": batas,
+			"total_gram": totalGram, "total_gram_perak": totalPerak, "total_beli": totalBeli, "total_jual": totalJual})
 	}
 }

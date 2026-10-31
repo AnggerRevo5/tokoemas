@@ -41,6 +41,13 @@ func SiapkanSkemaInvestor(db *sql.DB) error {
 			return fmt.Errorf("tabel %s belum ada dan gagal dibuat (%v); jalankan db/migrations/021_investor.sql dengan user database yang punya hak CREATE", t.nama, err)
 		}
 	}
+	// pembayaran bunga bisa dicatat sebagai pengeluaran kas back office; cash_id menunjuk catatan kasnya
+	// (isinya sama dengan db/migrations/023_investor_kas.sql)
+	if !kolomAda(db, "investor_movements", "cash_id") {
+		if _, err := db.Exec("ALTER TABLE investor_movements ADD COLUMN cash_id INT NULL"); err != nil {
+			return fmt.Errorf("kolom investor_movements.cash_id belum ada dan gagal dibuat (%v); jalankan db/migrations/023_investor_kas.sql dengan user database yang punya hak ALTER", err)
+		}
+	}
 	return nil
 }
 

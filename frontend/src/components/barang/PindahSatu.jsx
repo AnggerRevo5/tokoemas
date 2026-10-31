@@ -3,7 +3,7 @@ import { api } from '../../services/api'
 import Popup from '../common/Popup'
 import SpesifikasiBarang from './SpesifikasiBarang'
 
-// Popup pindah baki untuk satu perhiasan (tombol "Pindah" di baris tabel).
+// Popup pindah baki untuk satu barang (tombol "Pindah" di baris tabel).
 // baki: daftar baki di lokasi barang. onSelesai(pesan); onTutup(); onError(msg).
 export default function PindahSatu({ item, baki, kapasitas, onSelesai, onTutup, onError }) {
   const [tujuan, setTujuan] = useState('')
@@ -29,7 +29,7 @@ export default function PindahSatu({ item, baki, kapasitas, onSelesai, onTutup, 
   return (
     <Popup
       judul={`Pindah baki ${item.item_no}`}
-      labelKonfirmasi={bakiTujuan ? `Ya, pindah ke Baki ${bakiTujuan.no}` : 'Pilih baki tujuan'}
+      labelKonfirmasi={bakiTujuan ? `Ya, pindah ke ${bakiTujuan.name}` : 'Pilih baki tujuan'}
       loading={loading}
       nonaktif={!bakiTujuan}
       onKonfirmasi={pindah}
@@ -44,7 +44,7 @@ export default function PindahSatu({ item, baki, kapasitas, onSelesai, onTutup, 
           const penuh = b.isi >= kapasitas
           return (
             <option key={b.id} value={b.id} disabled={sekarang || penuh}>
-              Baki {b.no} ({b.isi}/{kapasitas}{sekarang ? ', baki sekarang' : penuh ? ', penuh' : ''})
+              {b.name} ({b.isi}/{kapasitas}{sekarang ? ', baki sekarang' : penuh ? ', penuh' : ''})
             </option>
           )
         })}

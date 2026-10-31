@@ -27,6 +27,7 @@ export default function Dashboard({ perluTindakan }) {
   // ringkasan tampilan: jumlah dari kartu per lokasi yang sudah ada
   const totalKas = saldo.reduce((s, x) => s + Number(x.saldo_kas || 0), 0)
   const totalGram = saldo.reduce((s, x) => s + Number(x.stok_gram || 0), 0)
+  const totalPerak = saldo.reduce((s, x) => s + Number(x.stok_perak || 0), 0)
   const totalPcs = saldo.reduce((s, x) => s + Number(x.stok_pcs || 0), 0)
   const totalService = saldo.reduce((s, x) => s + Number((svc[x.location_id] || {}).di_sini || 0), 0)
   const t = perluTindakan || {}
@@ -42,7 +43,7 @@ export default function Dashboard({ perluTindakan }) {
         <>
           <div className="ringkasan">
             <KartuRingkasan urutan={0} ikon={Wallet} label="Saldo kas" nilai={totalKas} format={formatRupiah} sub={`Total ${saldo.length} lokasi`} />
-            <KartuRingkasan urutan={1} ikon={Scale} label="Stok emas" nilai={totalGram} format={formatGram} satuan="gram" sub={`${totalPcs} pcs`} />
+            <KartuRingkasan urutan={1} ikon={Scale} label="Stok emas" nilai={totalGram} format={formatGram} satuan="gram" sub={totalPerak > 0 ? `${totalPcs} pcs, perak ${formatGram(totalPerak)} gram` : `${totalPcs} pcs`} />
             <KartuRingkasan urutan={2} ikon={Wrench} label="Barang service" nilai={totalService} format={formatJumlah} satuan="barang" sub="Di semua lokasi" />
             <KartuRingkasan
               urutan={3}

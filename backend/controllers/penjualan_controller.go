@@ -38,10 +38,10 @@ func PenjualanBatal(db *sql.DB) gin.HandlerFunc {
 		defer tx.Rollback()
 
 		var isVoid, recent bool
-		var cashID sql.NullInt64
+		var cashID, biayaID sql.NullInt64
 		err = tx.QueryRow(
-			"SELECT is_void, cash_id, created_at >= NOW() - INTERVAL 1 DAY FROM penadah_sales WHERE id = ? FOR UPDATE", id,
-		).Scan(&isVoid, &cashID, &recent)
+			"SELECT is_void, cash_id, biaya_cash_id, created_at >= NOW() - INTERVAL 1 DAY FROM penadah_sales WHERE id = ? FOR UPDATE", id,
+		).Scan(&isVoid, &cashID, &biayaID, &recent)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "penjualan tidak ditemukan"})
 			return
@@ -75,9 +75,11 @@ func PenjualanBatal(db *sql.DB) gin.HandlerFunc {
 				tx.Exec("UPDATE melt_batches SET status = 'cukim' WHERE cukim_item_id = ? AND is_void = FALSE", itemID)
 			}
 		}
-		if cashID.Valid {
-			tx.Exec("UPDATE cash_transactions SET is_void = TRUE, void_reason = ? WHERE id = ?", reason, cashID.Int64)
-			services.CatatAudit(tx, middleware.Meta(c), "void", "cash_transactions", cashID.Int64, gin.H{"reason": reason})
+		for _, kas := range []sql.NullInt64{cashID, biayaID} {
+			if kas.Valid {
+				tx.Exec("UPDATE cash_transactions SET is_void = TRUE, void_reason = ? WHERE id = ?", reason, kas.Int64)
+				services.CatatAudit(tx, middleware.Meta(c), "void", "cash_transactions", kas.Int64, gin.H{"reason": reason})
+			}
 		}
 		tx.Exec("UPDATE penadah_sales SET is_void = TRUE, void_reason = ? WHERE id = ?", reason, id)
 		services.CatatAudit(tx, middleware.Meta(c), "penjualan_batal", "penadah_sales", int64(id), gin.H{"reason": reason, "oleh": cl.Role})
@@ -152,6 +154,15 @@ func PenjualanPenadah(db *sql.DB) gin.HandlerFunc {
 		penadah := strings.TrimSpace(req.PenadahName)
 		if penadah == "" || req.SaleTotal <= 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "nama penadah dan harga jual wajib diisi"})
+			return
+		}
+		metode, okMetode := services.NormalMetode(req.Metode)
+		if !okMetode {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "metode pembayaran tidak dikenal"})
+			return
+		}
+		if err := services.ValidasiBiaya(metode, req.Biaya, req.SaleTotal); err != nil {
+			balasKesalahan(c, err)
 			return
 		}
 		tgl, ok := utils.ParseTanggal(c, req.SaleDate)
@@ -238,11 +249,15 @@ func PenjualanPenadah(db *sql.DB) gin.HandlerFunc {
 		}
 
 		note := strings.TrimSpace(req.Note)
+		// penjualan penadah selalu di back office: tunai maupun QRIS/Debit sama-sama menambah kas back office
+		catatKas := fmt.Sprintf("Jual ke penadah %s: %d barang", penadah, len(list))
+		if metode == services.MetodeQRIS {
+			catatKas += " (" + services.LabelMetode(metode) + ")"
+		}
 		res, err := tx.Exec(
-			`INSERT INTO cash_transactions (location_id, direction, category, amount, note, transaction_date, created_by)
-			 VALUES (?,?,?,?,?,?,?)`,
-			boID, "in", "jual_barang", req.SaleTotal,
-			fmt.Sprintf("Jual ke penadah %s: %d barang", penadah, len(list)), tgl, cl.UserID,
+			`INSERT INTO cash_transactions (location_id, direction, category, amount, note, transaction_date, created_by, metode)
+			 VALUES (?,?,?,?,?,?,?,?)`,
+			boID, "in", "jual_barang", req.SaleTotal, catatKas, tgl, cl.UserID, metode,
 		)
 		if err != nil {
 			utils.Gagal(c, err)
@@ -250,10 +265,26 @@ func PenjualanPenadah(db *sql.DB) gin.HandlerFunc {
 		}
 		cashID, _ := res.LastInsertId()
 
+		var biayaID sql.NullInt64
+		if req.Biaya > 0 {
+			rb, err := tx.Exec(
+				`INSERT INTO cash_transactions (location_id, direction, category, amount, note, transaction_date, created_by, metode)
+				 VALUES (?,?,?,?,?,?,?,?)`,
+				boID, "out", services.KategoriBiayaQRIS, req.Biaya,
+				fmt.Sprintf("Potongan %s jual ke penadah %s", services.LabelMetode(metode), penadah), tgl, cl.UserID, metode,
+			)
+			if err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			id, _ := rb.LastInsertId()
+			biayaID = sql.NullInt64{Int64: id, Valid: true}
+		}
+
 		res2, err := tx.Exec(
-			`INSERT INTO penadah_sales (sale_date, penadah_name, sale_total, modal, weight_gram, item_count, note, cash_id, created_by)
-			 VALUES (?,?,?,?,?,?,?,?,?)`,
-			tgl, penadah, req.SaleTotal, modal, berat, len(list), sql.NullString{String: note, Valid: note != ""}, cashID, cl.UserID,
+			`INSERT INTO penadah_sales (sale_date, penadah_name, sale_total, modal, weight_gram, item_count, note, cash_id, created_by, metode, biaya_cash_id)
+			 VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+			tgl, penadah, req.SaleTotal, modal, berat, len(list), sql.NullString{String: note, Valid: note != ""}, cashID, cl.UserID, metode, biayaID,
 		)
 		if err != nil {
 			utils.Gagal(c, err)
@@ -302,7 +333,8 @@ func PenjualanList(db *sql.DB) gin.HandlerFunc {
 		q := `SELECT s.id, s.sale_date, s.penadah_name, s.item_count, s.weight_gram, s.modal, s.sale_total,
 		             IFNULL(s.note,''), IFNULL(u.username,''),
 		             IFNULL((SELECT GROUP_CONCAT(CONCAT(i.item_name,' ',IFNULL(i.karat,''),' ',i.weight_gram,'g') SEPARATOR '; ')
-		                     FROM items i WHERE i.sale_id = s.id),'')
+		                     FROM items i WHERE i.sale_id = s.id),''),
+		             s.metode, IFNULL((SELECT x.amount FROM cash_transactions x WHERE x.id = s.biaya_cash_id AND x.is_void = FALSE),0)
 		      FROM penadah_sales s LEFT JOIN users u ON u.id = s.created_by
 		      WHERE s.is_void = FALSE`
 		args := []interface{}{}
@@ -328,7 +360,7 @@ func PenjualanList(db *sql.DB) gin.HandlerFunc {
 		for rows.Next() {
 			var r models.PenjualanListRow
 			if err := rows.Scan(&r.ID, &r.SaleDate, &r.PenadahName, &r.ItemCount, &r.WeightGram, &r.Modal, &r.SaleTotal,
-				&r.Note, &r.PJ, &r.Barang); err != nil {
+				&r.Note, &r.PJ, &r.Barang, &r.Metode, &r.Biaya); err != nil {
 				utils.Gagal(c, err)
 				return
 			}
@@ -371,8 +403,8 @@ func PenjualanVoid(db *sql.DB) gin.HandlerFunc {
 		defer tx.Rollback()
 
 		var isVoid bool
-		var cashID sql.NullInt64
-		err = tx.QueryRow("SELECT is_void, cash_id FROM penadah_sales WHERE id = ? FOR UPDATE", id).Scan(&isVoid, &cashID)
+		var cashID, biayaID sql.NullInt64
+		err = tx.QueryRow("SELECT is_void, cash_id, biaya_cash_id FROM penadah_sales WHERE id = ? FOR UPDATE", id).Scan(&isVoid, &cashID, &biayaID)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "penjualan tidak ditemukan"})
 			return
@@ -402,9 +434,11 @@ func PenjualanVoid(db *sql.DB) gin.HandlerFunc {
 				tx.Exec("UPDATE melt_batches SET status = 'cukim' WHERE cukim_item_id = ? AND is_void = FALSE", itemID)
 			}
 		}
-		if cashID.Valid {
-			tx.Exec("UPDATE cash_transactions SET is_void = TRUE, void_reason = ? WHERE id = ?", reason, cashID.Int64)
-			services.CatatAudit(tx, middleware.Meta(c), "void", "cash_transactions", cashID.Int64, gin.H{"reason": reason})
+		for _, kas := range []sql.NullInt64{cashID, biayaID} {
+			if kas.Valid {
+				tx.Exec("UPDATE cash_transactions SET is_void = TRUE, void_reason = ? WHERE id = ?", reason, kas.Int64)
+				services.CatatAudit(tx, middleware.Meta(c), "void", "cash_transactions", kas.Int64, gin.H{"reason": reason})
+			}
 		}
 		tx.Exec("UPDATE penadah_sales SET is_void = TRUE, void_reason = ? WHERE id = ?", reason, id)
 		services.CatatAudit(tx, middleware.Meta(c), "void", "penadah_sales", int64(id), gin.H{"reason": reason})

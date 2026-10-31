@@ -4,7 +4,7 @@ import { gram } from '../../utils/format'
 import Popup from '../common/Popup'
 import { DaftarSpesifikasi } from './SpesifikasiBarang'
 
-// Pindahkan perhiasan yang dicentang ke baki lain di lokasi yang sama.
+// Pindahkan barang (perhiasan atau logam mulia) yang dicentang ke baki lain di lokasi yang sama.
 // baki: daftar baki di lokasi barang. onSelesai(pesan); onError(msg).
 export default function PindahBaki({ terpilih, baki, kapasitas, onSelesai, onError }) {
   const [tujuan, setTujuan] = useState('')
@@ -39,12 +39,12 @@ export default function PindahBaki({ terpilih, baki, kapasitas, onSelesai, onErr
     <div className="card" style={{ marginTop: 16 }}>
       <div className="form-grid">
         <div>
-          <label>Pindahkan {terpilih.length} perhiasan ke baki</label>
+          <label>Pindahkan {terpilih.length} barang ke baki</label>
           <select value={tujuan} onChange={(e) => setTujuan(e.target.value)}>
             <option value="">Pilih baki tujuan</option>
             {baki.map((b) => (
               <option key={b.id} value={b.id} disabled={b.isi >= kapasitas}>
-                Baki {b.no} ({b.isi}/{kapasitas}{b.isi >= kapasitas ? ', penuh' : ''})
+                {b.name} ({b.isi}/{kapasitas}{b.isi >= kapasitas ? ', penuh' : ''})
               </option>
             ))}
           </select>
@@ -57,20 +57,20 @@ export default function PindahBaki({ terpilih, baki, kapasitas, onSelesai, onErr
       </div>
       {kurang && (
         <p className="neg" style={{ marginTop: 10, marginBottom: 0 }}>
-          Baki {bakiTujuan.no} hanya punya sisa tempat {sisa}, sedangkan barang yang dipindah {masuk}.
+          {bakiTujuan.name} hanya punya sisa tempat {sisa}, sedangkan barang yang dipindah {masuk}.
         </p>
       )}
 
       {konfirmasi && bakiTujuan && (
         <Popup
-          judul={`Pindahkan ke Baki ${bakiTujuan.no}?`}
+          judul={`Pindahkan ke ${bakiTujuan.name}?`}
           labelKonfirmasi="Ya, pindahkan"
           loading={loading}
           onKonfirmasi={pindah}
           onTutup={() => setKonfirmasi(false)}
         >
           <p className="muted">
-            {terpilih.length} perhiasan, {gram(berat)} gram. Isi Baki {bakiTujuan.no} menjadi {bakiTujuan.isi + masuk}/{kapasitas}.
+            {terpilih.length} barang, {gram(berat)} gram. Isi {bakiTujuan.name} menjadi {bakiTujuan.isi + masuk}/{kapasitas}.
           </p>
           <DaftarSpesifikasi items={terpilih} />
         </Popup>

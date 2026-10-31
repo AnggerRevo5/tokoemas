@@ -3,6 +3,7 @@ package controllers
 import (
 	"database/sql"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -211,25 +212,40 @@ func KasList(db *sql.DB) gin.HandlerFunc {
 		if !utils.TanggalOpsional(c, "from", "to") {
 			return
 		}
-		q := "SELECT id, location_id, direction, category, amount, IFNULL(note,''), transaction_date, created_at FROM cash_transactions WHERE is_void = FALSE"
-		args := []interface{}{}
-
+		// lokasi yang dilihat. Riwayat lokasi cabang juga memuat penjualan QRIS/Debit-nya yang uangnya masuk
+		// kas back office (beserta potongannya), ditandai KasLain, supaya penjualannya tidak terasa hilang.
+		lokasi := c.Query("location_id")
 		if cl.Role == "cabang" {
-			q += " AND location_id = ?"
-			args = append(args, cl.LocationID)
-		} else if loc := c.Query("location_id"); loc != "" {
-			q += " AND location_id = ?"
-			args = append(args, loc)
+			lokasi = strconv.Itoa(cl.LocationID)
+		}
+		q := `SELECT x.id, x.location_id, x.direction, x.category, x.amount, IFNULL(x.note,''), x.transaction_date, x.created_at,
+		             IFNULL(l.name,''),
+		             EXISTS (SELECT 1 FROM items j WHERE (j.jual_cash_id = x.id OR j.jual_biaya_cash_id = x.id) AND j.is_void = FALSE),
+		             IFNULL((SELECT g.id FROM gadai g WHERE g.cash_id = x.id AND g.is_void = FALSE LIMIT 1),
+		                    IFNULL((SELECT p.gadai_id FROM gadai_pembayaran p
+		                            WHERE (p.cash_pokok_id = x.id OR p.cash_biaya_id = x.id) AND p.is_void = FALSE LIMIT 1), 0))`
+		args := []interface{}{}
+		if lokasi != "" {
+			q += ", x.location_id <> ?"
+			args = append(args, lokasi)
+		} else {
+			q += ", FALSE"
+		}
+		q += " FROM cash_transactions x JOIN locations l ON l.id = x.location_id WHERE x.is_void = FALSE"
+		if lokasi != "" {
+			q += ` AND (x.location_id = ? OR x.asal_location_id = ?
+			         OR EXISTS (SELECT 1 FROM items i WHERE i.jual_biaya_cash_id = x.id AND i.location_id = ?))`
+			args = append(args, lokasi, lokasi, lokasi)
 		}
 		if v := c.Query("from"); v != "" {
-			q += " AND transaction_date >= ?"
+			q += " AND x.transaction_date >= ?"
 			args = append(args, v)
 		}
 		if v := c.Query("to"); v != "" {
-			q += " AND transaction_date <= ?"
+			q += " AND x.transaction_date <= ?"
 			args = append(args, v)
 		}
-		q += " ORDER BY transaction_date DESC, id DESC LIMIT 200"
+		q += " ORDER BY x.transaction_date DESC, x.id DESC LIMIT 200"
 
 		rows, err := db.Query(q, args...)
 		if err != nil {
@@ -241,7 +257,8 @@ func KasList(db *sql.DB) gin.HandlerFunc {
 		out := []models.KasListRow{}
 		for rows.Next() {
 			var r models.KasListRow
-			if err := rows.Scan(&r.ID, &r.LocationID, &r.Direction, &r.Category, &r.Amount, &r.Note, &r.Date, &r.CreatedAt); err != nil {
+			if err := rows.Scan(&r.ID, &r.LocationID, &r.Direction, &r.Category, &r.Amount, &r.Note, &r.Date, &r.CreatedAt,
+				&r.NamaKas, &r.DariPenjualan, &r.GadaiID, &r.KasLain); err != nil {
 				utils.Gagal(c, err)
 				return
 			}

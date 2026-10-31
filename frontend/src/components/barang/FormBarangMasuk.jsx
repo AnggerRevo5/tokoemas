@@ -93,7 +93,7 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
 
   const bakiDipilih = bakiList.find((b) => String(b.id) === fBaki)
   const sisaBaki = bakiDipilih ? kapasitas - bakiDipilih.isi : 0
-  const jumlahPerhiasan = baris.filter((b) => b.jenis === 'perhiasan').length
+  const jumlahPerhiasan = baris.length // semua barang (perhiasan, logam mulia emas atau perak) bisa masuk baki
   const bakiKurang = bakiDipilih && jumlahPerhiasan > sisaBaki
 
   const totalGram = baris.reduce((s, b) => s + Number(b.weight_gram || 0), 0)
@@ -113,14 +113,15 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
           note: fNote,
           posisi: wajibHarga ? fPosisi : '',
           items: baris.map((b) => ({
-            jenis: b.jenis,
+            jenis: b.jenis === 'perak' ? 'logam_mulia' : b.jenis,
+            bahan: b.jenis === 'perak' ? 'perak' : 'emas',
             item_name: b.item_name,
             brand: b.brand,
             karat: b.karat,
             weight_gram: Number(b.weight_gram),
             harga_beli: Number(b.harga_beli || 0),
             note: b.note,
-            tray_id: b.jenis === 'perhiasan' ? Number(fBaki || 0) : 0,
+            tray_id: Number(fBaki || 0),
           })),
         }),
       })
@@ -191,12 +192,12 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
               </div>
             )}
             <div>
-              <label>Masukkan perhiasan ke baki</label>
+              <label>Masukkan barang ke baki</label>
               <select value={fBaki} onChange={(e) => setFBaki(e.target.value)}>
                 <option value="">Tanpa baki</option>
                 {bakiList.map((b) => (
                   <option key={b.id} value={b.id} disabled={b.isi >= kapasitas}>
-                    Baki {b.no} ({b.isi}/{kapasitas}{b.isi >= kapasitas ? ', penuh' : ''})
+                    {b.name} ({b.isi}/{kapasitas}{b.isi >= kapasitas ? ', penuh' : ''})
                   </option>
                 ))}
               </select>
@@ -213,7 +214,7 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
 
           {bakiKurang && (
             <p className="neg" style={{ marginTop: 10 }}>
-              Baki {bakiDipilih.no} hanya punya sisa tempat {sisaBaki}, sedangkan ada {jumlahPerhiasan} perhiasan.
+              {bakiDipilih.name} hanya punya sisa tempat {sisaBaki}, sedangkan ada {jumlahPerhiasan} barang.
               Kurangi barang, pilih baki lain, atau tambah baki baru di bawah daftar stok.
             </p>
           )}
@@ -252,15 +253,16 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
               <div className="baris-grid" key={i}>
                 <select value={b.jenis} onChange={(e) => ubahBaris(i, 'jenis', e.target.value)}>
                   <option value="perhiasan">Perhiasan</option>
-                  <option value="logam_mulia">Logam mulia</option>
+                  <option value="logam_mulia">Logam mulia emas</option>
+                  <option value="perak">Logam mulia perak</option>
                 </select>
 
-                {b.jenis === 'logam_mulia' ? (
+                {b.jenis !== 'perhiasan' ? (
                   <input
-                    list="merek-lm"
+                    list={b.jenis === 'perak' ? undefined : 'merek-lm'}
                     value={b.brand}
                     onChange={(e) => ubahBaris(i, 'brand', e.target.value)}
-                    placeholder="Merek (Antam...)"
+                    placeholder={b.jenis === 'perak' ? 'Merek (Fine Silver...)' : 'Merek (Antam...)'}
                     required
                   />
                 ) : (
@@ -273,8 +275,8 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
                   />
                 )}
 
-                {b.jenis === 'logam_mulia' ? (
-                  <input value="24K" disabled />
+                {b.jenis !== 'perhiasan' ? (
+                  <input value={b.jenis === 'perak' ? '999' : '24K'} disabled />
                 ) : (
                   <select value={b.karat} onChange={(e) => ubahBaris(i, 'karat', e.target.value)} required>
                     <option value="">Kadar</option>

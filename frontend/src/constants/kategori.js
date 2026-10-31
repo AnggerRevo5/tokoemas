@@ -64,6 +64,13 @@ const SEMUA = {
   barang_toko: 'Barang toko',
   investor: 'Dana dari investor',
   pinjaman: 'Dana pinjaman',
+  jual_qris: 'Penjualan QRIS/Debit',
+  biaya_qris: 'Potongan QRIS/Debit',
+  tarik_investor: 'Penarikan pokok investor',
+  gadai_dana: 'Dana gadai diterima',
+  gadai_pokok: 'Pembayaran pokok gadai',
+  gadai_biaya: 'Biaya gadai (bunga dan denda)',
+  gadai_kembali: 'Kembali dari gadai',
 }
 Object.values(KATEGORI).forEach((j) =>
   Object.values(j).forEach((t) =>

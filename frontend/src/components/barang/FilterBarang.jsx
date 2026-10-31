@@ -25,6 +25,8 @@ export default function FilterBarang({
             <option value="lebur">Dilebur</option>
             <option value="hasil">Hasil lebur</option>
             <option value="terjual">Terjual</option>
+            <option value="digadai">Digadai</option>
+            <option value="tidak_ditebus">Tidak ditebus</option>
             <option value="semua">Semua</option>
           </select>
         </div>
@@ -33,7 +35,8 @@ export default function FilterBarang({
           <select value={jenisF} onChange={(e) => onJenis(e.target.value)}>
             <option value="semua">Semua</option>
             <option value="perhiasan">Perhiasan</option>
-            <option value="logam_mulia">Logam mulia</option>
+            <option value="logam_mulia">Logam mulia emas</option>
+            <option value="logam_mulia_perak">Logam mulia perak</option>
             <option value="hasil_lebur">Hasil lebur</option>
           </select>
         </div>
@@ -43,7 +46,8 @@ export default function FilterBarang({
         </div>
       </div>
       <p className="muted" style={{ marginBottom: 0 }}>
-        {data.jumlah} barang, {gram(data.total_gram)} gram
+        {data.jumlah} barang, {gram(data.total_gram)} gram emas
+        {data.total_gram_perak > 0 && <>, {gram(data.total_gram_perak)} gram perak</>}
         {data.total_beli > 0 && <>, harga beli {rupiah(data.total_beli)}</>}
         {data.total_jual > 0 && <>, total harga jual {rupiah(data.total_jual)}</>}
       </p>

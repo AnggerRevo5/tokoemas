@@ -12,10 +12,16 @@ type JualReq struct {
 	Items []JualItem `json:"items" binding:"max=1000,dive"`
 	Date  string     `json:"date" binding:"max=10"`
 	Note  string     `json:"note" binding:"max=200"`
+	// Metode: "tunai" (kas lokasi) atau "qris" (kas back office). Kosong = tunai.
+	Metode string `json:"metode" binding:"max=10"`
+	// Biaya: potongan QRIS/Debit dalam rupiah (opsional, hanya untuk metode qris).
+	Biaya float64 `json:"biaya" binding:"gte=0,lte=1000000000000"`
 }
 
 type BarangSatu struct {
-	Jenis      string  `json:"jenis" binding:"max=20"`
+	Jenis string `json:"jenis" binding:"max=20"`
+	// Bahan: "emas" (bawaan) atau "perak"; perak hanya untuk logam mulia dan selalu berkadar 999.
+	Bahan      string  `json:"bahan" binding:"max=10"`
 	ItemName   string  `json:"item_name" binding:"max=100"`
 	Brand      string  `json:"brand" binding:"max=50"`
 	Karat      string  `json:"karat" binding:"max=10"`
@@ -38,7 +44,13 @@ type BarangEditReq struct {
 
 // BakiBaruReq adalah payload JSON untuk BakiCreate.
 type BakiBaruReq struct {
-	LocationID int `json:"location_id" binding:"gte=0"`
+	LocationID int    `json:"location_id" binding:"gte=0"`
+	Name       string `json:"name" binding:"max=50"`
+}
+
+// BakiNamaReq adalah payload JSON untuk BakiRename.
+type BakiNamaReq struct {
+	Name string `json:"name" binding:"max=50"`
 }
 
 // PindahBakiReq adalah payload JSON untuk BakiPindah.
@@ -85,7 +97,10 @@ type BarangListRow struct {
 	TanggalJual  *time.Time `json:"tanggal_jual"`
 	BakiID       int        `json:"baki_id"`
 	BakiNo       int        `json:"baki_no"`
+	BakiNama     string     `json:"baki_nama"`
+	Bahan        string     `json:"bahan"` // emas | perak
 	DariCustomer bool       `json:"dari_customer"`
+	Metode       string     `json:"metode"` // tunai | qris untuk barang terjual dari Stok, kosong bila belum/lewat penadah
 }
 
 type KirimBOReq struct {

@@ -26,7 +26,7 @@ export default function FormLaporan({
           <input type="date" value={sampai} onChange={(e) => onSampai(e.target.value)} />
         </div>
         <div>
-          <label>Lokasi (untuk Kas dan Riwayat stok)</label>
+          <label>Lokasi (untuk Kas, Riwayat stok, dan Penjualan toko)</label>
           <PilihanLokasi locations={locations} value={locId} onChange={(e) => onLocId(e.target.value)}>
             <option value="0">Semua lokasi</option>
           </PilihanLokasi>
@@ -35,10 +35,10 @@ export default function FormLaporan({
 
       {KELOMPOK_LAPORAN.map((g) => (
         <div key={g}>
-          <label>{g}</label>
-          <div className="cek-grup">
+          <div className="baris-head">{g}</div>
+          <div className="cek-grup cek-kisi">
             {LAPORAN.filter(([, , gr]) => gr === g).map(([k, nama]) => (
-              <label className="cek-item" key={k}>
+              <label className="cek-kartu" key={k}>
                 <input type="checkbox" checked={!!pilih[k]} onChange={() => onToggle(k)} />
                 {nama}
               </label>

@@ -26,6 +26,12 @@ export default function KartuLokasi({ saldo, service }) {
       <div className="big">
         {saldo.stok_gram} gram <span className="muted">({saldo.stok_pcs} pcs)</span>
       </div>
+      {saldo.stok_perak > 0 && (
+        <>
+          <div className="label">Stok perak</div>
+          <div className="big">{saldo.stok_perak} gram</div>
+        </>
+      )}
 
       <div className="label">Barang service</div>
       <div className="big">

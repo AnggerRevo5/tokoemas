@@ -56,11 +56,16 @@ func Setup(r *gin.Engine, db *sql.DB) {
 	auth.POST("/barang/void/:id", controllers.BarangVoid(db))
 	auth.PUT("/barang/:id", controllers.BarangEdit(db))
 
+	// Pembatalan dan koreksi penjualan dari Stok (cabang paling lama 7 hari, selebihnya Super Admin atau Owner)
+	auth.POST("/jual-toko/:id/batal", controllers.JualBatal(db))
+	auth.POST("/jual-toko/:id/koreksi", controllers.JualKoreksi(db))
+
 	// Baki perhiasan
 	auth.GET("/baki", controllers.BakiList(db))
 	auth.POST("/baki", controllers.BakiCreate(db))
 	auth.POST("/baki/pindah", controllers.BakiPindah(db))
 	auth.POST("/baki/:id/hapus", controllers.BakiHapus(db))
+	auth.POST("/baki/:id/nama", controllers.BakiRename(db))
 
 	// Cuci
 	auth.POST("/cuci", controllers.CuciMulai(db))
@@ -86,6 +91,17 @@ func Setup(r *gin.Engine, db *sql.DB) {
 	auth.POST("/penjualan", controllers.PenjualanPenadah(db))
 	auth.GET("/penjualan", controllers.PenjualanList(db))
 	auth.POST("/penjualan/void/:id", controllers.PenjualanVoid(db))
+
+	// Gadai logam mulia: dana masuk, cicilan bulanan, tebus lebih cepat, barang kembali atau tidak ditebus
+	auth.GET("/gadai", controllers.GadaiList(db))
+	auth.POST("/gadai", controllers.GadaiCreate(db))
+	auth.GET("/gadai/:id", controllers.GadaiDetail(db))
+	auth.POST("/gadai/:id/bayar", controllers.GadaiBayar(db, false))
+	auth.POST("/gadai/:id/tebus", controllers.GadaiBayar(db, true))
+	auth.POST("/gadai/:id/kembali", controllers.GadaiAkhir(db, true))
+	auth.POST("/gadai/:id/tidak-ditebus", controllers.GadaiAkhir(db, false))
+	auth.POST("/gadai/:id/batal", controllers.GadaiBatal(db))
+	auth.POST("/gadai-bayar/:id/void", controllers.GadaiBayarVoid(db))
 
 	// Hutang dan dana
 	auth.POST("/hutang", controllers.HutangCreate(db))

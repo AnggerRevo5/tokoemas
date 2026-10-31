@@ -3,9 +3,13 @@ import { api } from '../../services/api'
 import { gram, hariIni, rupiah } from '../../utils/format'
 import { KETERANGAN_AKSI } from '../../constants/barang'
 import PilihanLokasi from '../common/PilihanLokasi'
+import PilihMetodeBayar from '../common/PilihMetodeBayar'
+import { BIAYA_KOSONG, nominalBiaya } from '../../utils/biaya'
 import { m } from 'motion/react'
 import AngkaBerjalan from '../common/AngkaBerjalan'
 import Spinner from '../common/Spinner'
+import FormGadai from './FormGadai'
+import Popup from '../common/Popup'
 
 const formatGram = (v) => String(gram(v))
 const formatRupiah = (v) => rupiah(Math.round(v))
@@ -21,9 +25,24 @@ export default function BarAksiBarang({
   const [target, setTarget] = useState('')
   const [catatan, setCatatan] = useState('')
   const [harga, setHarga] = useState({}) // harga jual per barang { id: 'nominal' }
+  const [metode, setMetode] = useState('tunai')
+  const [biaya, setBiaya] = useState(BIAYA_KOSONG)
+  const [konfirmasiJual, setKonfirmasiJual] = useState(false)
+  const totalJual = terpilih.reduce((s, r) => s + (Number(harga[r.id]) || 0), 0)
 
   // tujuan oper: cabang pertama bila belum dipilih
   const targetAktif = target || (cabangList.length > 0 ? String(cabangList[0].id) : '')
+
+  // penjualan: tampilkan card konfirmasi (barang, harga, metode) sebelum benar-benar tersimpan
+  function periksaJual(e) {
+    e.preventDefault()
+    onMulai()
+    if (terpilih.some((r) => !(Number(harga[r.id]) > 0))) return onError('Harga jual setiap barang wajib diisi')
+    if (metode === 'qris' && nominalBiaya(totalJual, biaya) > totalJual) {
+      return onError('Potongan tidak boleh melebihi total penjualan')
+    }
+    setKonfirmasiJual(true)
+  }
 
   async function jalankan(e) {
     e.preventDefault()
@@ -33,6 +52,9 @@ export default function BarAksiBarang({
     try {
       if (aksi === 'jual' && terpilih.some((r) => !(Number(harga[r.id]) > 0))) {
         throw new Error('Harga jual setiap barang wajib diisi')
+      }
+      if (aksi === 'jual' && metode === 'qris' && nominalBiaya(totalJual, biaya) > totalJual) {
+        throw new Error('Potongan tidak boleh melebihi total penjualan')
       }
       let res
       if (aksi === 'kirim') {
@@ -91,11 +113,15 @@ export default function BarAksiBarang({
           body: JSON.stringify({
             items: terpilih.map((r) => ({ item_id: r.id, harga: Number(harga[r.id]) })),
             date: tgl,
+            metode,
+            biaya: metode === 'qris' ? nominalBiaya(totalJual, biaya) : 0,
           }),
         })
       }
       setCatatan('')
       setHarga({})
+      setMetode('tunai')
+      setBiaya(BIAYA_KOSONG)
       onSelesai(res.message)
     } catch (err) {
       onError(err.message)
@@ -149,8 +175,12 @@ export default function BarAksiBarang({
         </button>
       </div>
 
-      {aksi && (
-        <form className="panel-aksi" onSubmit={jalankan}>
+      {aksi === 'gadai' && (
+        <FormGadai item={terpilih[0]} onMulai={onMulai} onSelesai={onSelesai} onError={onError} />
+      )}
+
+      {aksi && aksi !== 'gadai' && (
+        <form className="panel-aksi" onSubmit={aksi === 'jual' ? periksaJual : jalankan}>
           <div className="form-grid">
             <div>
               <label>{aksi === 'selesai_cuci' ? 'Tanggal selesai' : 'Tanggal'}</label>
@@ -214,19 +244,68 @@ export default function BarAksiBarang({
               </table>
               <div className="total-bar">
                 <span>
-                  Total harga jual (masuk ke kas toko):{' '}
+                  Total harga jual ({metode === 'qris' ? 'masuk ke kas back office' : 'masuk ke kas toko'}):{' '}
                   <b className="utama">
-                    <AngkaBerjalan nilai={terpilih.reduce((s, r) => s + (Number(harga[r.id]) || 0), 0)} format={formatRupiah} />
+                    <AngkaBerjalan nilai={totalJual} format={formatRupiah} />
                   </b>
                 </span>
               </div>
             </div>
           )}
+          {aksi === 'jual' && (
+            <PilihMetodeBayar
+              metode={metode}
+              onMetode={setMetode}
+              total={totalJual}
+              biaya={biaya}
+              onBiaya={setBiaya}
+            />
+          )}
 
           {KETERANGAN_AKSI[aksi] && <p className="muted">{KETERANGAN_AKSI[aksi]}</p>}
 
-          <button disabled={loading}>{loading ? <><Spinner />Memproses...</> : 'Konfirmasi'}</button>
+          <button disabled={loading}>{loading ? <><Spinner />Memproses...</> : aksi === 'jual' ? 'Lanjut' : 'Konfirmasi'}</button>
         </form>
+      )}
+
+      {konfirmasiJual && (
+        <Popup
+          judul={`Jual ${terpilih.length} barang?`}
+          labelKonfirmasi="Ya, catat penjualan"
+          loading={loading}
+          onKonfirmasi={async (e) => {
+            await jalankan(e)
+            setKonfirmasiJual(false)
+          }}
+          onTutup={() => setKonfirmasiJual(false)}
+        >
+          <p className="muted">Periksa barang dan harga sebelum disimpan:</p>
+          <div className="table-wrap" style={{ maxHeight: 260, overflow: 'auto' }}>
+            <table className="tabel-spek">
+              <thead>
+                <tr><th>Barang</th><th>Kadar</th><th className="num">Berat</th><th className="num">Harga jual</th></tr>
+              </thead>
+              <tbody>
+                {terpilih.map((r) => (
+                  <tr key={r.id}>
+                    <td>{r.item_no} {r.item_name}</td>
+                    <td>{r.karat}</td>
+                    <td className="num">{gram(r.weight_gram)} g</td>
+                    <td className="num">{rupiah(Number(harga[r.id]) || 0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <table className="tabel-spek" style={{ marginTop: 12 }}>
+            <tbody>
+              <tr><th>Tanggal</th><td>{tgl}</td></tr>
+              <tr><th>Metode</th><td>{metode === 'qris' ? 'QRIS/Debit (masuk kas back office)' : 'Tunai (masuk kas toko)'}</td></tr>
+              <tr><th>Total harga jual</th><td>{rupiah(totalJual)}</td></tr>
+              {metode === 'qris' && <tr><th>Potongan</th><td>{rupiah(nominalBiaya(totalJual, biaya))}</td></tr>}
+            </tbody>
+          </table>
+        </Popup>
       )}
     </m.div>
   )

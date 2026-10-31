@@ -15,6 +15,7 @@ import SpesifikasiBarang from './SpesifikasiBarang'
 // Ditutup dengan tombol silang, klik latar, atau Esc.
 export default function FormEditBarang({ item, baki, kapasitas, onSelesai, onTutup, onHapus }) {
   const lm = item.jenis === 'logam_mulia'
+  const perak = lm && item.bahan === 'perak'
   const [f, setF] = useState({
     item_name: item.item_name,
     brand: item.brand,
@@ -35,16 +36,16 @@ export default function FormEditBarang({ item, baki, kapasitas, onSelesai, onTut
   const bakiBaru = baki.find((b) => String(b.id) === f.tray_id)
   const sesudah = {
     ...item,
-    item_name: lm ? `Logam mulia ${f.brand.trim()}` : f.item_name.trim(),
+    item_name: lm ? `Logam mulia ${perak ? 'perak ' : ''}${f.brand.trim()}` : f.item_name.trim(),
     brand: lm ? f.brand.trim() : item.brand,
-    karat: lm ? '24K' : f.karat,
+    karat: lm ? (perak ? '999' : '24K') : f.karat,
     weight_gram: Number(f.weight_gram),
     harga_beli: Number(f.harga_beli || 0),
     note: f.note.trim(),
-    baki_no: lm ? 0 : bakiBaru ? bakiBaru.no : 0,
+    baki_nama: bakiBaru ? bakiBaru.name : '',
   }
 
-  const adaPerubahan = ['item_name', 'karat', 'weight_gram', 'harga_beli', 'note', 'baki_no']
+  const adaPerubahan = ['item_name', 'karat', 'weight_gram', 'harga_beli', 'note', 'baki_nama']
     .some((k) => String(sesudah[k] ?? '') !== String(item[k] ?? ''))
 
   useEffect(() => {
@@ -123,7 +124,7 @@ export default function FormEditBarang({ item, baki, kapasitas, onSelesai, onTut
         <div>
           <label>Kadar</label>
           {lm ? (
-            <input value="24K" disabled />
+            <input value={perak ? '999' : '24K'} disabled />
           ) : (
             <select value={f.karat} onChange={ubah('karat')} required>
               <option value="">Kadar</option>
@@ -148,7 +149,7 @@ export default function FormEditBarang({ item, baki, kapasitas, onSelesai, onTut
           <label>Keterangan</label>
           <input value={f.note} onChange={ubah('note')} />
         </div>
-        {!lm && (
+        {(
           <div>
             <label>Baki</label>
             <select value={f.tray_id} onChange={ubah('tray_id')}>
@@ -157,7 +158,7 @@ export default function FormEditBarang({ item, baki, kapasitas, onSelesai, onTut
                 const penuh = b.isi >= kapasitas && b.id !== item.baki_id
                 return (
                   <option key={b.id} value={b.id} disabled={penuh}>
-                    Baki {b.no} ({b.isi}/{kapasitas}{penuh ? ', penuh' : ''})
+                    {b.name} ({b.isi}/{kapasitas}{penuh ? ', penuh' : ''})
                   </option>
                 )
               })}

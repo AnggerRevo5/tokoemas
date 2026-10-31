@@ -92,7 +92,13 @@ export default function RiwayatPenjualan({
                   {r.note && <div className="muted">{r.note}</div>}
                 </td>
                 <td className="num">{rupiah(r.modal)}</td>
-                <td className="num">{rupiah(r.sale_total)}</td>
+                <td className="num">
+                  {rupiah(r.sale_total)}
+                  <div className="muted">
+                    {r.metode === 'qris' ? 'QRIS/Debit' : 'Tunai'}
+                    {r.biaya > 0 && `, potongan ${rupiah(r.biaya)}`}
+                  </div>
+                </td>
                 <td className={r.untung < 0 ? 'num neg' : 'num'}>
                   <b>{r.untung < 0 ? 'Rugi ' : 'Untung '}{rupiah(Math.abs(r.untung))}</b>
                 </td>

@@ -22,6 +22,8 @@ type PenjualanPenadahRequest struct {
 	SaleTotal   float64 `json:"sale_total" binding:"lte=1000000000000"`
 	SaleDate    string  `json:"sale_date" binding:"max=10"`
 	Note        string  `json:"note" binding:"max=200"`
+	Metode      string  `json:"metode" binding:"max=10"`
+	Biaya       float64 `json:"biaya" binding:"gte=0,lte=1000000000000"`
 }
 
 // PenjualanListRow adalah satu baris respons JSON dari PenjualanList.
@@ -37,4 +39,6 @@ type PenjualanListRow struct {
 	Note        string    `json:"note"`
 	PJ          string    `json:"pj"`
 	Barang      string    `json:"barang"`
+	Metode      string    `json:"metode"`
+	Biaya       float64   `json:"biaya"`
 }
