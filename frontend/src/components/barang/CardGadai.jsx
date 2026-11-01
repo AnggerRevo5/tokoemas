@@ -3,10 +3,10 @@ import { createPortal } from 'react-dom'
 import { m } from 'motion/react'
 import { X } from 'lucide-react'
 import { api } from '../../services/api'
-import { hariIni, rupiah } from '../../utils/format'
+import { gram, hariIni, rupiah } from '../../utils/format'
 import Popup from '../common/Popup'
 import Pesan from '../common/Pesan'
-import SpesifikasiBarang from './SpesifikasiBarang'
+import SpesifikasiBarang, { DaftarSpesifikasi } from './SpesifikasiBarang'
 
 const LABEL_STATUS = {
   aktif: 'Berjalan',
@@ -26,7 +26,7 @@ const JUDUL_AKSI = {
 
 const kosong = () => ({ tgl: hariIni(), amount: '', denda: '', diskon: '', alasan: '', note: '' })
 
-// Card gadai satu barang: ringkasan, jadwal cicilan, riwayat pembayaran, dan langkah berikutnya.
+// Card gadai (satu akad, satu atau beberapa barang): ringkasan, jadwal cicilan, riwayat pembayaran, dan langkah berikutnya.
 // Setiap langkah menampilkan card konfirmasi berisi spesifikasi barang dan rinciannya sebelum disimpan.
 // onUbah(pesan): ada perubahan data (daftar Stok dimuat ulang); onTutup().
 export default function CardGadai({ item, me, onUbah, onTutup }) {
@@ -58,6 +58,9 @@ export default function CardGadai({ item, me, onUbah, onTutup }) {
     return () => window.removeEventListener('keydown', esc)
   }, [onTutup, konfirmasi, loading])
 
+  const paket = !!g && g.barang.length > 1
+  // DaftarSpesifikasi memakai kolom id, sedangkan data gadai memakai item_id
+  const daftarBarang = paket ? g.barang.map((b) => ({ ...b, id: b.item_id })) : []
   const kelola = !!g && (me.role === 'super_admin' || (me.role === 'cabang' && g.location_id === me.location_id))
   const adaBayar = !!g && g.pembayaran.some((p) => !p.is_void)
   const sisa = g ? g.sisa : 0
@@ -104,19 +107,19 @@ export default function CardGadai({ item, me, onUbah, onTutup }) {
           ],
         }
       case 'kembali':
-        return { path: `/gadai/${g.id}/kembali`, body: { date: f.tgl }, baris: [['Tanggal kembali', f.tgl], ['Barang', 'Masuk lagi ke stok toko, status Tersedia']] }
+        return { path: `/gadai/${g.id}/kembali`, body: { date: f.tgl }, baris: [['Tanggal kembali', f.tgl], ['Barang', `${paket ? 'Semua barang masuk' : 'Masuk'} lagi ke stok toko, status Tersedia`]] }
       case 'tidak':
         return {
           path: `/gadai/${g.id}/tidak-ditebus`,
           body: { date: f.tgl, reason: f.alasan.trim() },
-          baris: [['Tanggal', f.tgl], ['Alasan', f.alasan.trim()], ['Akibat', 'Barang tidak ada lagi di stok toko']],
+          baris: [['Tanggal', f.tgl], ['Alasan', f.alasan.trim()], ['Akibat', `${paket ? 'Semua barang' : 'Barang'} tidak ada lagi di stok toko`]],
           danger: true,
         }
       case 'batal':
         return {
           path: `/gadai/${g.id}/batal`,
           body: { reason: f.alasan.trim() },
-          baris: [['Alasan', f.alasan.trim()], ['Akibat', 'Dana gadai dikeluarkan lagi dari kas dan barang kembali Tersedia']],
+          baris: [['Alasan', f.alasan.trim()], ['Akibat', `Dana gadai dikeluarkan lagi dari kas dan ${paket ? 'semua barang' : 'barang'} kembali Tersedia`]],
           danger: true,
         }
       default:
@@ -179,7 +182,7 @@ export default function CardGadai({ item, me, onUbah, onTutup }) {
         transition={{ duration: 0.18, ease: 'easeOut' }}
       >
         <div className="popup-kepala">
-          <h3>Gadai {item.item_no} - {item.item_name} {item.karat}</h3>
+          <h3>{paket ? `Gadai ${g.barang.length} barang` : `Gadai ${item.item_no} - ${item.item_name} ${item.karat}`}</h3>
           <button type="button" className="mini popup-tutup" onClick={onTutup} disabled={loading} aria-label="Tutup">
             <X size={16} aria-hidden="true" />
           </button>
@@ -189,6 +192,12 @@ export default function CardGadai({ item, me, onUbah, onTutup }) {
 
         {g && (
           <>
+            {paket && (
+              <>
+                <h4 style={{ margin: '12px 0 6px' }}>Barang yang digadaikan ({g.barang.length} barang, {gram(g.weight_gram)} g)</h4>
+                <DaftarSpesifikasi items={daftarBarang} />
+              </>
+            )}
             <table className="tabel-spek" style={{ marginTop: 12 }}>
               <tbody>
                 <tr><th>Status</th><td><span className={KELAS_STATUS[g.status]}>{LABEL_STATUS[g.status]}</span></td></tr>
@@ -359,7 +368,7 @@ export default function CardGadai({ item, me, onUbah, onTutup }) {
           }}
         >
           <p className="muted">Periksa barang dan rinciannya sebelum disimpan:</p>
-          <SpesifikasiBarang item={item} />
+          {paket ? <DaftarSpesifikasi items={daftarBarang} /> : <SpesifikasiBarang item={item} />}
           <table className="tabel-spek" style={{ marginTop: 12 }}>
             <tbody>
               <tr><th>Pegadaian</th><td>{g.pegadaian}</td></tr>

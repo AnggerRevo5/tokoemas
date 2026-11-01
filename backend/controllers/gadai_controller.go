@@ -91,7 +91,52 @@ func muatGadai(db *sql.DB, cl *models.Claims, id int) (models.GadaiRow, bool, er
 	if err == sql.ErrNoRows {
 		return r, false, nil
 	}
-	return r, err == nil, err
+	if err != nil {
+		return r, false, err
+	}
+	satu := []models.GadaiRow{r}
+	if err := isiBarangGadai(db, satu); err != nil {
+		return r, false, err
+	}
+	return satu[0], true, nil
+}
+
+type penanya interface {
+	Query(query string, args ...any) (*sql.Rows, error)
+}
+
+// isiBarangGadai mengisi daftar barang tiap gadai dan menjumlahkan beratnya.
+func isiBarangGadai(q penanya, daftar []models.GadaiRow) error {
+	if len(daftar) == 0 {
+		return nil
+	}
+	idx := map[int]int{}
+	args := make([]interface{}, 0, len(daftar))
+	for i := range daftar {
+		idx[daftar[i].ID] = i
+		daftar[i].Barang = []models.GadaiBarangRow{}
+		daftar[i].WeightGram = 0
+		args = append(args, daftar[i].ID)
+	}
+	rows, err := q.Query(
+		`SELECT b.gadai_id, i.id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''), IFNULL(i.brand,''), i.jenis, i.bahan, i.weight_gram, i.status
+		 FROM gadai_barang b JOIN items i ON i.id = b.item_id
+		 WHERE b.gadai_id IN (`+utils.Placeholders(len(args))+`) ORDER BY b.id`, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var gid int
+		var b models.GadaiBarangRow
+		if err := rows.Scan(&gid, &b.ItemID, &b.ItemNo, &b.ItemName, &b.Karat, &b.Brand, &b.Jenis, &b.Bahan, &b.WeightGram, &b.Status); err != nil {
+			return err
+		}
+		i := idx[gid]
+		daftar[i].Barang = append(daftar[i].Barang, b)
+		daftar[i].WeightGram += b.WeightGram
+	}
+	return rows.Err()
 }
 
 // ---------- DAFTAR GADAI ----------
@@ -109,7 +154,7 @@ func GadaiList(db *sql.DB) gin.HandlerFunc {
 			args = append(args, loc)
 		}
 		if it := c.Query("item_id"); it != "" {
-			q += " AND g.item_id = ?"
+			q += " AND g.id IN (SELECT gadai_id FROM gadai_barang WHERE item_id = ?)"
 			args = append(args, it)
 		}
 		switch s := c.DefaultQuery("status", "berjalan"); s {
@@ -138,6 +183,14 @@ func GadaiList(db *sql.DB) gin.HandlerFunc {
 				return
 			}
 			out = append(out, r)
+		}
+		if err := rows.Err(); err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		if err := isiBarangGadai(db, out); err != nil {
+			utils.Gagal(c, err)
+			return
 		}
 		c.JSON(http.StatusOK, out)
 	}
@@ -227,8 +280,21 @@ func GadaiCreate(db *sql.DB) gin.HandlerFunc {
 		}
 		req.Pegadaian = strings.TrimSpace(req.Pegadaian)
 		req.Note = strings.TrimSpace(req.Note)
+		// beberapa barang dalam satu gadai; item_id tunggal tetap diterima, tanpa duplikat dan dengan urutan dipertahankan
+		semua := req.ItemIDs
+		if len(semua) == 0 && req.ItemID > 0 {
+			semua = []int{req.ItemID}
+		}
+		ids := []int{}
+		terlihat := map[int]bool{}
+		for _, id := range semua {
+			if id > 0 && !terlihat[id] {
+				terlihat[id] = true
+				ids = append(ids, id)
+			}
+		}
 		switch {
-		case req.ItemID <= 0:
+		case len(ids) == 0:
 			c.JSON(http.StatusBadRequest, gin.H{"error": "pilih barang yang digadaikan"})
 			return
 		case req.Pegadaian == "":
@@ -269,64 +335,97 @@ func GadaiCreate(db *sql.DB) gin.HandlerFunc {
 		}
 		defer tx.Rollback()
 
-		items, err := services.AmbilBarang(tx, []int{req.ItemID})
+		items, err := services.AmbilBarang(tx, ids)
 		if err != nil {
 			balasKesalahan(c, err)
 			return
 		}
-		it := items[req.ItemID]
-		if it.Status != "tersedia" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s sedang tidak tersedia (%s)", it.Name, it.Status)})
+		pertama := items[ids[0]]
+		var totalBerat float64
+		namaSemua := make([]string, 0, len(ids))
+		for _, id := range ids {
+			it := items[id]
+			if it.Status != "tersedia" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s sedang tidak tersedia (%s)", it.Name, it.Status)})
+				return
+			}
+			if it.Location != pertama.Location {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "semua barang dalam satu gadai harus berasal dari lokasi yang sama"})
+				return
+			}
+			totalBerat += it.Weight
+			namaSemua = append(namaSemua, it.Name)
+		}
+		if !bolehKelolaGadai(c, cl, pertama.Location) {
 			return
 		}
-		if !bolehKelolaGadai(c, cl, it.Location) {
-			return
+
+		catatan := fmt.Sprintf("Dana gadai %s: %s %s %s g", req.Pegadaian, pertama.Name, pertama.Karat, strconv.FormatFloat(pertama.Weight, 'f', -1, 64))
+		if len(ids) > 1 {
+			catatan = fmt.Sprintf("Dana gadai %s: %d barang (%s) %s g", req.Pegadaian, len(ids), strings.Join(namaSemua, ", "),
+				strconv.FormatFloat(totalBerat, 'f', -1, 64))
 		}
-		catatan := fmt.Sprintf("Dana gadai %s: %s %s %s g", req.Pegadaian, it.Name, it.Karat, strconv.FormatFloat(it.Weight, 'f', -1, 64))
+		if r := []rune(catatan); len(r) > 250 {
+			catatan = string(r[:247]) + "..."
+		}
 		rk, err := tx.Exec(
 			`INSERT INTO cash_transactions (location_id, direction, category, amount, note, transaction_date, created_by)
 			 VALUES (?, 'in', ?, ?, ?, ?, ?)`,
-			it.Location, services.KategoriGadaiDana, req.Dana, catatan, tgl, cl.UserID)
+			pertama.Location, services.KategoriGadaiDana, req.Dana, catatan, tgl, cl.UserID)
 		if err != nil {
 			utils.Gagal(c, err)
 			return
 		}
 		kasID, _ := rk.LastInsertId()
 
-		rs, err := tx.Exec(services.SQLStokItem, it.Location, "out", "pegadaian", it.Name, it.Weight, it.Karat,
-			"Digadaikan di "+req.Pegadaian, tgl, cl.UserID, it.ID)
-		if err != nil {
-			utils.Gagal(c, err)
-			return
-		}
-		stokID, _ := rs.LastInsertId()
-
-		if _, err := tx.Exec("UPDATE items SET status = 'digadai' WHERE id = ?", it.ID); err != nil {
-			utils.Gagal(c, err)
-			return
+		stokIDs := make([]int64, 0, len(ids))
+		for _, id := range ids {
+			it := items[id]
+			rs, err := tx.Exec(services.SQLStokItem, it.Location, "out", "pegadaian", it.Name, it.Weight, it.Karat,
+				"Digadaikan di "+req.Pegadaian, tgl, cl.UserID, it.ID)
+			if err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			stokID, _ := rs.LastInsertId()
+			stokIDs = append(stokIDs, stokID)
+			if _, err := tx.Exec("UPDATE items SET status = 'digadai' WHERE id = ?", it.ID); err != nil {
+				utils.Gagal(c, err)
+				return
+			}
 		}
 		rg, err := tx.Exec(
 			`INSERT INTO gadai (item_id, location_id, pegadaian, dana, tenor, cicilan, total, start_date, first_due, note,
 			                    cash_id, out_stock_id, created_by)
 			 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-			it.ID, it.Location, req.Pegadaian, req.Dana, req.Tenor, req.Cicilan, total, tgl, tempo,
-			sql.NullString{String: req.Note, Valid: req.Note != ""}, kasID, stokID, cl.UserID)
+			pertama.ID, pertama.Location, req.Pegadaian, req.Dana, req.Tenor, req.Cicilan, total, tgl, tempo,
+			sql.NullString{String: req.Note, Valid: req.Note != ""}, kasID, stokIDs[0], cl.UserID)
 		if err != nil {
 			utils.Gagal(c, err)
 			return
 		}
 		gid, _ := rg.LastInsertId()
-		services.CatatAudit(tx, middleware.Meta(c), "create", "gadai", gid, gin.H{"request": req, "total": total})
+		for k, id := range ids {
+			if _, err := tx.Exec("INSERT INTO gadai_barang (gadai_id, item_id, out_stock_id) VALUES (?,?,?)", gid, id, stokIDs[k]); err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+		}
+		services.CatatAudit(tx, middleware.Meta(c), "create", "gadai", gid, gin.H{"request": req, "item_ids": ids, "total": total})
 		services.CatatAudit(tx, middleware.Meta(c), "create_auto", "cash_transactions", kasID, gin.H{"gadai": gid, "dana": req.Dana})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
 			return
 		}
+		apa := pertama.Name
+		if len(ids) > 1 {
+			apa = fmt.Sprintf("%d barang", len(ids))
+		}
 		c.JSON(http.StatusCreated, gin.H{
 			"id": gid,
 			"message": fmt.Sprintf("%s digadaikan di %s, kas bertambah %s. Cicilan %d x %s",
-				it.Name, req.Pegadaian, utils.RupiahTeks(float64(req.Dana)), req.Tenor, utils.RupiahTeks(float64(req.Cicilan))),
+				apa, req.Pegadaian, utils.RupiahTeks(float64(req.Dana)), req.Tenor, utils.RupiahTeks(float64(req.Cicilan))),
 		})
 	}
 }
@@ -500,6 +599,34 @@ func GadaiBayar(db *sql.DB, pelunasan bool) gin.HandlerFunc {
 
 // ---------- BARANG KEMBALI KE TOKO / TIDAK DITEBUS ----------
 
+// barangGadai adalah satu barang yang dijaminkan, dibaca sebelum diubah.
+type barangGadai struct {
+	ID    int
+	Nama  string
+	Karat string
+	Berat float64
+}
+
+// kunciBarangGadai mengunci dan membaca semua barang dalam satu gadai.
+func kunciBarangGadai(tx *sql.Tx, id int) ([]barangGadai, error) {
+	rows, err := tx.Query(
+		`SELECT i.id, i.item_name, IFNULL(i.karat,''), i.weight_gram
+		 FROM gadai_barang b JOIN items i ON i.id = b.item_id WHERE b.gadai_id = ? ORDER BY b.id FOR UPDATE`, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []barangGadai{}
+	for rows.Next() {
+		var b barangGadai
+		if err := rows.Scan(&b.ID, &b.Nama, &b.Karat, &b.Berat); err != nil {
+			return nil, err
+		}
+		out = append(out, b)
+	}
+	return out, rows.Err()
+}
+
 func GadaiAkhir(db *sql.DB, kembali bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		cl := c.MustGet("claims").(*models.Claims)
@@ -541,14 +668,18 @@ func GadaiAkhir(db *sql.DB, kembali bool) gin.HandlerFunc {
 		if !bolehKelolaGadai(c, cl, g.Lokasi) {
 			return
 		}
-		var itemID int
-		var nama, karat string
-		var berat float64
-		if err := tx.QueryRow(
-			`SELECT i.id, i.item_name, IFNULL(i.karat,''), i.weight_gram FROM gadai g JOIN items i ON i.id = g.item_id WHERE g.id = ? FOR UPDATE`, id,
-		).Scan(&itemID, &nama, &karat, &berat); err != nil {
+		barang, err := kunciBarangGadai(tx, id)
+		if err != nil {
 			utils.Gagal(c, err)
 			return
+		}
+		if len(barang) == 0 {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "daftar barang gadai tidak ditemukan"})
+			return
+		}
+		itemIDs := make([]int, 0, len(barang))
+		for _, b := range barang {
+			itemIDs = append(itemIDs, b.ID)
 		}
 
 		if kembali {
@@ -556,47 +687,63 @@ func GadaiAkhir(db *sql.DB, kembali bool) gin.HandlerFunc {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "barang baru bisa dikembalikan setelah gadai lunas"})
 				return
 			}
-			rs, err := tx.Exec(services.SQLStokItem, g.Lokasi, "in", "gadai_kembali", nama, berat, karat,
-				"Kembali dari "+g.Pegadaian, tgl, cl.UserID, itemID)
-			if err != nil {
+			var stokPertama int64
+			for k, b := range barang {
+				rs, err := tx.Exec(services.SQLStokItem, g.Lokasi, "in", "gadai_kembali", b.Nama, b.Berat, b.Karat,
+					"Kembali dari "+g.Pegadaian, tgl, cl.UserID, b.ID)
+				if err != nil {
+					utils.Gagal(c, err)
+					return
+				}
+				stokID, _ := rs.LastInsertId()
+				if k == 0 {
+					stokPertama = stokID
+				}
+				if _, err := tx.Exec("UPDATE items SET status = 'tersedia' WHERE id = ?", b.ID); err != nil {
+					utils.Gagal(c, err)
+					return
+				}
+				if _, err := tx.Exec("UPDATE gadai_barang SET in_stock_id = ? WHERE gadai_id = ? AND item_id = ?", stokID, id, b.ID); err != nil {
+					utils.Gagal(c, err)
+					return
+				}
+			}
+			if _, err := tx.Exec("UPDATE gadai SET status = 'kembali', end_date = ?, in_stock_id = ? WHERE id = ?", tgl, stokPertama, id); err != nil {
 				utils.Gagal(c, err)
 				return
 			}
-			stokID, _ := rs.LastInsertId()
-			if _, err := tx.Exec("UPDATE items SET status = 'tersedia' WHERE id = ?", itemID); err != nil {
-				utils.Gagal(c, err)
-				return
-			}
-			if _, err := tx.Exec("UPDATE gadai SET status = 'kembali', end_date = ?, in_stock_id = ? WHERE id = ?", tgl, stokID, id); err != nil {
-				utils.Gagal(c, err)
-				return
-			}
-			services.CatatAudit(tx, middleware.Meta(c), "gadai_kembali", "gadai", int64(id), gin.H{"item_id": itemID, "tanggal": tgl})
+			services.CatatAudit(tx, middleware.Meta(c), "gadai_kembali", "gadai", int64(id), gin.H{"item_ids": itemIDs, "tanggal": tgl})
 		} else {
 			if g.Status != services.GadaiAktif {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "hanya gadai yang masih berjalan yang bisa ditandai tidak ditebus"})
 				return
 			}
-			if _, err := tx.Exec("UPDATE items SET status = 'tidak_ditebus' WHERE id = ?", itemID); err != nil {
-				utils.Gagal(c, err)
-				return
+			for _, b := range barang {
+				if _, err := tx.Exec("UPDATE items SET status = 'tidak_ditebus' WHERE id = ?", b.ID); err != nil {
+					utils.Gagal(c, err)
+					return
+				}
 			}
 			if _, err := tx.Exec("UPDATE gadai SET status = 'tidak_ditebus', end_date = ?, end_note = ? WHERE id = ?", tgl, req.Reason, id); err != nil {
 				utils.Gagal(c, err)
 				return
 			}
 			services.CatatAudit(tx, middleware.Meta(c), "gadai_tidak_ditebus", "gadai", int64(id),
-				gin.H{"item_id": itemID, "tanggal": tgl, "alasan": req.Reason})
+				gin.H{"item_ids": itemIDs, "tanggal": tgl, "alasan": req.Reason})
 		}
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
 			return
 		}
+		apa := barang[0].Nama
+		if len(barang) > 1 {
+			apa = fmt.Sprintf("%d barang", len(barang))
+		}
 		if kembali {
-			c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%s kembali ke stok toko", nama)})
+			c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%s kembali ke stok toko", apa)})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%s ditandai tidak ditebus, barang tidak ada lagi di stok", nama)})
+		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%s ditandai tidak ditebus, barang tidak ada lagi di stok", apa)})
 	}
 }
 
@@ -700,14 +847,14 @@ func GadaiBatal(db *sql.DB) gin.HandlerFunc {
 		}
 		defer tx.Rollback()
 
-		var itemID, lokasi int
+		var lokasi int
 		var status string
 		var baru bool
-		var kasID, stokID sql.NullInt64
+		var kasID sql.NullInt64
 		err = tx.QueryRow(
-			`SELECT item_id, location_id, status, created_at >= NOW() - INTERVAL 7 DAY, cash_id, out_stock_id
+			`SELECT location_id, status, created_at >= NOW() - INTERVAL 7 DAY, cash_id
 			 FROM gadai WHERE id = ? AND is_void = FALSE FOR UPDATE`, id,
-		).Scan(&itemID, &lokasi, &status, &baru, &kasID, &stokID)
+		).Scan(&lokasi, &status, &baru, &kasID)
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "gadai tidak ditemukan"})
 			return
@@ -738,17 +885,41 @@ func GadaiBatal(db *sql.DB) gin.HandlerFunc {
 			utils.Gagal(c, err)
 			return
 		}
-		if stokID.Valid {
-			if _, err := tx.Exec("UPDATE stock_movements SET is_void = TRUE, void_reason = ? WHERE id = ?", reason, stokID.Int64); err != nil {
+		type jaminan struct {
+			item int
+			stok sql.NullInt64
+		}
+		daftar := []jaminan{}
+		rb, err := tx.Query("SELECT item_id, out_stock_id FROM gadai_barang WHERE gadai_id = ?", id)
+		if err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		for rb.Next() {
+			var j jaminan
+			if err := rb.Scan(&j.item, &j.stok); err != nil {
+				rb.Close()
+				utils.Gagal(c, err)
+				return
+			}
+			daftar = append(daftar, j)
+		}
+		rb.Close()
+		itemIDs := make([]int, 0, len(daftar))
+		for _, j := range daftar {
+			itemIDs = append(itemIDs, j.item)
+			if j.stok.Valid {
+				if _, err := tx.Exec("UPDATE stock_movements SET is_void = TRUE, void_reason = ? WHERE id = ?", reason, j.stok.Int64); err != nil {
+					utils.Gagal(c, err)
+					return
+				}
+			}
+			if _, err := tx.Exec("UPDATE items SET status = 'tersedia' WHERE id = ?", j.item); err != nil {
 				utils.Gagal(c, err)
 				return
 			}
 		}
-		if _, err := tx.Exec("UPDATE items SET status = 'tersedia' WHERE id = ?", itemID); err != nil {
-			utils.Gagal(c, err)
-			return
-		}
-		services.CatatAudit(tx, middleware.Meta(c), "void", "gadai", int64(id), gin.H{"reason": reason, "item_id": itemID})
+		services.CatatAudit(tx, middleware.Meta(c), "void", "gadai", int64(id), gin.H{"reason": reason, "item_ids": itemIDs})
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
 			return

@@ -1,14 +1,17 @@
 import { useState } from 'react'
 import { api } from '../../services/api'
-import { hariIni, rupiah } from '../../utils/format'
+import { gram, hariIni, rupiah } from '../../utils/format'
 import Popup from '../common/Popup'
 import Spinner from '../common/Spinner'
-import SpesifikasiBarang from './SpesifikasiBarang'
+import SpesifikasiBarang, { DaftarSpesifikasi } from './SpesifikasiBarang'
 
-// Form menggadaikan satu barang. Sebelum disimpan muncul card berisi spesifikasi barang dan rincian
+// Form menggadaikan satu atau beberapa barang dalam satu akad (satu dana, satu cicilan). Sebelum disimpan muncul card berisi spesifikasi barang dan rincian
 // dana serta cicilan; baru setelah dikonfirmasi tercatat.
 // onMulai(): bersihkan pesan; onSelesai(pesan); onError(pesan).
-export default function FormGadai({ item, onMulai, onSelesai, onError }) {
+export default function FormGadai({ items, onMulai, onSelesai, onError }) {
+  const item = items[0]
+  const jumlah = items.length
+  const totalBerat = items.reduce((s, r) => s + r.weight_gram, 0)
   const [f, setF] = useState({ pegadaian: '', dana: '', tenor: '', cicilan: '', tgl: hariIni(), tempo: '', note: '' })
   const [konfirmasi, setKonfirmasi] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -37,7 +40,7 @@ export default function FormGadai({ item, onMulai, onSelesai, onError }) {
       const res = await api('/gadai', {
         method: 'POST',
         body: JSON.stringify({
-          item_id: item.id,
+          item_ids: items.map((r) => r.id),
           pegadaian: f.pegadaian.trim(),
           dana,
           tenor,
@@ -59,8 +62,13 @@ export default function FormGadai({ item, onMulai, onSelesai, onError }) {
   return (
     <form className="panel-aksi" onSubmit={periksa}>
       <p className="muted" style={{ marginTop: 0 }}>
-        Menggadaikan <b>{item.item_no} {item.item_name}</b> ({item.weight_gram} g)
+        {jumlah === 1 ? (
+          <>Menggadaikan <b>{item.item_no} {item.item_name}</b> ({item.weight_gram} g)</>
+        ) : (
+          <>Menggadaikan <b>{jumlah} barang</b> dalam satu gadai ({gram(totalBerat)} g). Dana dan cicilan di bawah berlaku untuk seluruh barang.</>
+        )}
       </p>
+      {jumlah > 1 && <DaftarSpesifikasi items={items} />}
       <div className="form-grid">
         <div>
           <label>Nama pegadaian</label>
@@ -104,16 +112,17 @@ export default function FormGadai({ item, onMulai, onSelesai, onError }) {
 
       {konfirmasi && (
         <Popup
-          judul={`Gadaikan ${item.item_no}?`}
+          judul={jumlah === 1 ? `Gadaikan ${item.item_no}?` : `Gadaikan ${jumlah} barang?`}
           labelKonfirmasi="Ya, gadaikan"
           loading={loading}
           onKonfirmasi={simpan}
           onTutup={() => setKonfirmasi(false)}
         >
           <p className="muted">Periksa barang dan rincian gadai sebelum disimpan:</p>
-          <SpesifikasiBarang item={item} />
+          {jumlah === 1 ? <SpesifikasiBarang item={item} /> : <DaftarSpesifikasi items={items} />}
           <table className="tabel-spek" style={{ marginTop: 12 }}>
             <tbody>
+              {jumlah > 1 && <tr><th>Jumlah barang</th><td>{jumlah} barang, {gram(totalBerat)} g</td></tr>}
               <tr><th>Pegadaian</th><td>{f.pegadaian.trim()}</td></tr>
               <tr><th>Tanggal gadai</th><td>{f.tgl}</td></tr>
               <tr><th>Dana diterima</th><td>{rupiah(dana)} (masuk ke kas {item.lokasi})</td></tr>

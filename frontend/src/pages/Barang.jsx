@@ -82,7 +82,7 @@ export default function Barang({ me, onUbah }) {
       .catch((e) => setError(e.message))
     api(`/baki?location_id=${locId}`).then(setBaki).catch(() => {})
     api(`/gadai?location_id=${locId}`)
-      .then((d) => setGadaiMap(Object.fromEntries(d.map((x) => [x.item_id, x]))))
+      .then((d) => setGadaiMap(Object.fromEntries(d.flatMap((x) => x.barang.map((b) => [b.item_id, x])))))
       .catch(() => {})
     api('/barang/notif').then(setNotif).catch(() => {})
   }, [locId, status, jenisF, cari, bakiF, batas])
@@ -103,9 +103,9 @@ export default function Barang({ me, onUbah }) {
     (r) => (r.jenis === 'perhiasan' || r.jenis === 'logam_mulia') && r.status === 'tersedia' && r.location_id === terpilih[0].location_id,
   ) ? terpilih[0].location_id : null
   const bakiPindah = lokasiPindah ? baki.rows.filter((b) => b.location_id === lokasiPindah) : []
-  // gadai: satu barang tersedia (perhiasan atau logam mulia), oleh akun cabang atau Super Admin
-  const bisaGadai = (isCabang || me.role === 'super_admin') && terpilih.length === 1 &&
-    terpilih[0].status === 'tersedia'
+  // gadai: satu atau beberapa barang tersedia dari lokasi yang sama, oleh akun cabang atau Super Admin
+  const bisaGadai = (isCabang || me.role === 'super_admin') && terpilih.length >= 1 &&
+    terpilih.every((r) => r.status === 'tersedia' && r.location_id === terpilih[0].location_id)
   const aksiTersedia = aksiUntukMode(mode, { isCabang, adaLM, bisaGadai })
 
   useEffect(() => {

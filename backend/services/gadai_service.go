@@ -57,6 +57,18 @@ var tabelGadai = []struct{ nama, sql string }{
 		FOREIGN KEY (gadai_id) REFERENCES gadai(id),
 		FOREIGN KEY (created_by) REFERENCES users(id)
 	)`},
+	// satu gadai (akad) bisa menjaminkan beberapa barang; gadai.item_id tetap menyimpan barang pertama
+	{"gadai_barang", `CREATE TABLE IF NOT EXISTS gadai_barang (
+		id INT AUTO_INCREMENT PRIMARY KEY,
+		gadai_id INT NOT NULL,
+		item_id INT NOT NULL,
+		out_stock_id INT NULL,
+		in_stock_id INT NULL,
+		UNIQUE KEY uq_gadai_barang (gadai_id, item_id),
+		INDEX idx_gadai_barang_item (item_id),
+		FOREIGN KEY (gadai_id) REFERENCES gadai(id),
+		FOREIGN KEY (item_id) REFERENCES items(id)
+	)`},
 }
 
 const enumStatusBarang = "ENUM('tersedia','dikirim','cuci','lebur','terjual','hasil','kembali','digadai','tidak_ditebus') NOT NULL DEFAULT 'tersedia'"
@@ -67,6 +79,12 @@ func SiapkanSkemaGadai(db *sql.DB) error {
 		if _, err := db.Exec(t.sql); err != nil && !tabelAda(db, t.nama) {
 			return fmt.Errorf("tabel %s belum ada dan gagal dibuat (%v); jalankan db/migrations/024_gadai.sql dengan user database yang punya hak CREATE", t.nama, err)
 		}
+	}
+	// gadai lama (satu barang) dicatat juga di gadai_barang; aman dijalankan berulang
+	if _, err := db.Exec(`INSERT INTO gadai_barang (gadai_id, item_id, out_stock_id, in_stock_id)
+		SELECT g.id, g.item_id, g.out_stock_id, g.in_stock_id FROM gadai g
+		WHERE NOT EXISTS (SELECT 1 FROM gadai_barang b WHERE b.gadai_id = g.id)`); err != nil {
+		return fmt.Errorf("isi gadai_barang dari gadai lama gagal (%v); jalankan db/migrations/029_gadai_paket.sql", err)
 	}
 	var tipe string
 	db.QueryRow(

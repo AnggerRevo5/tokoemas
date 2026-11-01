@@ -197,7 +197,7 @@ export default function BarAksiBarang({
           }}
         >
       {aksi === 'gadai' && (
-        <FormGadai item={terpilih[0]} onMulai={mulai} onSelesai={onSelesai} onError={gagal} />
+        <FormGadai items={terpilih} onMulai={mulai} onSelesai={onSelesai} onError={gagal} />
       )}
 
       {aksi && aksi !== 'gadai' && (

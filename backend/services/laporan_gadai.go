@@ -29,11 +29,14 @@ func TabelGadai(db *sql.DB, dari, sampai, loc string) (models.TabelLaporan, erro
 			"Dibayar (Rp)", "Denda (Rp)", "Diskon (Rp)", "Sisa (Rp)", "Sisa bulan", "Jatuh tempo berikut", "Status"},
 		Tipe: []string{"teks", "teks", "teks", "gram", "teks", "rupiah", "teks", "rupiah", "rupiah", "rupiah", "rupiah", "rupiah", "teks", "teks", "teks"},
 	}
-	q := `SELECT g.start_date, l.name, CONCAT(IFNULL(i.item_no,''), ' ', i.item_name, ' ', IFNULL(i.karat,'')), i.weight_gram,
+	// satu gadai bisa berisi beberapa barang: nama digabung dan berat dijumlahkan
+	q := `SELECT g.start_date, l.name,
+	             IFNULL((SELECT GROUP_CONCAT(CONCAT(IFNULL(i.item_no,''), ' ', i.item_name, ' ', IFNULL(i.karat,'')) ORDER BY b.id SEPARATOR '; ')
+	                     FROM gadai_barang b JOIN items i ON i.id = b.item_id WHERE b.gadai_id = g.id), ''),
+	             IFNULL((SELECT SUM(i.weight_gram) FROM gadai_barang b JOIN items i ON i.id = b.item_id WHERE b.gadai_id = g.id), 0),
 	             g.pegadaian, g.dana, g.tenor, g.cicilan, g.total, g.first_due, g.status,
 	             IFNULL(p.dibayar,0), IFNULL(p.denda,0), IFNULL(p.diskon,0), IFNULL(p.bulan,0)
 	      FROM gadai g
-	      JOIN items i ON i.id = g.item_id
 	      JOIN locations l ON l.id = g.location_id
 	      LEFT JOIN (SELECT gadai_id, SUM(amount) AS dibayar, SUM(denda) AS denda, SUM(diskon) AS diskon,
 	                        SUM(jenis = 'cicilan') AS bulan

@@ -3,7 +3,8 @@ package models
 // GadaiBaruReq adalah payload JSON untuk GadaiCreate. Nominal dalam rupiah bulat.
 // JatuhTempoPertama kosong berarti satu bulan setelah tanggal gadai.
 type GadaiBaruReq struct {
-	ItemID            int    `json:"item_id" binding:"gte=0"`
+	ItemID            int    `json:"item_id" binding:"gte=0"`           // satu barang (cara lama)
+	ItemIDs           []int  `json:"item_ids" binding:"max=50,dive,gte=1"` // beberapa barang dalam satu gadai
 	Pegadaian         string `json:"pegadaian" binding:"max=100"`
 	Dana              int64  `json:"dana" binding:"gte=0,lte=100000000000"`
 	Tenor             int    `json:"tenor" binding:"gte=0,lte=120"`
@@ -29,15 +30,30 @@ type GadaiAkhirReq struct {
 	Reason string `json:"reason" binding:"max=250"`
 }
 
-// GadaiRow adalah satu gadai beserta angka ringkasnya.
+// GadaiBarangRow adalah satu barang yang dijaminkan dalam sebuah gadai.
+type GadaiBarangRow struct {
+	ItemID     int     `json:"item_id"`
+	ItemNo     string  `json:"item_no"`
+	ItemName   string  `json:"item_name"`
+	Karat      string  `json:"karat"`
+	Brand      string  `json:"brand"`
+	Jenis      string  `json:"jenis"`
+	Bahan      string  `json:"bahan"`
+	WeightGram float64 `json:"weight_gram"`
+	Status     string  `json:"status"`
+}
+
+// GadaiRow adalah satu gadai beserta angka ringkasnya. ItemID/ItemNo/ItemName/Karat/Brand adalah barang pertama;
+// WeightGram adalah berat seluruh barang; Barang memuat semua barang yang dijaminkan.
 type GadaiRow struct {
-	ID           int     `json:"id"`
-	ItemID       int     `json:"item_id"`
-	ItemNo       string  `json:"item_no"`
-	ItemName     string  `json:"item_name"`
-	Karat        string  `json:"karat"`
-	Brand        string  `json:"brand"`
-	WeightGram   float64 `json:"weight_gram"`
+	ID           int              `json:"id"`
+	ItemID       int              `json:"item_id"`
+	ItemNo       string           `json:"item_no"`
+	ItemName     string           `json:"item_name"`
+	Karat        string           `json:"karat"`
+	Brand        string           `json:"brand"`
+	WeightGram   float64          `json:"weight_gram"`
+	Barang       []GadaiBarangRow `json:"barang"`
 	LocationID   int     `json:"location_id"`
 	Lokasi       string  `json:"lokasi"`
 	Pegadaian    string  `json:"pegadaian"`
