@@ -25,7 +25,6 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
   const [fPosisi, setFPosisi] = useState('toko')
   const [fBaki, setFBaki] = useState('')
   const [bakiList, setBakiList] = useState([])
-  const [kapasitas, setKapasitas] = useState(100)
   const [baris, setBaris] = useState([barisBaru()])
   const [fokus, setFokus] = useState(false)
   const wadah = useRef(null)
@@ -45,18 +44,16 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
     if (fOpsi.length) setFKat(fOpsi[0][0])
   }, [fTipe])
 
-  // daftar baki di lokasi tujuan; otomatis memilih baki pertama yang masih punya tempat
+  // daftar baki di lokasi tujuan; otomatis memilih baki pertama
   useEffect(() => {
     if (!formBuka || !fLoc) return
     api(`/baki?location_id=${fLoc}`)
       .then((d) => {
         const list = d.rows.filter((b) => b.location_id === Number(fLoc))
         setBakiList(list)
-        setKapasitas(d.kapasitas)
         setFBaki((lama) => {
-          if (lama && list.some((b) => String(b.id) === lama && b.isi < d.kapasitas)) return lama
-          const luang = list.find((b) => b.isi < d.kapasitas)
-          return luang ? String(luang.id) : ''
+          if (lama && list.some((b) => String(b.id) === lama)) return lama
+          return list.length > 0 ? String(list[0].id) : ''
         })
       })
       .catch(() => {})
@@ -90,11 +87,6 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
     tambahBaris()
     setFokus(true)
   }
-
-  const bakiDipilih = bakiList.find((b) => String(b.id) === fBaki)
-  const sisaBaki = bakiDipilih ? kapasitas - bakiDipilih.isi : 0
-  const jumlahPerhiasan = baris.length // semua barang (perhiasan, logam mulia emas atau perak) bisa masuk baki
-  const bakiKurang = bakiDipilih && jumlahPerhiasan > sisaBaki
 
   const totalGram = baris.reduce((s, b) => s + Number(b.weight_gram || 0), 0)
   const totalBeli = baris.reduce((s, b) => s + Number(b.harga_beli || 0), 0)
@@ -196,8 +188,8 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
               <select value={fBaki} onChange={(e) => setFBaki(e.target.value)}>
                 <option value="">Tanpa baki</option>
                 {bakiList.map((b) => (
-                  <option key={b.id} value={b.id} disabled={b.isi >= kapasitas}>
-                    {b.name} ({b.isi}/{kapasitas}{b.isi >= kapasitas ? ', penuh' : ''})
+                  <option key={b.id} value={b.id}>
+                    {b.name} ({b.isi} barang)
                   </option>
                 ))}
               </select>
@@ -212,12 +204,6 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
             </div>
           </div>
 
-          {bakiKurang && (
-            <p className="neg" style={{ marginTop: 10 }}>
-              {bakiDipilih.name} hanya punya sisa tempat {sisaBaki}, sedangkan ada {jumlahPerhiasan} barang.
-              Kurangi barang, pilih baki lain, atau tambah baki baru di bawah daftar stok.
-            </p>
-          )}
           {wajibHarga && (
             <p className="muted" style={{ marginTop: 10 }}>
               Harga beli wajib diisi. Kas toko otomatis keluar sebesar total harga beli.
@@ -343,7 +329,7 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
             {totalBeli > 0 && <span>harga beli <b className="utama"><AngkaBerjalan nilai={totalBeli} format={formatRupiah} /></b></span>}
           </div>
 
-          <button disabled={loading || bakiKurang}>{loading ? <><Spinner />Menyimpan...</> : 'Simpan semua'}</button>
+          <button disabled={loading}>{loading ? <><Spinner />Menyimpan...</> : 'Simpan semua'}</button>
         </m.form>
       )}
     </>

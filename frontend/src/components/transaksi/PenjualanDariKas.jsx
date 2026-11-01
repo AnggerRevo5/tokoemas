@@ -74,7 +74,7 @@ export default function PenjualanDariKas({ kas, me, onUbah, onTutup }) {
                     <td className="num">{gram(r.weight_gram)} g</td>
                     <td className="num">{rupiah(r.harga_jual || 0)}</td>
                     <td>{r.tanggal_jual ? r.tanggal_jual.slice(0, 10) : '-'}</td>
-                    <td>{r.metode === 'qris' ? 'QRIS/Debit' : 'Tunai'}</td>
+                    <td>{r.metode === 'qris' ? 'QRIS/Debit' : r.metode === 'transfer' ? 'Transfer' : 'Tunai'}</td>
                     <td>
                       <button type="button" className="mini primary" onClick={() => setPilih(r)}>Ubah / batalkan</button>
                     </td>

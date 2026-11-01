@@ -270,6 +270,8 @@ func JualKoreksi(db *sql.DB) gin.HandlerFunc {
 				asal = sql.NullInt64{Int64: int64(j.Lokasi), Valid: true}
 				catatan += " dari " + namaAsal
 			}
+		} else if metode == services.MetodeTransfer {
+			catatan = "Penjualan 1 barang (" + services.LabelMetode(metode) + ", koreksi)"
 		}
 		rk, err := tx.Exec(
 			`INSERT INTO cash_transactions (location_id, direction, category, amount, note, transaction_date, created_by, metode, asal_location_id)

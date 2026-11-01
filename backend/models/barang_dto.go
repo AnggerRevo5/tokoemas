@@ -12,7 +12,7 @@ type JualReq struct {
 	Items []JualItem `json:"items" binding:"max=1000,dive"`
 	Date  string     `json:"date" binding:"max=10"`
 	Note  string     `json:"note" binding:"max=200"`
-	// Metode: "tunai" (kas lokasi) atau "qris" (kas back office). Kosong = tunai.
+	// Metode: "tunai" atau "transfer" (kas lokasi yang menjual) atau "qris" (kas back office). Kosong = tunai.
 	Metode string `json:"metode" binding:"max=10"`
 	// Biaya: potongan QRIS/Debit dalam rupiah (opsional, hanya untuk metode qris).
 	Biaya float64 `json:"biaya" binding:"gte=0,lte=1000000000000"`
@@ -100,7 +100,7 @@ type BarangListRow struct {
 	BakiNama     string     `json:"baki_nama"`
 	Bahan        string     `json:"bahan"` // emas | perak
 	DariCustomer bool       `json:"dari_customer"`
-	Metode       string     `json:"metode"` // tunai | qris untuk barang terjual dari Stok, kosong bila belum/lewat penadah
+	Metode       string     `json:"metode"` // tunai | transfer | qris untuk barang terjual dari Stok, kosong bila belum/lewat penadah
 }
 
 type KirimBOReq struct {

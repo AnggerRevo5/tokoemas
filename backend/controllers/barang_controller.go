@@ -129,7 +129,7 @@ func BarangJual(db *sql.DB) gin.HandlerFunc {
 		}
 		for _, lokasi := range urutLokasi {
 			kj := perLokasi[lokasi]
-			// tunai: kas lokasi yang menjual. QRIS/Debit: kas back office; untuk toko cabang diberi kategori
+			// tunai dan transfer: kas lokasi yang menjual. QRIS/Debit: kas back office; untuk toko cabang diberi kategori
 			// tersendiri dan asal cabangnya dicatat agar omzet cabang tetap bisa dilacak.
 			kasLokasi, kategoriKas := lokasi, "omzet"
 			if lokasi == boID {
@@ -146,6 +146,8 @@ func BarangJual(db *sql.DB) gin.HandlerFunc {
 					asal = sql.NullInt64{Int64: int64(lokasi), Valid: true}
 					catatanKas += " dari " + namaAsal
 				}
+			} else if metode == services.MetodeTransfer {
+				catatanKas += " (" + services.LabelMetode(metode) + ")"
 			}
 			if req.Note != "" {
 				catatanKas += ": " + req.Note
@@ -195,6 +197,10 @@ func BarangJual(db *sql.DB) gin.HandlerFunc {
 		}
 		if metode == services.MetodeQRIS {
 			c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%d barang terjual (%s), kas back office bertambah %s", len(items), services.LabelMetode(metode), utils.RupiahTeks(totalSemua-req.Biaya))})
+			return
+		}
+		if metode == services.MetodeTransfer {
+			c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%d barang terjual (%s), kas toko bertambah %s", len(items), services.LabelMetode(metode), utils.RupiahTeks(totalSemua))})
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%d barang terjual, kas bertambah %s", len(items), utils.RupiahTeks(totalSemua))})
@@ -319,22 +325,15 @@ func BarangCreate(db *sql.DB) gin.HandlerFunc {
 		}
 		defer tx.Rollback()
 
-		// kapasitas baki dicek di dalam transaksi supaya tidak bisa terlewati
-		perBaki := map[int]int{}
+		// baki harus ada dan milik lokasi barang; isi satu baki tidak dibatasi
+		cekBaki := map[int]bool{}
 		for _, it := range req.Items {
-			if it.TrayID > 0 {
-				perBaki[it.TrayID]++
-			}
-		}
-		for trayID, n := range perBaki {
-			sisa, err := services.SisaBaki(tx, trayID, locID)
-			if err != nil {
-				balasKesalahan(c, err)
-				return
-			}
-			if n > sisa {
-				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("baki tidak cukup: sisa tempat %d, barang yang dimasukkan %d (maksimal %d per baki)", sisa, n, services.KapasitasBaki)})
-				return
+			if it.TrayID > 0 && !cekBaki[it.TrayID] {
+				cekBaki[it.TrayID] = true
+				if _, err := services.IsiBaki(tx, it.TrayID, locID); err != nil {
+					balasKesalahan(c, err)
+					return
+				}
 			}
 		}
 

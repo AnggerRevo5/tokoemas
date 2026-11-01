@@ -66,11 +66,12 @@ func TabelPenjualanTokoRingkas(db *sql.DB, dari, sampai, loc string) (models.Tab
 	t := models.TabelLaporan{
 		Kode:  "penjualan_toko_ringkas",
 		Judul: "Penjualan Toko (ringkasan per lokasi dan metode)",
-		Kolom: []string{"Lokasi", "Tunai (Rp)", "QRIS/Debit (Rp)", "Total penjualan (Rp)", "Modal (Rp)", "Untung / rugi (Rp)"},
-		Tipe:  []string{"teks", "rupiah", "rupiah", "rupiah", "rupiah", "rupiah"},
+		Kolom: []string{"Lokasi", "Tunai (Rp)", "Transfer (Rp)", "QRIS/Debit (Rp)", "Total penjualan (Rp)", "Modal (Rp)", "Untung / rugi (Rp)"},
+		Tipe:  []string{"teks", "rupiah", "rupiah", "rupiah", "rupiah", "rupiah", "rupiah"},
 	}
 	q := `SELECT l.name,
-	             IFNULL(SUM(IF(IFNULL(jc.metode, 'tunai') = 'qris', 0, i.harga_jual)), 0),
+	             IFNULL(SUM(IF(IFNULL(jc.metode, 'tunai') IN ('qris', 'transfer'), 0, i.harga_jual)), 0),
+	             IFNULL(SUM(IF(jc.metode = 'transfer', i.harga_jual, 0)), 0),
 	             IFNULL(SUM(IF(jc.metode = 'qris', i.harga_jual, 0)), 0),
 	             IFNULL(SUM(i.harga_jual), 0), IFNULL(SUM(i.harga_beli), 0)` + sqlDasarPenjualanToko
 	args := []interface{}{dari, sampai}
@@ -85,23 +86,24 @@ func TabelPenjualanTokoRingkas(db *sql.DB, dari, sampai, loc string) (models.Tab
 	}
 	defer rows.Close()
 
-	var sumTunai, sumQRIS, sumJual, sumModal float64
+	var sumTunai, sumTransfer, sumQRIS, sumJual, sumModal float64
 	for rows.Next() {
 		var lok string
-		var tunai, qris, jual, modal float64
-		if err := rows.Scan(&lok, &tunai, &qris, &jual, &modal); err != nil {
+		var tunai, transfer, qris, jual, modal float64
+		if err := rows.Scan(&lok, &tunai, &transfer, &qris, &jual, &modal); err != nil {
 			return t, err
 		}
 		sumTunai += tunai
+		sumTransfer += transfer
 		sumQRIS += qris
 		sumJual += jual
 		sumModal += modal
-		t.Baris = append(t.Baris, []interface{}{lok, tunai, qris, jual, modal, jual - modal})
+		t.Baris = append(t.Baris, []interface{}{lok, tunai, transfer, qris, jual, modal, jual - modal})
 	}
 	if err := rows.Err(); err != nil {
 		return t, err
 	}
-	t.Baris = append(t.Baris, []interface{}{"TOTAL", sumTunai, sumQRIS, sumJual, sumModal, sumJual - sumModal})
+	t.Baris = append(t.Baris, []interface{}{"TOTAL", sumTunai, sumTransfer, sumQRIS, sumJual, sumModal, sumJual - sumModal})
 	t.Tebal = []int{len(t.Baris) - 1}
 	return t, nil
 }

@@ -6,15 +6,13 @@ import { DaftarSpesifikasi } from './SpesifikasiBarang'
 
 // Pindahkan barang (perhiasan atau logam mulia) yang dicentang ke baki lain di lokasi yang sama.
 // baki: daftar baki di lokasi barang. onSelesai(pesan); onError(msg).
-export default function PindahBaki({ terpilih, baki, kapasitas, onSelesai, onError }) {
+export default function PindahBaki({ terpilih, baki, onSelesai, onError }) {
   const [tujuan, setTujuan] = useState('')
   const [konfirmasi, setKonfirmasi] = useState(false)
   const [loading, setLoading] = useState(false)
 
   const bakiTujuan = baki.find((b) => String(b.id) === tujuan)
   const masuk = bakiTujuan ? terpilih.filter((r) => r.baki_id !== bakiTujuan.id).length : 0
-  const sisa = bakiTujuan ? kapasitas - bakiTujuan.isi : 0
-  const kurang = bakiTujuan && masuk > sisa
   const berat = terpilih.reduce((s, r) => s + r.weight_gram, 0)
 
   async function pindah() {
@@ -43,23 +41,18 @@ export default function PindahBaki({ terpilih, baki, kapasitas, onSelesai, onErr
           <select value={tujuan} onChange={(e) => setTujuan(e.target.value)}>
             <option value="">Pilih baki tujuan</option>
             {baki.map((b) => (
-              <option key={b.id} value={b.id} disabled={b.isi >= kapasitas}>
-                {b.name} ({b.isi}/{kapasitas}{b.isi >= kapasitas ? ', penuh' : ''})
+              <option key={b.id} value={b.id}>
+                {b.name} ({b.isi} barang)
               </option>
             ))}
           </select>
         </div>
         <div style={{ alignSelf: 'end' }}>
-          <button type="button" disabled={!bakiTujuan || kurang} onClick={() => setKonfirmasi(true)}>
+          <button type="button" disabled={!bakiTujuan} onClick={() => setKonfirmasi(true)}>
             Pindah baki
           </button>
         </div>
       </div>
-      {kurang && (
-        <p className="neg" style={{ marginTop: 10, marginBottom: 0 }}>
-          {bakiTujuan.name} hanya punya sisa tempat {sisa}, sedangkan barang yang dipindah {masuk}.
-        </p>
-      )}
 
       {konfirmasi && bakiTujuan && (
         <Popup
@@ -70,7 +63,7 @@ export default function PindahBaki({ terpilih, baki, kapasitas, onSelesai, onErr
           onTutup={() => setKonfirmasi(false)}
         >
           <p className="muted">
-            {terpilih.length} barang, {gram(berat)} gram. Isi {bakiTujuan.name} menjadi {bakiTujuan.isi + masuk}/{kapasitas}.
+            {terpilih.length} barang, {gram(berat)} gram. Isi {bakiTujuan.name} menjadi {bakiTujuan.isi + masuk} barang.
           </p>
           <DaftarSpesifikasi items={terpilih} />
         </Popup>

@@ -10,6 +10,7 @@ func TestNormalMetode(t *testing.T) {
 		{"", MetodeTunai, true},
 		{"tunai", MetodeTunai, true},
 		{" QRIS ", MetodeQRIS, true},
+		{"Transfer", MetodeTransfer, true},
 		{"cek", "", false},
 	} {
 		got, ok := NormalMetode(c.in)
@@ -31,6 +32,8 @@ func TestValidasiBiaya(t *testing.T) {
 		{MetodeQRIS, 1_000_000, 1_000_000, false},
 		{MetodeQRIS, 1_000_001, 1_000_000, true},
 		{MetodeTunai, 5_000, 1_000_000, true},
+		{MetodeTransfer, 0, 1_000_000, false},
+		{MetodeTransfer, 5_000, 1_000_000, true},
 		{MetodeQRIS, -1, 1_000_000, true},
 	}
 	for _, c := range cases {

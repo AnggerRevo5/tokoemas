@@ -323,7 +323,7 @@ export default function BarAksiBarang({
           <table className="tabel-spek" style={{ marginTop: 12 }}>
             <tbody>
               <tr><th>Tanggal</th><td>{tgl}</td></tr>
-              <tr><th>Metode</th><td>{metode === 'qris' ? 'QRIS/Debit (masuk kas back office)' : 'Tunai (masuk kas toko)'}</td></tr>
+              <tr><th>Metode</th><td>{metode === 'qris' ? 'QRIS/Debit (masuk kas back office)' : metode === 'transfer' ? 'Transfer (masuk kas toko)' : 'Tunai (masuk kas toko)'}</td></tr>
               <tr><th>Total harga jual</th><td>{rupiah(totalJual)}</td></tr>
               {metode === 'qris' && <tr><th>Potongan</th><td>{rupiah(nominalBiaya(totalJual, biaya))}</td></tr>}
             </tbody>

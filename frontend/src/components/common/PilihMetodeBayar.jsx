@@ -1,9 +1,9 @@
 import { rupiah } from '../../utils/format'
 import { nominalBiaya, nominalBiayaTeks, persenBiayaTeks } from '../../utils/biaya'
 
-// Pilihan metode pembayaran penjualan. Tunai tetap di kas yang menjual; QRIS/Debit masuk kas back office.
+// Pilihan metode pembayaran penjualan. Tunai dan transfer tetap di kas yang menjual; QRIS/Debit masuk kas back office.
 // Potongan QRIS/Debit (opsional) diisi dalam rupiah atau persen, yang satunya terhitung otomatis dari total.
-// metode: 'tunai' | 'qris'. biaya: state dari utils/biaya. tujuanTunai: teks tujuan kas untuk tunai.
+// metode: 'tunai' | 'transfer' | 'qris'. biaya: state dari utils/biaya. tujuanTunai: teks tujuan kas untuk tunai.
 export default function PilihMetodeBayar({ metode, onMetode, total, biaya, onBiaya, tujuanTunai = 'kas toko' }) {
   const qris = metode === 'qris'
   const potongan = nominalBiaya(total, biaya)
@@ -16,6 +16,7 @@ export default function PilihMetodeBayar({ metode, onMetode, total, biaya, onBia
           <label>Metode pembayaran</label>
           <select value={metode} onChange={(e) => onMetode(e.target.value)}>
             <option value="tunai">Tunai</option>
+            <option value="transfer">Transfer</option>
             <option value="qris">QRIS/Debit</option>
           </select>
         </div>
@@ -50,7 +51,7 @@ export default function PilihMetodeBayar({ metode, onMetode, total, biaya, onBia
       <p className="muted" style={{ marginBottom: 0 }}>
         {qris
           ? `QRIS/Debit masuk ke kas back office${potongan > 0 ? `, diterima ${rupiah(Math.max(Number(total) - potongan, 0))} setelah potongan ${rupiah(potongan)}` : ''}. Potongan boleh dikosongkan.`
-          : `Tunai tetap masuk ke ${tujuanTunai}.`}
+          : `${metode === 'transfer' ? 'Transfer' : 'Tunai'} tetap masuk ke ${tujuanTunai}.`}
       </p>
       {melebihi && <div className="error">Potongan tidak boleh melebihi total penjualan.</div>}
     </div>

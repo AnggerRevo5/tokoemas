@@ -13,7 +13,7 @@ import SpesifikasiBarang from './SpesifikasiBarang'
 // baki: daftar baki di lokasi barang. onSelesai(pesan): setelah tersimpan; onTutup().
 // onHapus(item): buka konfirmasi hapus barang (hanya dikirim bila akun boleh menghapus).
 // Ditutup dengan tombol silang, klik latar, atau Esc.
-export default function FormEditBarang({ item, baki, kapasitas, onSelesai, onTutup, onHapus }) {
+export default function FormEditBarang({ item, baki, onSelesai, onTutup, onHapus }) {
   const lm = item.jenis === 'logam_mulia'
   const perak = lm && item.bahan === 'perak'
   const [f, setF] = useState({
@@ -155,10 +155,9 @@ export default function FormEditBarang({ item, baki, kapasitas, onSelesai, onTut
             <select value={f.tray_id} onChange={ubah('tray_id')}>
               <option value="">Tanpa baki</option>
               {baki.map((b) => {
-                const penuh = b.isi >= kapasitas && b.id !== item.baki_id
                 return (
-                  <option key={b.id} value={b.id} disabled={penuh}>
-                    {b.name} ({b.isi}/{kapasitas}{penuh ? ', penuh' : ''})
+                  <option key={b.id} value={b.id}>
+                    {b.name} ({b.isi} barang)
                   </option>
                 )
               })}

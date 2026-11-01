@@ -7,7 +7,7 @@ import Popup from '../common/Popup'
 // Ringkasan baki (perhiasan dan logam mulia) di lokasi yang dipilih: dropdown pencari untuk memfilter baki (aman untuk ratusan baki),
 // tambah baki, dan hapus baki kosong.
 // bolehTambah: false bila lokasi belum dipilih (mode "Semua lokasi"). onUbah(pesan): setelah baki ditambah/dihapus.
-export default function PanelBaki({ baki, kapasitas, bakiF, onPilih, lokasiId, bolehTambah, onUbah, onError }) {
+export default function PanelBaki({ baki, bakiF, onPilih, lokasiId, bolehTambah, onUbah, onError }) {
   const [loading, setLoading] = useState(false)
   const [hapus, setHapus] = useState(null)
   const [form, setForm] = useState(null) // { id?, nama }: kartu tambah baki atau ubah nama
@@ -66,14 +66,12 @@ export default function PanelBaki({ baki, kapasitas, bakiF, onPilih, lokasiId, b
   const terpilih = baki.find((b) => String(b.id) === bakiF)
   const jml = {
     kosong: baki.filter((b) => b.isi === 0).length,
-    penuh: baki.filter((b) => b.isi >= kapasitas).length,
   }
   jml.terisi = baki.length - jml.kosong
 
   const cocok = (b) => {
     if (saring === 'kosong' && b.isi !== 0) return false
     if (saring === 'terisi' && b.isi === 0) return false
-    if (saring === 'penuh' && b.isi < kapasitas) return false
     const q = cari.trim().toLowerCase()
     return !q || (b.name || '').toLowerCase().includes(q) || (b.lokasi || '').toLowerCase().includes(q)
   }
@@ -108,7 +106,7 @@ export default function PanelBaki({ baki, kapasitas, bakiF, onPilih, lokasiId, b
             onClick={() => setBuka((x) => !x)}
           >
             {terpilih
-              ? `${terpilih.name}${lokasiId === '0' ? ` (${terpilih.lokasi})` : ''}: ${terpilih.isi}/${kapasitas}`
+              ? `${terpilih.name}${lokasiId === '0' ? ` (${terpilih.lokasi})` : ''}: ${terpilih.isi} barang`
               : 'Semua baki'}
             <ChevronDown size={14} aria-hidden="true" />
           </button>
@@ -127,7 +125,6 @@ export default function PanelBaki({ baki, kapasitas, bakiF, onPilih, lokasiId, b
                   ['semua', 'Semua', baki.length],
                   ['terisi', 'Terisi', jml.terisi],
                   ['kosong', 'Kosong', jml.kosong],
-                  ['penuh', 'Penuh', jml.penuh],
                 ].map(([k, l, n]) => (
                   <button
                     key={k}
@@ -164,8 +161,7 @@ export default function PanelBaki({ baki, kapasitas, bakiF, onPilih, lokasiId, b
                         >
                           <span>{b.name}</span>
                           <span className="muted">
-                            {b.isi}/{kapasitas}
-                            {b.isi === 0 ? ' kosong' : b.isi >= kapasitas ? ' penuh' : ''}
+                            {b.isi === 0 ? 'kosong' : `${b.isi} barang`}
                           </span>
                         </button>
                         <button
@@ -204,7 +200,7 @@ export default function PanelBaki({ baki, kapasitas, bakiF, onPilih, lokasiId, b
           )}
         </div>
         <span className="muted">
-          Terisi {jml.terisi} - Kosong {jml.kosong} - Penuh {jml.penuh}
+          Terisi {jml.terisi} - Kosong {jml.kosong}
         </span>
         {bolehTambah && (
           <button type="button" className="ghost" style={{ marginLeft: 'auto' }} disabled={loading} onClick={() => {
@@ -217,7 +213,7 @@ export default function PanelBaki({ baki, kapasitas, bakiF, onPilih, lokasiId, b
       </div>
       {baki.length === 0 && (
         <p className="muted" style={{ marginBottom: 0 }}>
-          Belum ada baki. Tambah baki, lalu masukkan barang ke dalamnya (maksimal {kapasitas} barang per baki).
+          Belum ada baki. Tambah baki, lalu masukkan barang ke dalamnya (jumlah barang per baki tidak dibatasi).
         </p>
       )}
 
@@ -241,8 +237,8 @@ export default function PanelBaki({ baki, kapasitas, bakiF, onPilih, lokasiId, b
           />
           {galat && <div className="error" style={{ marginTop: 10 }}>{galat}</div>}
           <p className="muted" style={{ marginBottom: 0 }}>
-            Nama bebas (maksimal 50 karakter) dan tidak boleh sama dengan baki lain di lokasi ini. Satu baki memuat
-            maksimal {kapasitas} barang.
+            Nama bebas (maksimal 50 karakter) dan tidak boleh sama dengan baki lain di lokasi ini. Satu baki bisa
+            memuat barang berapa pun jumlahnya.
           </p>
         </Popup>
       )}
@@ -260,7 +256,7 @@ export default function PanelBaki({ baki, kapasitas, bakiF, onPilih, lokasiId, b
             <tbody>
               <tr><th>Baki</th><td>{hapus.name}</td></tr>
               <tr><th>Lokasi</th><td>{hapus.lokasi}</td></tr>
-              <tr><th>Isi</th><td>{hapus.isi} dari {kapasitas} barang (kosong)</td></tr>
+              <tr><th>Isi</th><td>{hapus.isi} barang (kosong)</td></tr>
             </tbody>
           </table>
           <p className="muted" style={{ marginTop: 10, marginBottom: 0 }}>

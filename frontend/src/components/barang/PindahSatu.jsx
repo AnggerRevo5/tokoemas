@@ -5,7 +5,7 @@ import SpesifikasiBarang from './SpesifikasiBarang'
 
 // Popup pindah baki untuk satu barang (tombol "Pindah" di baris tabel).
 // baki: daftar baki di lokasi barang. onSelesai(pesan); onTutup(); onError(msg).
-export default function PindahSatu({ item, baki, kapasitas, onSelesai, onTutup, onError }) {
+export default function PindahSatu({ item, baki, onSelesai, onTutup, onError }) {
   const [tujuan, setTujuan] = useState('')
   const [loading, setLoading] = useState(false)
   const bakiTujuan = baki.find((b) => String(b.id) === tujuan)
@@ -41,10 +41,9 @@ export default function PindahSatu({ item, baki, kapasitas, onSelesai, onTutup, 
         <option value="">Pilih baki tujuan</option>
         {baki.map((b) => {
           const sekarang = b.id === item.baki_id
-          const penuh = b.isi >= kapasitas
           return (
-            <option key={b.id} value={b.id} disabled={sekarang || penuh}>
-              {b.name} ({b.isi}/{kapasitas}{sekarang ? ', baki sekarang' : penuh ? ', penuh' : ''})
+            <option key={b.id} value={b.id} disabled={sekarang}>
+              {b.name} ({b.isi} barang{sekarang ? ', baki sekarang' : ''})
             </option>
           )
         })}

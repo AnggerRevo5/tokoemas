@@ -5,9 +5,6 @@ import (
 	"fmt"
 )
 
-// KapasitasBaki adalah jumlah maksimal barang dalam satu baki.
-const KapasitasBaki = 100
-
 // Isinya sama dengan db/migrations/020_baki.sql (bisa dijalankan manual oleh admin database).
 const sqlTabelBaki = `CREATE TABLE IF NOT EXISTS trays (
 	id INT AUTO_INCREMENT PRIMARY KEY,
@@ -47,8 +44,9 @@ func SiapkanSkemaBaki(db *sql.DB) error {
 const sqlIsiBaki = `SELECT COUNT(*) FROM items
 	WHERE tray_id = ? AND location_id = ? AND is_void = FALSE AND status NOT IN ('terjual','lebur','hasil','tidak_ditebus')`
 
-// SisaBaki mengunci baki dan mengembalikan lokasi serta sisa tempatnya. Baki harus milik lokasi yang diminta.
-func SisaBaki(tx *sql.Tx, trayID, lokasi int) (int, error) {
+// IsiBaki mengunci baki dan mengembalikan jumlah barang di dalamnya. Baki harus milik lokasi yang diminta.
+// Satu baki tidak punya batas jumlah barang.
+func IsiBaki(tx *sql.Tx, trayID, lokasi int) (int, error) {
 	var locBaki int
 	if err := tx.QueryRow("SELECT location_id FROM trays WHERE id = ? FOR UPDATE", trayID).Scan(&locBaki); err != nil {
 		return 0, salah("baki tidak ditemukan")
@@ -60,5 +58,5 @@ func SisaBaki(tx *sql.Tx, trayID, lokasi int) (int, error) {
 	if err := tx.QueryRow(sqlIsiBaki, trayID, lokasi).Scan(&isi); err != nil {
 		return 0, err
 	}
-	return KapasitasBaki - isi, nil
+	return isi, nil
 }

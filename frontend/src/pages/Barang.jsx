@@ -34,7 +34,7 @@ export default function Barang({ me, onUbah }) {
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
   const [aksi, setAksi] = useState(null)
-  const [baki, setBaki] = useState({ rows: [], kapasitas: 100 })
+  const [baki, setBaki] = useState({ rows: [] })
   const [bakiF, setBakiF] = useState('')
   const [editItem, setEditItem] = useState(null)
   const [pindahItem, setPindahItem] = useState(null)
@@ -234,7 +234,6 @@ export default function Barang({ me, onUbah }) {
 
       <PanelBaki
         baki={baki.rows}
-        kapasitas={baki.kapasitas}
         bakiF={bakiF}
         onPilih={setBakiF}
         lokasiId={locId}
@@ -252,7 +251,6 @@ export default function Barang({ me, onUbah }) {
           key={editItem.id}
           item={editItem}
           baki={baki.rows.filter((b) => b.location_id === editItem.location_id)}
-          kapasitas={baki.kapasitas}
           onSelesai={(pesan) => {
             setInfo(pesan)
             setEditItem(null)
@@ -293,7 +291,6 @@ export default function Barang({ me, onUbah }) {
         <PindahBaki
           terpilih={terpilih}
           baki={bakiPindah}
-          kapasitas={baki.kapasitas}
           onSelesai={(pesan) => {
             resetPesan()
             setInfo(pesan)
@@ -308,7 +305,6 @@ export default function Barang({ me, onUbah }) {
         <PindahSatu
           item={pindahItem}
           baki={baki.rows.filter((b) => b.location_id === pindahItem.location_id)}
-          kapasitas={baki.kapasitas}
           onSelesai={(pesan) => {
             resetPesan()
             setInfo(pesan)

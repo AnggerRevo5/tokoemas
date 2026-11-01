@@ -249,9 +249,9 @@ func PenjualanPenadah(db *sql.DB) gin.HandlerFunc {
 		}
 
 		note := strings.TrimSpace(req.Note)
-		// penjualan penadah selalu di back office: tunai maupun QRIS/Debit sama-sama menambah kas back office
+		// penjualan penadah selalu di back office: tunai, transfer, maupun QRIS/Debit sama-sama menambah kas back office
 		catatKas := fmt.Sprintf("Jual ke penadah %s: %d barang", penadah, len(list))
-		if metode == services.MetodeQRIS {
+		if metode != services.MetodeTunai {
 			catatKas += " (" + services.LabelMetode(metode) + ")"
 		}
 		res, err := tx.Exec(

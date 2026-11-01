@@ -12,7 +12,8 @@ import Spinner from '../common/Spinner'
 import SpesifikasiBarang from './SpesifikasiBarang'
 
 const BATAS_HARI = 7
-const labelMetode = (m) => (m === 'qris' ? 'QRIS/Debit' : 'Tunai')
+const LABEL_METODE = { qris: 'QRIS/Debit', transfer: 'Transfer' }
+const labelMetode = (m) => LABEL_METODE[m] || 'Tunai'
 
 // true bila tanggal (YYYY-MM-DD) masih dalam batas hari yang boleh diubah akun cabang
 function dalamBatas(tgl) {

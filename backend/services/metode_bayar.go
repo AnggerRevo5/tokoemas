@@ -6,10 +6,12 @@ import (
 	"strings"
 )
 
-// Metode pembayaran penjualan. Tunai tetap di kas lokasi yang menjual; QRIS/Debit masuk ke kas back office.
+// Metode pembayaran penjualan. Tunai dan transfer sama-sama tetap di kas lokasi yang menjual;
+// hanya QRIS/Debit yang masuk ke kas back office.
 const (
-	MetodeTunai = "tunai"
-	MetodeQRIS  = "qris"
+	MetodeTunai    = "tunai"
+	MetodeTransfer = "transfer"
+	MetodeQRIS     = "qris"
 )
 
 // KategoriJualQRIS adalah kategori kas back office untuk penjualan QRIS/Debit dari toko cabang.
@@ -24,6 +26,8 @@ func NormalMetode(m string) (string, bool) {
 	switch strings.ToLower(strings.TrimSpace(m)) {
 	case "", MetodeTunai:
 		return MetodeTunai, true
+	case MetodeTransfer:
+		return MetodeTransfer, true
 	case MetodeQRIS:
 		return MetodeQRIS, true
 	}
@@ -32,8 +36,11 @@ func NormalMetode(m string) (string, bool) {
 
 // LabelMetode adalah nama metode untuk catatan kas dan pesan.
 func LabelMetode(m string) string {
-	if m == MetodeQRIS {
+	switch m {
+	case MetodeQRIS:
 		return "QRIS/Debit"
+	case MetodeTransfer:
+		return "Transfer"
 	}
 	return "Tunai"
 }
