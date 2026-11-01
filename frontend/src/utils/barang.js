@@ -37,7 +37,7 @@ export function tentukanMode(terpilih, tipeLok) {
 
 // Tombol aksi yang tersedia untuk mode tertentu: [[kode aksi, label]].
 // transit_toko hanya untuk akun cabang tujuan (owner hanya memantau progres).
-// bisaGadai: satu logam mulia tersedia dipilih oleh akun yang boleh menggadaikan.
+// bisaGadai: satu barang tersedia dipilih oleh akun yang boleh menggadaikan.
 export function aksiUntukMode(mode, { isCabang, adaLM, bisaGadai }) {
   if (mode === 'transit' && !isCabang) return [['sampai', 'Sudah sampai'], ['belum', 'Belum sampai']]
   if (mode === 'transit_toko' && isCabang) {

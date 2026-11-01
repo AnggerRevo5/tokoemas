@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../services/api'
-import { toggleId } from '../utils/format'
 import { bisaPilih, tentukanMode, aksiUntukMode } from '../utils/barang'
 import Pesan from '../components/common/Pesan'
 import Popup from '../components/common/Popup'
@@ -69,10 +68,13 @@ export default function Barang({ me, onUbah }) {
     api(`/barang?${p.toString()}`)
       .then((d) => {
         setData(d)
+        // pilihan menyimpan datanya sendiri sehingga tetap ada saat pencarian atau filter berganti
         setPilih((lama) => {
-          const baru = {}
+          const baru = { ...lama }
           d.rows.forEach((r) => {
-            if (lama[r.id] && bisaPilih(r)) baru[r.id] = true
+            if (!lama[r.id]) return
+            if (bisaPilih(r)) baru[r.id] = r
+            else delete baru[r.id]
           })
           return baru
         })
@@ -90,7 +92,7 @@ export default function Barang({ me, onUbah }) {
   }, [muat])
 
   const bisaDipilih = data.rows.filter(bisaPilih)
-  const terpilih = data.rows.filter((r) => pilih[r.id])
+  const terpilih = Object.values(pilih)
   const beratTerpilih = terpilih.reduce((s, r) => s + r.weight_gram, 0)
   const adaLM = terpilih.some((r) => r.jenis === 'logam_mulia')
   const semuaDipilih = bisaDipilih.length > 0 && bisaDipilih.every((r) => pilih[r.id])
@@ -101,9 +103,9 @@ export default function Barang({ me, onUbah }) {
     (r) => (r.jenis === 'perhiasan' || r.jenis === 'logam_mulia') && r.status === 'tersedia' && r.location_id === terpilih[0].location_id,
   ) ? terpilih[0].location_id : null
   const bakiPindah = lokasiPindah ? baki.rows.filter((b) => b.location_id === lokasiPindah) : []
-  // gadai: satu logam mulia tersedia, oleh akun cabang atau Super Admin
+  // gadai: satu barang tersedia (perhiasan atau logam mulia), oleh akun cabang atau Super Admin
   const bisaGadai = (isCabang || me.role === 'super_admin') && terpilih.length === 1 &&
-    terpilih[0].jenis === 'logam_mulia' && terpilih[0].bahan !== 'perak' && terpilih[0].status === 'tersedia'
+    terpilih[0].status === 'tersedia'
   const aksiTersedia = aksiUntukMode(mode, { isCabang, adaLM, bisaGadai })
 
   useEffect(() => {
@@ -111,13 +113,25 @@ export default function Barang({ me, onUbah }) {
   }, [mode, adaLM, bisaGadai])
 
   function toggleSemua() {
-    if (semuaDipilih) {
-      setPilih({})
-    } else {
-      const n = {}
-      bisaDipilih.forEach((r) => (n[r.id] = true))
-      setPilih(n)
-    }
+    // hanya memengaruhi barang yang sedang tampil; pilihan dari pencarian sebelumnya tetap
+    const n = { ...pilih }
+    bisaDipilih.forEach((r) => {
+      if (semuaDipilih) delete n[r.id]
+      else n[r.id] = r
+    })
+    setPilih(n)
+  }
+
+  function ubahPilih(id) {
+    setPilih((p) => {
+      if (p[id]) {
+        const n = { ...p }
+        delete n[id]
+        return n
+      }
+      const r = data.rows.find((x) => x.id === id)
+      return r ? { ...p, [id]: r } : p
+    })
   }
 
   function resetPesan() {
@@ -202,6 +216,7 @@ export default function Barang({ me, onUbah }) {
         status={status}
         onStatus={(v) => {
           setStatus(v)
+          setPilih({}) // status berbeda tidak bisa diproses bersamaan
           setBatas(LANGKAH_MUAT)
         }}
         jenisF={jenisF}
@@ -356,7 +371,7 @@ export default function Barang({ me, onUbah }) {
         <TabelBarang
           rows={data.rows}
           pilih={pilih}
-          onToggle={(id) => setPilih((p) => toggleId(p, id))}
+          onToggle={ubahPilih}
           semuaDipilih={semuaDipilih}
           onToggleSemua={toggleSemua}
           bisaVoid={bisaVoid}
@@ -393,6 +408,7 @@ export default function Barang({ me, onUbah }) {
           </div>
         )}
       </div>
+      {terpilih.length > 0 && <div className="ruang-bar-aksi" aria-hidden="true" />}
     </div>
   )
 }

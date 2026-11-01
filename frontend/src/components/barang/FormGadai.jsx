@@ -5,7 +5,7 @@ import Popup from '../common/Popup'
 import Spinner from '../common/Spinner'
 import SpesifikasiBarang from './SpesifikasiBarang'
 
-// Form menggadaikan satu logam mulia. Sebelum disimpan muncul card berisi spesifikasi barang dan rincian
+// Form menggadaikan satu barang. Sebelum disimpan muncul card berisi spesifikasi barang dan rincian
 // dana serta cicilan; baru setelah dikonfirmasi tercatat.
 // onMulai(): bersihkan pesan; onSelesai(pesan); onError(pesan).
 export default function FormGadai({ item, onMulai, onSelesai, onError }) {

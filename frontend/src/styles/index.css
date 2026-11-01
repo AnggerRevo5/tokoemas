@@ -540,6 +540,21 @@ button.mini.danger-fill:hover:not(:disabled) { background: var(--danger); filter
 .baki-baris.aktif { color: var(--gold-text); background: var(--gold-soft); font-weight: 600; }
 .baki-kosong { margin: 8px 4px; }
 
+/* card aksi barang yang dicentang: melayang di bawah layar supaya tabel tidak bergeser */
+.card.action-bar.melayang {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 50;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 14px 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg), 0 0 0 3px var(--gold-ring);
+}
+.card.action-bar.melayang .aksi-tombol { margin-top: 10px; }
+.ruang-bar-aksi { height: 120px; }
 .aksi-tombol { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .panel-aksi { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
 

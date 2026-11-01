@@ -10,6 +10,7 @@ import AngkaBerjalan from '../common/AngkaBerjalan'
 import Spinner from '../common/Spinner'
 import FormGadai from './FormGadai'
 import Popup from '../common/Popup'
+import KartuAksi from './KartuAksi'
 
 const formatGram = (v) => String(gram(v))
 const formatRupiah = (v) => rupiah(Math.round(v))
@@ -28,6 +29,16 @@ export default function BarAksiBarang({
   const [metode, setMetode] = useState('tunai')
   const [biaya, setBiaya] = useState(BIAYA_KOSONG)
   const [konfirmasiJual, setKonfirmasiJual] = useState(false)
+  const [galat, setGalat] = useState('') // pesan galat ditampilkan di dalam card, karena halaman tertutup latar
+  const mulai = () => {
+    setGalat('')
+    onMulai()
+  }
+  const gagal = (msg) => {
+    setGalat(msg)
+    onError(msg)
+  }
+  const judulAksi = (aksiTersedia.find(([k]) => k === aksi) || [])[1] || ''
   const totalJual = terpilih.reduce((s, r) => s + (Number(harga[r.id]) || 0), 0)
 
   // tujuan oper: cabang pertama bila belum dipilih
@@ -36,17 +47,17 @@ export default function BarAksiBarang({
   // penjualan: tampilkan card konfirmasi (barang, harga, metode) sebelum benar-benar tersimpan
   function periksaJual(e) {
     e.preventDefault()
-    onMulai()
-    if (terpilih.some((r) => !(Number(harga[r.id]) > 0))) return onError('Harga jual setiap barang wajib diisi')
+    mulai()
+    if (terpilih.some((r) => !(Number(harga[r.id]) > 0))) return gagal('Harga jual setiap barang wajib diisi')
     if (metode === 'qris' && nominalBiaya(totalJual, biaya) > totalJual) {
-      return onError('Potongan tidak boleh melebihi total penjualan')
+      return gagal('Potongan tidak boleh melebihi total penjualan')
     }
     setKonfirmasiJual(true)
   }
 
   async function jalankan(e) {
     e.preventDefault()
-    onMulai()
+    mulai()
     setLoading(true)
     const ids = terpilih.map((r) => r.id)
     try {
@@ -124,16 +135,16 @@ export default function BarAksiBarang({
       setBiaya(BIAYA_KOSONG)
       onSelesai(res.message)
     } catch (err) {
-      onError(err.message)
+      gagal(err.message)
     } finally {
       setLoading(false)
     }
   }
 
   return (
+    <>
     <m.div
-      className="card action-bar"
-      style={{ marginTop: 16 }}
+      className="card action-bar melayang"
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
@@ -175,8 +186,18 @@ export default function BarAksiBarang({
         </button>
       </div>
 
+      {aksi && (
+        <KartuAksi
+          judul={judulAksi}
+          galat={galat}
+          onTutup={() => {
+            setGalat('')
+            onAksi(null)
+            onMulai()
+          }}
+        >
       {aksi === 'gadai' && (
-        <FormGadai item={terpilih[0]} onMulai={onMulai} onSelesai={onSelesai} onError={onError} />
+        <FormGadai item={terpilih[0]} onMulai={mulai} onSelesai={onSelesai} onError={gagal} />
       )}
 
       {aksi && aksi !== 'gadai' && (
@@ -267,6 +288,8 @@ export default function BarAksiBarang({
           <button disabled={loading}>{loading ? <><Spinner />Memproses...</> : aksi === 'jual' ? 'Lanjut' : 'Konfirmasi'}</button>
         </form>
       )}
+        </KartuAksi>
+      )}
 
       {konfirmasiJual && (
         <Popup
@@ -308,5 +331,6 @@ export default function BarAksiBarang({
         </Popup>
       )}
     </m.div>
+    </>
   )
 }

@@ -18,7 +18,7 @@ import (
 
 const tglFormat = "2006-01-02"
 
-// Gadai hanya untuk logam mulia. Dana yang diterima masuk ke kas lokasi barang, cicilan keluar dari kas yang sama.
+// Gadai untuk semua barang terdaftar (perhiasan, logam mulia emas atau perak). Dana yang diterima masuk ke kas lokasi barang, cicilan keluar dari kas yang sama.
 // Setiap cicilan dipecah menjadi pokok (kategori gadai_pokok, bukan laba) dan biaya (gadai_biaya, masuk Laba Rugi).
 
 const sqlGadai = `SELECT g.id, g.item_id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''), IFNULL(i.brand,''), i.weight_gram,
@@ -282,13 +282,6 @@ func GadaiCreate(db *sql.DB) gin.HandlerFunc {
 		if !bolehKelolaGadai(c, cl, it.Location) {
 			return
 		}
-		var jenis, bahan string
-		tx.QueryRow("SELECT jenis, bahan FROM items WHERE id = ?", it.ID).Scan(&jenis, &bahan)
-		if jenis != "logam_mulia" || bahan == "perak" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "hanya logam mulia emas (batangan, Antam) yang bisa digadaikan"})
-			return
-		}
-
 		catatan := fmt.Sprintf("Dana gadai %s: %s %s %s g", req.Pegadaian, it.Name, it.Karat, strconv.FormatFloat(it.Weight, 'f', -1, 64))
 		rk, err := tx.Exec(
 			`INSERT INTO cash_transactions (location_id, direction, category, amount, note, transaction_date, created_by)
