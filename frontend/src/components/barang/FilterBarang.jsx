@@ -37,6 +37,9 @@ export default function FilterBarang({
             <option value="perhiasan">Perhiasan</option>
             <option value="logam_mulia">Logam mulia emas</option>
             <option value="logam_mulia_perak">Logam mulia perak</option>
+            <option value="susuk">Susuk emas</option>
+            <option value="tempat_perhiasan">Tempat perhiasan</option>
+            <option value="kotak_perhiasan">Kotak perhiasan</option>
             <option value="hasil_lebur">Hasil lebur</option>
           </select>
         </div>

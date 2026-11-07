@@ -31,12 +31,12 @@ func BarangJual(db *sql.DB) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "maksimal 300 barang sekali proses"})
 			return
 		}
-		// harga jual wajib diisi per barang (manual)
+		// harga jual wajib diisi per barang (manual); 0 = gratis, dicek per jenis setelah barang dikunci
 		harga := map[int]float64{}
 		idsJual := make([]int, 0, len(req.Items))
 		for _, it := range req.Items {
-			if it.Harga <= 0 {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "harga jual setiap barang wajib diisi (lebih dari 0)"})
+			if it.Harga < 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "harga jual tidak boleh negatif"})
 				return
 			}
 			if _, dobel := harga[it.ItemID]; dobel {
@@ -82,6 +82,10 @@ func BarangJual(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		for _, it := range items {
+			if harga[it.ID] == 0 && !services.BolehGratis(it.Jenis) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("harga jual %s wajib diisi (lebih dari 0)", it.Name)})
+				return
+			}
 			if it.Status != "tersedia" {
 				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s sedang tidak tersedia (%s)", it.Name, it.Status)})
 				return
@@ -258,6 +262,7 @@ func BarangCreate(db *sql.DB) gin.HandlerFunc {
 		catatanUmum := strings.TrimSpace(req.Note)
 
 		var totalBeli float64
+		totalBarang := 0
 		for i := range req.Items {
 			it := &req.Items[i]
 			baris := i + 1
@@ -273,11 +278,36 @@ func BarangCreate(db *sql.DB) gin.HandlerFunc {
 				it.Bahan = "perak"
 			}
 
-			if it.WeightGram <= 0 {
+			if it.Jumlah == 0 {
+				it.Jumlah = 1
+			}
+			if it.Jumlah > 1 && !services.TanpaGram(it.Jenis) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("baris %d: jumlah hanya untuk susuk, tempat, dan kotak perhiasan", baris)})
+				return
+			}
+			totalBarang += it.Jumlah
+			// berat susuk, tempat, dan kotak perhiasan opsional
+			if it.WeightGram <= 0 && !services.TanpaGram(it.Jenis) {
 				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("baris %d: berat wajib diisi", baris)})
 				return
 			}
 			switch it.Jenis {
+			case "susuk", "tempat_perhiasan", "kotak_perhiasan":
+				if it.ItemName == "" {
+					it.ItemName = services.NamaBawaan(it.Jenis)
+				}
+				it.Brand = ""
+				// kadar opsional, hanya untuk susuk
+				if it.Jenis == "susuk" && strings.TrimSpace(it.Karat) != "" {
+					k, ok := utils.NormalKarat(it.Karat)
+					if !ok {
+						c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("baris %d: kadar harus 1K sampai 24K", baris)})
+						return
+					}
+					it.Karat = k
+				} else {
+					it.Karat = ""
+				}
 			case "logam_mulia":
 				if it.Brand == "" {
 					c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("baris %d: merek logam mulia wajib diisi", baris)})
@@ -305,8 +335,8 @@ func BarangCreate(db *sql.DB) gin.HandlerFunc {
 				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("baris %d: jenis barang tidak valid", baris)})
 				return
 			}
-			if it.Jenis != "perhiasan" && it.Jenis != "logam_mulia" {
-				it.TrayID = 0 // baki untuk perhiasan dan logam mulia (emas atau perak)
+			if !services.BolehBaki(it.Jenis) {
+				it.TrayID = 0 // baki untuk perhiasan, logam mulia (emas atau perak), dan susuk
 			}
 			if it.Jenis != "logam_mulia" {
 				it.Bahan = "emas"
@@ -315,7 +345,11 @@ func BarangCreate(db *sql.DB) gin.HandlerFunc {
 				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("baris %d: harga beli wajib diisi", baris)})
 				return
 			}
-			totalBeli += it.HargaBeli
+			totalBeli += it.HargaBeli * float64(it.Jumlah)
+		}
+		if totalBarang > 300 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "maksimal 300 barang sekali input"})
+			return
 		}
 
 		tx, err := db.Begin()
@@ -341,7 +375,7 @@ func BarangCreate(db *sql.DB) gin.HandlerFunc {
 		kasKeluar := 0.0
 		if beliCustomer {
 			kasKeluar = totalBeli
-			note := fmt.Sprintf("Beli dari customer: %d barang", len(req.Items))
+			note := fmt.Sprintf("Beli dari customer: %d barang", totalBarang)
 			if catatanUmum != "" {
 				note += " - " + catatanUmum
 			}
@@ -356,47 +390,49 @@ func BarangCreate(db *sql.DB) gin.HandlerFunc {
 			}
 			id, _ := res.LastInsertId()
 			cashID = id
-			services.CatatAudit(tx, middleware.Meta(c), "create_auto", "cash_transactions", id, gin.H{"pembelian_customer": len(req.Items), "total": totalBeli})
+			services.CatatAudit(tx, middleware.Meta(c), "create_auto", "cash_transactions", id, gin.H{"pembelian_customer": totalBarang, "total": totalBeli})
 		}
 
 		var lastID int64
 		for _, it := range req.Items {
-			res, err := tx.Exec(
-				`INSERT INTO items
-				 (item_name, karat, weight_gram, origin_location_id, location_id, source_category, entry_date, note, created_by,
-				  jenis, brand, kondisi, harga_beli, purchase_cash_id, tray_id, bahan)
-				 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-				it.ItemName, it.Karat, it.WeightGram, locID, locID, req.Category, tgl, it.Note, cl.UserID,
-				it.Jenis, sql.NullString{String: it.Brand, Valid: it.Brand != ""}, kondisi, it.HargaBeli, cashID,
-				sql.NullInt64{Int64: int64(it.TrayID), Valid: it.TrayID > 0}, it.Bahan,
-			)
-			if err != nil {
-				utils.Gagal(c, err)
-				return
-			}
-			id, _ := res.LastInsertId()
-			lastID = id
-			tx.Exec("UPDATE items SET item_no = ? WHERE id = ?", fmt.Sprintf("BRG-%05d", id), id)
-			if kirimKeBO {
-				tx.Exec("UPDATE items SET status = 'dikirim', kirim_tgl = ? WHERE id = ?", tgl, id)
-			}
-			if _, err := tx.Exec(services.SQLStokItem, locID, "in", req.Category, it.ItemName, it.WeightGram, it.Karat,
-				it.Note, tgl, cl.UserID, id); err != nil {
-				utils.Gagal(c, err)
-				return
+			for n := 0; n < it.Jumlah; n++ {
+				res, err := tx.Exec(
+					`INSERT INTO items
+					 (item_name, karat, weight_gram, origin_location_id, location_id, source_category, entry_date, note, created_by,
+					  jenis, brand, kondisi, harga_beli, purchase_cash_id, tray_id, bahan)
+					 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+					it.ItemName, it.Karat, it.WeightGram, locID, locID, req.Category, tgl, it.Note, cl.UserID,
+					it.Jenis, sql.NullString{String: it.Brand, Valid: it.Brand != ""}, kondisi, it.HargaBeli, cashID,
+					sql.NullInt64{Int64: int64(it.TrayID), Valid: it.TrayID > 0}, it.Bahan,
+				)
+				if err != nil {
+					utils.Gagal(c, err)
+					return
+				}
+				id, _ := res.LastInsertId()
+				lastID = id
+				tx.Exec("UPDATE items SET item_no = ? WHERE id = ?", fmt.Sprintf("%s-%05d", services.AwalanKode(it.Jenis), id), id)
+				if kirimKeBO {
+					tx.Exec("UPDATE items SET status = 'dikirim', kirim_tgl = ? WHERE id = ?", tgl, id)
+				}
+				if _, err := tx.Exec(services.SQLStokItem, locID, "in", req.Category, it.ItemName, it.WeightGram, it.Karat,
+					it.Note, tgl, cl.UserID, id); err != nil {
+					utils.Gagal(c, err)
+					return
+				}
 			}
 		}
-		services.CatatAudit(tx, middleware.Meta(c), "create", "items", lastID, gin.H{"jumlah_barang": len(req.Items), "request": req})
+		services.CatatAudit(tx, middleware.Meta(c), "create", "items", lastID, gin.H{"jumlah_barang": totalBarang, "request": req})
 
 		if err := tx.Commit(); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "gagal menyimpan"})
 			return
 		}
-		pesan := fmt.Sprintf("%d barang tersimpan", len(req.Items))
+		pesan := fmt.Sprintf("%d barang tersimpan", totalBarang)
 		if kirimKeBO {
 			pesan += ", diantar ke back office (menunggu konfirmasi)"
 		}
-		c.JSON(http.StatusCreated, gin.H{"message": pesan, "jumlah": len(req.Items), "kas_keluar": kasKeluar})
+		c.JSON(http.StatusCreated, gin.H{"message": pesan, "jumlah": totalBarang, "kas_keluar": kasKeluar})
 	}
 }
 
@@ -512,7 +548,7 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 			args = append(args, s)
 		}
 		switch j := c.Query("jenis"); j {
-		case "perhiasan", "hasil_lebur":
+		case "perhiasan", "hasil_lebur", "susuk", "tempat_perhiasan", "kotak_perhiasan":
 			dari += " AND i.jenis = ?"
 			args = append(args, j)
 		case "logam_mulia": // logam mulia emas
@@ -542,7 +578,8 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 		var jumlah int
 		var totalGram, totalPerak, totalBeli, totalJual float64
 		if err := db.QueryRow(
-			"SELECT COUNT(*), IFNULL(SUM(IF(i.bahan = 'perak', 0, i.weight_gram)),0), IFNULL(SUM(IF(i.bahan = 'perak', i.weight_gram, 0)),0),"+
+			"SELECT COUNT(*), IFNULL(SUM(IF(i.bahan = 'perak' OR i.jenis IN ("+services.SQLJenisTanpaGram+"), 0, i.weight_gram)),0),"+
+				" IFNULL(SUM(IF(i.bahan = 'perak', i.weight_gram, 0)),0),"+
 				" IFNULL(SUM(i.harga_beli),0), IFNULL(SUM(i.harga_jual),0) "+dari, args...,
 		).Scan(&jumlah, &totalGram, &totalPerak, &totalBeli, &totalJual); err != nil {
 			utils.Gagal(c, err)

@@ -1,16 +1,17 @@
 import { rupiah, gram } from '../../utils/format'
+import { JENIS_LABEL } from '../../utils/barang'
 
-const JENIS = { perhiasan: 'Perhiasan', logam_mulia: 'Logam mulia', hasil_lebur: 'Hasil lebur' }
+const beratTeks = (g) => (g > 0 ? `${gram(g)} g` : '-')
 
 // baris spesifikasi satu barang: [label, nilai]
 function barisSpesifikasi(r) {
   const lm = r.jenis === 'logam_mulia'
   return [
     ['No', r.item_no],
-    ['Jenis', lm && r.bahan === 'perak' ? 'Logam mulia perak' : JENIS[r.jenis] || r.jenis],
+    ['Jenis', lm && r.bahan === 'perak' ? 'Logam mulia perak' : JENIS_LABEL[r.jenis] || r.jenis],
     lm ? ['Merek', r.brand || '-'] : ['Nama', r.item_name],
     ['Kadar', r.karat || '-'],
-    ['Berat', `${gram(r.weight_gram)} g`],
+    ['Berat', beratTeks(r.weight_gram)],
     ['Harga beli', r.harga_beli > 0 ? rupiah(r.harga_beli) : '-'],
     ['Kondisi', r.kondisi === 'kotor' ? 'Kotor' : 'Bersih'],
     ['Baki', r.baki_nama || 'Tanpa baki'],
@@ -60,7 +61,7 @@ export function DaftarSpesifikasi({ items }) {
               <td>{r.item_no}</td>
               <td>{r.item_name}</td>
               <td>{r.karat}</td>
-              <td className="num">{gram(r.weight_gram)} g</td>
+              <td className="num">{beratTeks(r.weight_gram)}</td>
               <td>{r.baki_nama || 'Tanpa baki'}</td>
             </tr>
           ))}

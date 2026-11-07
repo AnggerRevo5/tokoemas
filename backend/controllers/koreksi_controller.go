@@ -156,7 +156,8 @@ func Saldo(db *sql.DB) gin.HandlerFunc {
 		q := `SELECT l.id, l.name,
 		  IFNULL((SELECT SUM(IF(direction='in',amount,-amount)) FROM cash_transactions WHERE location_id=l.id AND is_void=FALSE),0),
 		  IFNULL((SELECT SUM(IF(m.direction='in',m.weight_gram,-m.weight_gram)) FROM stock_movements m LEFT JOIN items i ON i.id = m.item_id
-		          WHERE m.location_id=l.id AND m.is_void=FALSE AND IFNULL(i.bahan,'emas')='emas'),0),
+		          WHERE m.location_id=l.id AND m.is_void=FALSE AND IFNULL(i.bahan,'emas')='emas'
+		            AND IFNULL(i.jenis,'perhiasan') NOT IN (` + services.SQLJenisTanpaGram + `)),0),
 		  IFNULL((SELECT SUM(IF(m.direction='in',m.weight_gram,-m.weight_gram)) FROM stock_movements m LEFT JOIN items i ON i.id = m.item_id
 		          WHERE m.location_id=l.id AND m.is_void=FALSE AND i.bahan='perak'),0),
 		  IFNULL((SELECT SUM(IF(direction='in',qty,-qty)) FROM stock_movements WHERE location_id=l.id AND is_void=FALSE),0)

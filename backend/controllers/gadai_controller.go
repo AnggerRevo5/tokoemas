@@ -345,6 +345,10 @@ func GadaiCreate(db *sql.DB) gin.HandlerFunc {
 		namaSemua := make([]string, 0, len(ids))
 		for _, id := range ids {
 			it := items[id]
+			if services.TanpaGram(it.Jenis) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s tidak bisa digadaikan", it.Name)})
+				return
+			}
 			if it.Status != "tersedia" {
 				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s sedang tidak tersedia (%s)", it.Name, it.Status)})
 				return

@@ -29,6 +29,10 @@ func barangDiBO(c *gin.Context, tx *sql.Tx, ids []int, boID int) (map[int]models
 		return nil, false
 	}
 	for _, it := range items {
+		if services.TanpaGram(it.Jenis) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s tidak bisa dicuci atau dilebur", it.Name)})
+			return nil, false
+		}
 		if it.Status != "tersedia" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s sedang tidak tersedia (%s)", it.Name, it.Status)})
 			return nil, false

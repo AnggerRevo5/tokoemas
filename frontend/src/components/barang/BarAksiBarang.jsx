@@ -5,6 +5,7 @@ import { KETERANGAN_AKSI } from '../../constants/barang'
 import PilihanLokasi from '../common/PilihanLokasi'
 import PilihMetodeBayar from '../common/PilihMetodeBayar'
 import { BIAYA_KOSONG, nominalBiaya } from '../../utils/biaya'
+import { bolehGratis, tanpaGram } from '../../utils/barang'
 import { m } from 'motion/react'
 import AngkaBerjalan from '../common/AngkaBerjalan'
 import Spinner from '../common/Spinner'
@@ -40,6 +41,9 @@ export default function BarAksiBarang({
   }
   const judulAksi = (aksiTersedia.find(([k]) => k === aksi) || [])[1] || ''
   const totalJual = terpilih.reduce((s, r) => s + (Number(harga[r.id]) || 0), 0)
+  // harga jual wajib > 0, kecuali tempat/kotak perhiasan yang dicentang Gratis (harga '0')
+  const hargaKosong = terpilih.some((r) => !(Number(harga[r.id]) > 0) && !(bolehGratis(r.jenis) && harga[r.id] === '0'))
+  const beratTeks = (r) => (tanpaGram(r.jenis) && !(r.weight_gram > 0) ? '-' : `${gram(r.weight_gram)} g`)
 
   // tujuan oper: cabang pertama bila belum dipilih
   const targetAktif = target || (cabangList.length > 0 ? String(cabangList[0].id) : '')
@@ -48,7 +52,7 @@ export default function BarAksiBarang({
   function periksaJual(e) {
     e.preventDefault()
     mulai()
-    if (terpilih.some((r) => !(Number(harga[r.id]) > 0))) return gagal('Harga jual setiap barang wajib diisi')
+    if (hargaKosong) return gagal('Harga jual setiap barang wajib diisi')
     if (metode === 'qris' && nominalBiaya(totalJual, biaya) > totalJual) {
       return gagal('Potongan tidak boleh melebihi total penjualan')
     }
@@ -61,7 +65,7 @@ export default function BarAksiBarang({
     setLoading(true)
     const ids = terpilih.map((r) => r.id)
     try {
-      if (aksi === 'jual' && terpilih.some((r) => !(Number(harga[r.id]) > 0))) {
+      if (aksi === 'jual' && hargaKosong) {
         throw new Error('Harga jual setiap barang wajib diisi')
       }
       if (aksi === 'jual' && metode === 'qris' && nominalBiaya(totalJual, biaya) > totalJual) {
@@ -248,16 +252,29 @@ export default function BarAksiBarang({
                   {terpilih.map((r) => (
                     <tr key={r.id}>
                       <td>{r.item_no} {r.item_name} {r.karat}</td>
-                      <td className="num">{gram(r.weight_gram)} g</td>
+                      <td className="num">{beratTeks(r)}</td>
                       <td className="num">{r.harga_beli > 0 ? rupiah(r.harga_beli) : '-'}</td>
                       <td>
                         <input
                           type="number"
                           min="1"
-                          value={harga[r.id] ?? ''}
+                          value={harga[r.id] === '0' ? '' : harga[r.id] ?? ''}
                           onChange={(e) => setHarga((p) => ({ ...p, [r.id]: e.target.value }))}
-                          required
+                          disabled={harga[r.id] === '0'}
+                          placeholder={harga[r.id] === '0' ? 'Gratis' : undefined}
+                          aria-label={`Harga jual ${r.item_no}`}
+                          required={harga[r.id] !== '0'}
                         />
+                        {bolehGratis(r.jenis) && (
+                          <label className="muted" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                            <input
+                              type="checkbox"
+                              checked={harga[r.id] === '0'}
+                              onChange={(e) => setHarga((p) => ({ ...p, [r.id]: e.target.checked ? '0' : '' }))}
+                            />
+                            Gratis
+                          </label>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -313,8 +330,8 @@ export default function BarAksiBarang({
                   <tr key={r.id}>
                     <td>{r.item_no} {r.item_name}</td>
                     <td>{r.karat}</td>
-                    <td className="num">{gram(r.weight_gram)} g</td>
-                    <td className="num">{rupiah(Number(harga[r.id]) || 0)}</td>
+                    <td className="num">{beratTeks(r)}</td>
+                    <td className="num">{harga[r.id] === '0' ? 'Gratis' : rupiah(Number(harga[r.id]) || 0)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -10,6 +10,7 @@ type ItemRow struct {
 	Weight   float64
 	Location int
 	Status   string
+	Jenis    string
 }
 
 // Item mencerminkan tabel items (barang per pcs).

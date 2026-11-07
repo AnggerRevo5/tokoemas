@@ -10,6 +10,7 @@ import Pesan from '../common/Pesan'
 import PilihMetodeBayar from '../common/PilihMetodeBayar'
 import Spinner from '../common/Spinner'
 import SpesifikasiBarang from './SpesifikasiBarang'
+import { bolehGratis } from '../../utils/barang'
 
 const BATAS_HARI = 7
 const LABEL_METODE = { qris: 'QRIS/Debit', transfer: 'Transfer' }
@@ -30,7 +31,7 @@ export default function CardPenjualan({ item, me, onUbah, onTutup }) {
   const tglLama = item.tanggal_jual ? item.tanggal_jual.slice(0, 10) : ''
   const metodeLama = item.metode || 'tunai'
   const [aksi, setAksi] = useState(null) // 'koreksi' | 'batal'
-  const [harga, setHarga] = useState(String(item.harga_jual || ''))
+  const [harga, setHarga] = useState(String(item.harga_jual ?? ''))
   const [tgl, setTgl] = useState(tglLama || hariIni())
   const [metode, setMetode] = useState(metodeLama)
   const [biaya, setBiaya] = useState(BIAYA_KOSONG)
@@ -40,6 +41,9 @@ export default function CardPenjualan({ item, me, onUbah, onTutup }) {
   const [error, setError] = useState('')
 
   const hargaBaru = Number(harga) || 0
+  // tempat/kotak perhiasan boleh berharga 0 (gratis)
+  const gratisBoleh = bolehGratis(item.jenis)
+  const teksHarga = (h) => (h === 0 && gratisBoleh ? 'Gratis' : rupiah(h || 0))
   const potongan = metode === 'qris' ? nominalBiaya(hargaBaru, biaya) : 0
 
   // alasan barang ini tidak bisa diubah oleh akun ini (kosong = boleh)
@@ -63,7 +67,7 @@ export default function CardPenjualan({ item, me, onUbah, onTutup }) {
     setError('')
     if (!alasan.trim()) return setError('Alasan wajib diisi')
     if (aksi === 'koreksi') {
-      if (hargaBaru <= 0) return setError('Harga jual wajib diisi')
+      if (harga === '' || hargaBaru < 0 || (hargaBaru === 0 && !gratisBoleh)) return setError('Harga jual wajib diisi')
       if (metode === 'qris' && potongan > hargaBaru) return setError('Potongan tidak boleh melebihi harga jual')
     }
     setKonfirmasi(true)
@@ -112,7 +116,7 @@ export default function CardPenjualan({ item, me, onUbah, onTutup }) {
 
         <table className="tabel-spek" style={{ marginTop: 12 }}>
           <tbody>
-            <tr><th>Harga jual</th><td>{rupiah(item.harga_jual || 0)}</td></tr>
+            <tr><th>Harga jual</th><td>{teksHarga(item.harga_jual)}</td></tr>
             <tr><th>Tanggal jual</th><td>{tglLama || '-'}</td></tr>
             <tr><th>Metode</th><td>{item.metode ? labelMetode(item.metode) : '-'}</td></tr>
             <tr><th>Harga beli</th><td>{item.harga_beli > 0 ? rupiah(item.harga_beli) : '-'}</td></tr>
@@ -139,8 +143,8 @@ export default function CardPenjualan({ item, me, onUbah, onTutup }) {
               <>
                 <div className="form-grid">
                   <div>
-                    <label>Harga jual (Rp)</label>
-                    <input type="number" min="1" value={harga} onChange={(e) => setHarga(e.target.value)} required />
+                    <label>{gratisBoleh ? 'Harga jual (Rp, 0 = gratis)' : 'Harga jual (Rp)'}</label>
+                    <input type="number" min={gratisBoleh ? '0' : '1'} value={harga} onChange={(e) => setHarga(e.target.value)} required />
                   </div>
                   <div>
                     <label>Tanggal jual</label>
@@ -188,7 +192,7 @@ export default function CardPenjualan({ item, me, onUbah, onTutup }) {
           {aksi === 'batal' ? (
             <table className="tabel-spek" style={{ marginTop: 12 }}>
               <tbody>
-                <tr><th>Penjualan</th><td>{rupiah(item.harga_jual || 0)}, {tglLama}, {labelMetode(metodeLama)}</td></tr>
+                <tr><th>Penjualan</th><td>{teksHarga(item.harga_jual)}, {tglLama}, {labelMetode(metodeLama)}</td></tr>
                 <tr><th>Alasan</th><td>{alasan.trim()}</td></tr>
                 <tr><th>Akibat</th><td>Barang kembali Tersedia dan kas dikurangi {rupiah(item.harga_jual || 0)}</td></tr>
               </tbody>
@@ -198,7 +202,7 @@ export default function CardPenjualan({ item, me, onUbah, onTutup }) {
               <thead><tr><th></th><th>Sebelum</th><th>Sesudah</th></tr></thead>
               <tbody>
                 <tr className={hargaBaru !== item.harga_jual ? 'berubah' : undefined}>
-                  <th>Harga jual</th><td>{rupiah(item.harga_jual || 0)}</td><td>{rupiah(hargaBaru)}</td>
+                  <th>Harga jual</th><td>{teksHarga(item.harga_jual)}</td><td>{teksHarga(hargaBaru)}</td>
                 </tr>
                 <tr className={tgl !== tglLama ? 'berubah' : undefined}>
                   <th>Tanggal</th><td>{tglLama}</td><td>{tgl}</td>

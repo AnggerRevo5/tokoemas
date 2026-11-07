@@ -3,12 +3,13 @@ import { api } from '../../services/api'
 import { gram, hariIni, rupiah } from '../../utils/format'
 import { KATEGORI } from '../../constants/kategori'
 import { NAMA_UMUM, MEREK_LM, KARAT_UMUM, KARAT_LAIN } from '../../constants/barang'
-import { barisBaru } from '../../utils/barang'
+import { barisBaru, tanpaGram, bolehBaki, JENIS_LABEL } from '../../utils/barang'
 import PilihanLokasi from '../common/PilihanLokasi'
 import { m } from 'motion/react'
 import { Plus, X } from 'lucide-react'
 import AngkaBerjalan from '../common/AngkaBerjalan'
 import Spinner from '../common/Spinner'
+import Popup from '../common/Popup'
 
 const formatGram = (v) => String(gram(v))
 const formatRupiah = (v) => rupiah(Math.round(v))
@@ -27,6 +28,7 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
   const [bakiList, setBakiList] = useState([])
   const [baris, setBaris] = useState([barisBaru()])
   const [fokus, setFokus] = useState(false)
+  const [konfirmasi, setKonfirmasi] = useState(false)
   const wadah = useRef(null)
 
   const tipeLok = (id) => (locations.find((l) => l.id === Number(id)) || {}).type
@@ -88,11 +90,31 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
     setFokus(true)
   }
 
-  const totalGram = baris.reduce((s, b) => s + Number(b.weight_gram || 0), 0)
-  const totalBeli = baris.reduce((s, b) => s + Number(b.harga_beli || 0), 0)
+  // susuk, tempat, dan kotak perhiasan: satu baris bisa berisi banyak barang (kolom jumlah)
+  const jumlahBaris = (b) => (tanpaGram(b.jenis) ? Math.max(1, Math.floor(Number(b.jumlah) || 1)) : 1)
+  const totalBarang = baris.reduce((s, b) => s + jumlahBaris(b), 0)
+  const totalGram = baris.reduce((s, b) => s + (tanpaGram(b.jenis) ? 0 : Number(b.weight_gram || 0)), 0)
+  const totalBeli = baris.reduce((s, b) => s + Number(b.harga_beli || 0) * jumlahBaris(b), 0)
+  const labelJenis = (j) => (j === 'perak' ? 'Logam mulia perak' : j === 'logam_mulia' ? 'Logam mulia emas' : JENIS_LABEL[j])
+  const namaBaris = (b) =>
+    b.jenis === 'logam_mulia' || b.jenis === 'perak' ? b.brand : b.item_name.trim() || JENIS_LABEL[b.jenis]
+  const kadarBaris = (b) => (b.jenis === 'perak' ? '999' : b.jenis === 'logam_mulia' ? '24K' : b.karat || '-')
+  // baki sama dengan server: tempat dan kotak perhiasan tidak pernah masuk baki ('perak' di form = logam mulia)
+  const masukBaki = (b) => bolehBaki(b.jenis === 'perak' ? 'logam_mulia' : b.jenis)
+  const namaBaki = (bakiList.find((x) => String(x.id) === fBaki) || {}).name
+  const teksBaki = !namaBaki || !baris.some(masukBaki)
+    ? 'Tanpa baki'
+    : baris.every(masukBaki) ? namaBaki : `${namaBaki} (tempat dan kotak perhiasan tanpa baki)`
 
-  async function simpanMasuk(e) {
+  // tampilkan card konfirmasi (barang, jumlah, harga) sebelum benar-benar tersimpan
+  function periksaMasuk(e) {
     e.preventDefault()
+    onMulai()
+    if (totalBarang > 300) return onError('Maksimal 300 barang sekali input')
+    setKonfirmasi(true)
+  }
+
+  async function simpanMasuk() {
     onMulai()
     setLoading(true)
     try {
@@ -110,10 +132,11 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
             item_name: b.item_name,
             brand: b.brand,
             karat: b.karat,
-            weight_gram: Number(b.weight_gram),
+            weight_gram: Number(b.weight_gram || 0),
             harga_beli: Number(b.harga_beli || 0),
             note: b.note,
             tray_id: Number(fBaki || 0),
+            jumlah: jumlahBaris(b),
           })),
         }),
       })
@@ -122,9 +145,11 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
       setBaris([barisBaru()])
       setFNote('')
       setFPosisi('toko')
+      setKonfirmasi(false)
       setFormBuka(false)
       onSukses({ message, lokasiId: fLoc, status })
     } catch (err) {
+      setKonfirmasi(false)
       onError(err.message)
     } finally {
       setLoading(false)
@@ -143,7 +168,7 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
         <m.form
           className="card"
           style={{ marginBottom: 16 }}
-          onSubmit={simpanMasuk}
+          onSubmit={periksaMasuk}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && e.target.tagName === 'INPUT') e.preventDefault()
           }}
@@ -153,7 +178,7 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
         >
           <h3>Tambah Barang Masuk</h3>
           <p className="muted">
-            Satu baris = satu barang. Tekan Enter di kolom terakhir untuk menambah baris baru
+            Satu baris = satu barang (susuk, tempat, dan kotak perhiasan bisa diisi jumlahnya). Tekan Enter di kolom terakhir untuk menambah baris baru
             (jenis, nama, dan kadar terisi otomatis).
           </p>
 
@@ -231,6 +256,7 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
               <span>Nama / merek</span>
               <span>Kadar</span>
               <span>Berat (gram)</span>
+              <span>Jumlah</span>
               <span>Harga beli (Rp)</span>
               <span>Keterangan</span>
               <span></span>
@@ -241,9 +267,19 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
                   <option value="perhiasan">Perhiasan</option>
                   <option value="logam_mulia">Logam mulia emas</option>
                   <option value="perak">Logam mulia perak</option>
+                  <option value="susuk">Susuk emas</option>
+                  <option value="tempat_perhiasan">Tempat perhiasan</option>
+                  <option value="kotak_perhiasan">Kotak perhiasan</option>
                 </select>
 
-                {b.jenis !== 'perhiasan' ? (
+                {tanpaGram(b.jenis) ? (
+                  <input
+                    value={b.item_name}
+                    onChange={(e) => ubahBaris(i, 'item_name', e.target.value)}
+                    placeholder={`${JENIS_LABEL[b.jenis]} (opsional)`}
+                    aria-label="Nama barang (opsional)"
+                  />
+                ) : b.jenis !== 'perhiasan' ? (
                   <input
                     list={b.jenis === 'perak' ? undefined : 'merek-lm'}
                     value={b.brand}
@@ -261,11 +297,18 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
                   />
                 )}
 
-                {b.jenis !== 'perhiasan' ? (
+                {b.jenis === 'tempat_perhiasan' || b.jenis === 'kotak_perhiasan' ? (
+                  <input value="-" disabled aria-label="Kadar" />
+                ) : b.jenis !== 'perhiasan' && b.jenis !== 'susuk' ? (
                   <input value={b.jenis === 'perak' ? '999' : '24K'} disabled />
                 ) : (
-                  <select value={b.karat} onChange={(e) => ubahBaris(i, 'karat', e.target.value)} required>
-                    <option value="">Kadar</option>
+                  <select
+                    value={b.karat}
+                    onChange={(e) => ubahBaris(i, 'karat', e.target.value)}
+                    required={b.jenis === 'perhiasan'}
+                    aria-label="Kadar"
+                  >
+                    <option value="">{b.jenis === 'susuk' ? 'Kadar (opsional)' : 'Kadar'}</option>
                     <optgroup label="Umum">
                       {KARAT_UMUM.map((n) => (
                         <option key={n} value={`${n}K`}>{n}K</option>
@@ -283,11 +326,22 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
                   className="in-berat"
                   type="number"
                   step="0.001"
-                  min="0.001"
-                  placeholder="Berat (gram)"
+                  min={tanpaGram(b.jenis) ? '0' : '0.001'}
+                  placeholder={tanpaGram(b.jenis) ? 'Berat (opsional)' : 'Berat (gram)'}
                   value={b.weight_gram}
                   onChange={(e) => ubahBaris(i, 'weight_gram', e.target.value)}
                   onKeyDown={(e) => enterBaris(e, false)}
+                  required={!tanpaGram(b.jenis)}
+                />
+                <input
+                  type="number"
+                  min="1"
+                  max="300"
+                  step="1"
+                  value={tanpaGram(b.jenis) ? b.jumlah : '1'}
+                  onChange={(e) => ubahBaris(i, 'jumlah', e.target.value)}
+                  disabled={!tanpaGram(b.jenis)}
+                  aria-label="Jumlah barang"
                   required
                 />
                 <input
@@ -324,13 +378,53 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
           </div>
 
           <div className="total-bar">
-            <span>Total: <b>{baris.length}</b> barang</span>
+            <span>Total: <b>{totalBarang}</b> barang</span>
             <span><b className="utama"><AngkaBerjalan nilai={totalGram} format={formatGram} /></b> gram</span>
             {totalBeli > 0 && <span>harga beli <b className="utama"><AngkaBerjalan nilai={totalBeli} format={formatRupiah} /></b></span>}
           </div>
 
-          <button disabled={loading}>{loading ? <><Spinner />Menyimpan...</> : 'Simpan semua'}</button>
+          <button disabled={loading}>{loading ? <><Spinner />Menyimpan...</> : 'Lanjut'}</button>
         </m.form>
+      )}
+
+      {konfirmasi && (
+        <Popup
+          judul={`Simpan ${totalBarang} barang masuk?`}
+          labelKonfirmasi="Ya, simpan"
+          loading={loading}
+          onKonfirmasi={simpanMasuk}
+          onTutup={() => setKonfirmasi(false)}
+        >
+          <p className="muted">Periksa barang dan harga sebelum disimpan:</p>
+          <div className="table-wrap" style={{ maxHeight: 260, overflow: 'auto' }}>
+            <table className="tabel-spek">
+              <thead>
+                <tr><th>Barang</th><th>Kadar</th><th className="num">Berat</th><th className="num">Jumlah</th><th className="num">Harga beli</th></tr>
+              </thead>
+              <tbody>
+                {baris.map((b, i) => (
+                  <tr key={i}>
+                    <td>{labelJenis(b.jenis)}{namaBaris(b) && namaBaris(b) !== JENIS_LABEL[b.jenis] ? `: ${namaBaris(b)}` : ''}</td>
+                    <td>{kadarBaris(b)}</td>
+                    <td className="num">{Number(b.weight_gram) > 0 ? `${gram(b.weight_gram)} g` : '-'}</td>
+                    <td className="num">{jumlahBaris(b)}</td>
+                    <td className="num">{Number(b.harga_beli) > 0 ? rupiah(Number(b.harga_beli)) : '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <table className="tabel-spek" style={{ marginTop: 12 }}>
+            <tbody>
+              <tr><th>Lokasi</th><td>{(locations.find((l) => l.id === Number(fLoc)) || {}).name || '-'}</td></tr>
+              <tr><th>Asal barang</th><td>{(fOpsi.find(([k]) => k === fKat) || [])[1] || fKat}</td></tr>
+              <tr><th>Baki</th><td>{teksBaki}</td></tr>
+              <tr><th>Tanggal</th><td>{fTgl}</td></tr>
+              <tr><th>Total</th><td>{totalBarang} barang, {gram(totalGram)} g emas</td></tr>
+              {totalBeli > 0 && <tr><th>Total harga beli</th><td>{rupiah(totalBeli)}{wajibHarga && ' (kas toko keluar)'}</td></tr>}
+            </tbody>
+          </table>
+        </Popup>
       )}
     </>
   )

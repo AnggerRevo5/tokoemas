@@ -304,13 +304,11 @@ func BakiPindah(db *sql.DB) gin.HandlerFunc {
 				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s tidak berada di lokasi baki tujuan", it.Name)})
 				return
 			}
+			if !services.BolehBaki(it.Jenis) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "hanya perhiasan, logam mulia (emas atau perak), dan susuk yang bisa dimasukkan ke baki"})
+				return
+			}
 			args = append(args, it.ID)
-		}
-		var bukanPerhiasan int
-		tx.QueryRow("SELECT COUNT(*) FROM items WHERE jenis NOT IN ('perhiasan', 'logam_mulia') AND id IN ("+utils.Placeholders(len(args))+")", args...).Scan(&bukanPerhiasan)
-		if bukanPerhiasan > 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "hanya perhiasan dan logam mulia (emas atau perak) yang bisa dimasukkan ke baki"})
-			return
 		}
 		if _, err := services.IsiBaki(tx, req.TrayID, loc); err != nil {
 			balasKesalahan(c, err)
@@ -364,10 +362,6 @@ func BarangEdit(db *sql.DB) gin.HandlerFunc {
 		req.ItemName = strings.TrimSpace(req.ItemName)
 		req.Brand = strings.TrimSpace(req.Brand)
 		req.Note = strings.TrimSpace(req.Note)
-		if req.WeightGram <= 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "berat wajib diisi"})
-			return
-		}
 
 		tx, err := db.Begin()
 		if err != nil {
@@ -423,8 +417,30 @@ func BarangEdit(db *sql.DB) gin.HandlerFunc {
 				return
 			}
 			karat = k
+		case "susuk", "tempat_perhiasan", "kotak_perhiasan":
+			if nama == "" {
+				nama = services.NamaBawaan(lama.Jenis)
+			}
+			// kadar opsional, hanya untuk susuk
+			if lama.Jenis == "susuk" && strings.TrimSpace(req.Karat) != "" {
+				k, ok := utils.NormalKarat(req.Karat)
+				if !ok {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "kadar harus 1K sampai 24K"})
+					return
+				}
+				karat = k
+			}
 		default:
 			c.JSON(http.StatusBadRequest, gin.H{"error": "barang hasil lebur dikelola di menu Lebur"})
+			return
+		}
+		// berat wajib kecuali susuk, tempat, dan kotak perhiasan
+		if req.WeightGram <= 0 && !services.TanpaGram(lama.Jenis) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "berat wajib diisi"})
+			return
+		}
+		if req.TrayID > 0 && !services.BolehBaki(lama.Jenis) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "barang ini tidak bisa dimasukkan ke baki"})
 			return
 		}
 

@@ -26,7 +26,7 @@ func TabelPenjualanToko(db *sql.DB, dari, sampai, loc string) (models.TabelLapor
 		Tipe:  []string{"teks", "teks", "teks", "gram", "rupiah", "rupiah", "rupiah", "teks"},
 	}
 	q := `SELECT i.tanggal_jual, l.name, CONCAT(IFNULL(i.item_no,''), ' ', i.item_name, ' ', IFNULL(i.karat,'')),
-	             i.weight_gram, i.harga_beli, i.harga_jual, IFNULL(jc.metode, 'tunai')` + sqlDasarPenjualanToko
+	             i.weight_gram, i.harga_beli, i.harga_jual, IFNULL(jc.metode, 'tunai'), i.jenis` + sqlDasarPenjualanToko
 	args := []interface{}{dari, sampai}
 	if loc != "" {
 		q += " AND i.location_id = ?"
@@ -42,15 +42,21 @@ func TabelPenjualanToko(db *sql.DB, dari, sampai, loc string) (models.TabelLapor
 	var sumBerat, sumModal, sumJual float64
 	for rows.Next() {
 		var tgl time.Time
-		var lok, barang, metode string
+		var lok, barang, metode, jenis string
 		var berat, modal, jual float64
-		if err := rows.Scan(&tgl, &lok, &barang, &berat, &modal, &jual, &metode); err != nil {
+		if err := rows.Scan(&tgl, &lok, &barang, &berat, &modal, &jual, &metode, &jenis); err != nil {
 			return t, err
 		}
-		sumBerat += berat
+		if !TanpaGram(jenis) { // total berat = gram emas saja; susuk/tempat/kotak tidak ikut
+			sumBerat += berat
+		}
 		sumModal += modal
 		sumJual += jual
-		t.Baris = append(t.Baris, []interface{}{fmtTgl(tgl), lok, barang, berat, modal, jual, jual - modal, LabelMetode(metode)})
+		labelMetode := LabelMetode(metode)
+		if jual == 0 {
+			labelMetode = "Gratis" // tempat/kotak perhiasan yang diberikan cuma-cuma
+		}
+		t.Baris = append(t.Baris, []interface{}{fmtTgl(tgl), lok, barang, berat, modal, jual, jual - modal, labelMetode})
 	}
 	if err := rows.Err(); err != nil {
 		return t, err

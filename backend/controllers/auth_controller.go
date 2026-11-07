@@ -28,7 +28,7 @@ func Login(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		username := strings.TrimSpace(req.Username)
-		if !middleware.CekBatasLogin(c, strings.ToLower(username)) {
+		if !middleware.CekBatasLogin(c) {
 			services.CatatKeamanan(db, eventDari(c, "login_dibatasi", username, 0, 0, "terlalu banyak percobaan"))
 			return
 		}
@@ -57,16 +57,11 @@ func Login(db *sql.DB) gin.HandlerFunc {
 			alasan = "akun nonaktif"
 		}
 		if alasan != "" {
-			if middleware.CatatLoginGagal(c, strings.ToLower(username)) {
-				alasan += ", dikunci sementara"
-			}
 			services.CatatKeamanan(db, eventDari(c, "login_gagal", username, id, int(locID.Int64), alasan))
 			// pesan sama untuk semua alasan agar tidak membocorkan username yang terdaftar
 			c.JSON(http.StatusUnauthorized, gin.H{"error": pesanLoginGagal})
 			return
 		}
-		middleware.CatatLoginBerhasil(c, strings.ToLower(username))
-
 		// perbarui hash lama ke cost bcrypt yang lebih kuat (password tidak berubah)
 		if services.PerluHashUlang(hash) {
 			if baru, err := bcrypt.GenerateFromPassword([]byte(req.Password), services.BcryptCost); err == nil {

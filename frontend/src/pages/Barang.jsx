@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../services/api'
-import { bisaPilih, tentukanMode, aksiUntukMode } from '../utils/barang'
+import { bisaPilih, tentukanMode, aksiUntukMode, tanpaGram, bolehBaki } from '../utils/barang'
 import Pesan from '../components/common/Pesan'
 import Popup from '../components/common/Popup'
 import NotifBanner from '../components/barang/NotifBanner'
@@ -93,24 +93,25 @@ export default function Barang({ me, onUbah }) {
 
   const bisaDipilih = data.rows.filter(bisaPilih)
   const terpilih = Object.values(pilih)
-  const beratTerpilih = terpilih.reduce((s, r) => s + r.weight_gram, 0)
+  const beratTerpilih = terpilih.reduce((s, r) => s + (tanpaGram(r.jenis) ? 0 : r.weight_gram), 0)
   const adaLM = terpilih.some((r) => r.jenis === 'logam_mulia')
+  const adaTanpaGram = terpilih.some((r) => tanpaGram(r.jenis))
   const semuaDipilih = bisaDipilih.length > 0 && bisaDipilih.every((r) => pilih[r.id])
 
   const mode = tentukanMode(terpilih, tipeLok)
-  // pindah baki: semua yang dicentang perhiasan atau logam mulia tersedia di satu lokasi yang punya baki
+  // pindah baki: semua yang dicentang boleh berbaki (perhiasan, logam mulia, susuk) dan tersedia di satu lokasi yang punya baki
   const lokasiPindah = terpilih.length > 0 && terpilih.every(
-    (r) => (r.jenis === 'perhiasan' || r.jenis === 'logam_mulia') && r.status === 'tersedia' && r.location_id === terpilih[0].location_id,
+    (r) => bolehBaki(r.jenis) && r.status === 'tersedia' && r.location_id === terpilih[0].location_id,
   ) ? terpilih[0].location_id : null
   const bakiPindah = lokasiPindah ? baki.rows.filter((b) => b.location_id === lokasiPindah) : []
   // gadai: satu atau beberapa barang tersedia dari lokasi yang sama, oleh akun cabang atau Super Admin
-  const bisaGadai = (isCabang || me.role === 'super_admin') && terpilih.length >= 1 &&
+  const bisaGadai = (isCabang || me.role === 'super_admin') && terpilih.length >= 1 && !adaTanpaGram &&
     terpilih.every((r) => r.status === 'tersedia' && r.location_id === terpilih[0].location_id)
-  const aksiTersedia = aksiUntukMode(mode, { isCabang, adaLM, bisaGadai })
+  const aksiTersedia = aksiUntukMode(mode, { isCabang, adaLM, adaTanpaGram, bisaGadai })
 
   useEffect(() => {
     if (aksi && !aksiTersedia.some(([k]) => k === aksi)) setAksi(null)
-  }, [mode, adaLM, bisaGadai])
+  }, [mode, adaLM, adaTanpaGram, bisaGadai])
 
   function toggleSemua() {
     // hanya memengaruhi barang yang sedang tampil; pilihan dari pencarian sebelumnya tetap

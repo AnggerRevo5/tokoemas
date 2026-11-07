@@ -23,7 +23,7 @@ type jualLama struct {
 	Lokasi         int
 	Nama, Karat    string
 	Berat          float64
-	Status         string
+	Status, Jenis  string
 	Harga          float64
 	SaleID         sql.NullInt64
 	KasID, BiayaID sql.NullInt64
@@ -34,10 +34,10 @@ type jualLama struct {
 func kunciJual(tx *sql.Tx, id int) (jualLama, error) {
 	var j jualLama
 	err := tx.QueryRow(
-		`SELECT location_id, item_name, IFNULL(karat,''), weight_gram, status, IFNULL(harga_jual,0), sale_id,
+		`SELECT location_id, item_name, IFNULL(karat,''), weight_gram, status, jenis, IFNULL(harga_jual,0), sale_id,
 		        jual_cash_id, jual_biaya_cash_id, IFNULL(tanggal_jual >= DATE_SUB(CURDATE(), INTERVAL 7 DAY), 0)
 		 FROM items WHERE id = ? AND is_void = FALSE FOR UPDATE`, id,
-	).Scan(&j.Lokasi, &j.Nama, &j.Karat, &j.Berat, &j.Status, &j.Harga, &j.SaleID, &j.KasID, &j.BiayaID, &j.Baru)
+	).Scan(&j.Lokasi, &j.Nama, &j.Karat, &j.Berat, &j.Status, &j.Jenis, &j.Harga, &j.SaleID, &j.KasID, &j.BiayaID, &j.Baru)
 	return j, err
 }
 
@@ -193,10 +193,6 @@ func JualKoreksi(db *sql.DB) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "alasan koreksi wajib diisi"})
 			return
 		}
-		if req.Harga <= 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "harga jual wajib diisi (lebih dari 0)"})
-			return
-		}
 		tgl, ok := utils.ParseTanggal(c, req.Date)
 		if !ok {
 			return
@@ -233,6 +229,11 @@ func JualKoreksi(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		if !periksaJual(c, cl, j) {
+			return
+		}
+		// harga 0 (gratis) hanya untuk tempat dan kotak perhiasan
+		if req.Harga == 0 && !services.BolehGratis(j.Jenis) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "harga jual wajib diisi (lebih dari 0)"})
 			return
 		}
 		meta := middleware.Meta(c)

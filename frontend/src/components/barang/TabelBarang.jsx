@@ -1,7 +1,7 @@
 import { AnimatePresence } from 'motion/react'
 import { rupiah } from '../../utils/format'
 import { STATUS_LABEL, STATUS_CLASS } from '../../constants/barang'
-import { bisaPilih } from '../../utils/barang'
+import { bisaPilih, bolehBaki } from '../../utils/barang'
 import useAnimasiDaftar from '../../hooks/useAnimasiDaftar'
 import BarisAnimasi from '../common/BarisAnimasi'
 import BarisKosong from '../common/BarisKosong'
@@ -65,7 +65,7 @@ export default function TabelBarang({
                 )}
               </td>
               <td>{r.baki_nama || '-'}</td>
-              <td className="num">{r.weight_gram} g</td>
+              <td className="num">{r.weight_gram > 0 ? `${r.weight_gram} g` : '-'}</td>
               <td>
                 <span className={r.kondisi === 'kotor' ? 'tag warn' : 'tag in'}>
                   {r.kondisi === 'kotor' ? 'Kotor' : 'Bersih'}
@@ -73,7 +73,7 @@ export default function TabelBarang({
               </td>
               <td className="num">{r.harga_beli > 0 ? rupiah(r.harga_beli) : '-'}</td>
               <td className="num">
-                {r.harga_jual ? rupiah(r.harga_jual) : '-'}
+                {r.harga_jual ? rupiah(r.harga_jual) : r.status === 'terjual' && r.harga_jual === 0 ? 'Gratis' : '-'}
                 {r.harga_jual > 0 && r.harga_beli > 0 && (
                   <div className={r.harga_jual < r.harga_beli ? 'neg' : 'muted'}>
                     {r.harga_jual < r.harga_beli ? 'rugi' : 'untung'} {rupiah(Math.abs(r.harga_jual - r.harga_beli))}
@@ -128,7 +128,7 @@ export default function TabelBarang({
                     Edit
                   </button>
                 )}
-                {r.status === 'tersedia' && (r.jenis === 'perhiasan' || r.jenis === 'logam_mulia') && (
+                {r.status === 'tersedia' && bolehBaki(r.jenis) && (
                   <button type="button" className="mini" style={{ marginLeft: 6 }} onClick={() => onPindah(r)}>
                     Pindah
                   </button>

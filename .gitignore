@@ -4,14 +4,19 @@ dist/
 .env.*
 *.exe
 *.log
-.env
-.env.*
 !.env.example
 .vscode/
 backup/
+# dokumen kerja (stok Excel, daftar harga, laporan) dan file kunci Office
 *.xlsx
+*.xls
+*.csv
+*.docx
+*.doc
+~$*
 *.pdf
 *.local.sql
 reset-db.ps1
 docker-compose.override.yml
 db/
+docs/

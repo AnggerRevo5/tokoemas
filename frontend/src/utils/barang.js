@@ -2,6 +2,22 @@
 export const bisaPilih = (r) =>
   r.status === 'tersedia' || r.status === 'dikirim' || r.status === 'cuci' || r.status === 'kembali'
 
+// label jenis barang
+export const JENIS_LABEL = {
+  perhiasan: 'Perhiasan',
+  logam_mulia: 'Logam mulia',
+  hasil_lebur: 'Hasil lebur',
+  susuk: 'Susuk emas',
+  tempat_perhiasan: 'Tempat perhiasan',
+  kotak_perhiasan: 'Kotak perhiasan',
+}
+
+// aturan jenis, sama dengan backend/services/jenis_barang.go:
+// susuk/tempat/kotak tanpa gram (berat-kadar opsional, tidak cuci/lebur/gadai); tempat/kotak boleh gratis
+export const tanpaGram = (jenis) => jenis === 'susuk' || jenis === 'tempat_perhiasan' || jenis === 'kotak_perhiasan'
+export const bolehGratis = (jenis) => jenis === 'tempat_perhiasan' || jenis === 'kotak_perhiasan'
+export const bolehBaki = (jenis) => jenis === 'perhiasan' || jenis === 'logam_mulia' || jenis === 'susuk'
+
 // satu baris isian pada form barang masuk (meniru jenis, nama, merek, dan kadar baris sebelumnya)
 export const barisBaru = (dari) => ({
   jenis: dari ? dari.jenis : 'perhiasan',
@@ -11,6 +27,7 @@ export const barisBaru = (dari) => ({
   weight_gram: '',
   harga_beli: '',
   note: '',
+  jumlah: '1',
 })
 
 // Menentukan "mode" dari barang yang dicentang:
@@ -38,7 +55,8 @@ export function tentukanMode(terpilih, tipeLok) {
 // Tombol aksi yang tersedia untuk mode tertentu: [[kode aksi, label]].
 // transit_toko hanya untuk akun cabang tujuan (owner hanya memantau progres).
 // bisaGadai: satu atau beberapa barang tersedia dari lokasi yang sama dipilih oleh akun yang boleh menggadaikan.
-export function aksiUntukMode(mode, { isCabang, adaLM, bisaGadai }) {
+// adaTanpaGram: ada susuk/tempat/kotak yang dipilih (tidak bisa dicuci atau dilebur).
+export function aksiUntukMode(mode, { isCabang, adaLM, adaTanpaGram, bisaGadai }) {
   if (mode === 'transit' && !isCabang) return [['sampai', 'Sudah sampai'], ['belum', 'Belum sampai']]
   if (mode === 'transit_toko' && isCabang) {
     return [['terima_toko', 'Sudah diterima'], ['belum_toko', 'Belum diterima']]
@@ -48,6 +66,7 @@ export function aksiUntukMode(mode, { isCabang, adaLM, bisaGadai }) {
   }
   const gadai = bisaGadai ? [['gadai', 'Digadaikan']] : []
   if (mode === 'back_office' && !isCabang) {
+    if (adaTanpaGram) return [['kirim', 'Jual (oper ke toko)']]
     return adaLM
       ? [['kirim', 'Jual (oper ke toko)'], ...gadai]
       : [['kirim', 'Jual (oper ke toko)'], ['cuci', 'Cuci'], ['lebur', 'Lebur']]

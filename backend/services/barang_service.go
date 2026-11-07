@@ -18,7 +18,7 @@ func AmbilBarang(tx *sql.Tx, ids []int) (map[int]models.ItemRow, error) {
 		}
 	}
 	rows, err := tx.Query(
-		`SELECT id, item_name, IFNULL(karat,''), weight_gram, location_id, status
+		`SELECT id, item_name, IFNULL(karat,''), weight_gram, location_id, status, jenis
 		 FROM items WHERE is_void = FALSE AND id IN (`+utils.Placeholders(len(args))+`) FOR UPDATE`, args...)
 	if err != nil {
 		return nil, err
@@ -27,7 +27,7 @@ func AmbilBarang(tx *sql.Tx, ids []int) (map[int]models.ItemRow, error) {
 	out := map[int]models.ItemRow{}
 	for rows.Next() {
 		var r models.ItemRow
-		if err := rows.Scan(&r.ID, &r.Name, &r.Karat, &r.Weight, &r.Location, &r.Status); err != nil {
+		if err := rows.Scan(&r.ID, &r.Name, &r.Karat, &r.Weight, &r.Location, &r.Status, &r.Jenis); err != nil {
 			return nil, err
 		}
 		out[r.ID] = r

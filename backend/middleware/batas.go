@@ -86,20 +86,15 @@ func (p *pembatas) bersihkan() {
 var (
 	// percobaan login per IP: maksimal 20 dalam 10 menit
 	loginPerIP = pembatasBaru(10*time.Minute, 20, 15*time.Minute)
-	// login gagal per pasangan username+IP: 5 kali dalam 15 menit lalu dikunci 15 menit.
-	// Dipasangkan dengan IP agar orang lain tidak bisa mengunci akun toko dari luar.
-	gagalPerAkun = pembatasBaru(15*time.Minute, 5, 15*time.Minute)
 	// semua request API per IP (perlindungan banjir request)
 	requestPerIP = pembatasBaru(time.Minute, 600, 0)
 )
 
-// CekBatasLogin dipanggil sebelum memeriksa password. Mengembalikan false (dan membalas 429) bila terkunci.
-func CekBatasLogin(c *gin.Context, username string) bool {
+// CekBatasLogin dipanggil sebelum memeriksa password. Salah password tidak membuat akun menunggu;
+// yang tersisa hanya pembatas banjir percobaan per IP. Mengembalikan false (dan membalas 429) bila terkunci.
+func CekBatasLogin(c *gin.Context) bool {
 	ip := c.ClientIP()
-	sisa := gagalPerAkun.terkunci(username + "|" + ip)
-	if s := loginPerIP.terkunci(ip); s > sisa {
-		sisa = s
-	}
+	sisa := loginPerIP.terkunci(ip)
 	if sisa == 0 && loginPerIP.tambah(ip) {
 		sisa = loginPerIP.terkunci(ip)
 	}
@@ -111,16 +106,6 @@ func CekBatasLogin(c *gin.Context, username string) bool {
 		return false
 	}
 	return true
-}
-
-// CatatLoginGagal menambah hitungan gagal; mengembalikan true bila akun (untuk IP ini) baru saja dikunci.
-func CatatLoginGagal(c *gin.Context, username string) bool {
-	return gagalPerAkun.tambah(username + "|" + c.ClientIP())
-}
-
-// CatatLoginBerhasil menghapus hitungan gagal untuk username+IP ini.
-func CatatLoginBerhasil(c *gin.Context, username string) {
-	gagalPerAkun.reset(username + "|" + c.ClientIP())
 }
 
 // BatasRequest membatasi jumlah request per IP agar API tidak dibanjiri.

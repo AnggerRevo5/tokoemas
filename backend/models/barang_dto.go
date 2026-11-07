@@ -25,10 +25,12 @@ type BarangSatu struct {
 	ItemName   string  `json:"item_name" binding:"max=100"`
 	Brand      string  `json:"brand" binding:"max=50"`
 	Karat      string  `json:"karat" binding:"max=10"`
-	WeightGram float64 `json:"weight_gram" binding:"lte=100000"`
+	WeightGram float64 `json:"weight_gram" binding:"gte=0,lte=100000"`
 	HargaBeli  float64 `json:"harga_beli" binding:"lte=1000000000000"`
 	Note       string  `json:"note" binding:"max=200"`
 	TrayID     int     `json:"tray_id" binding:"gte=0"`
+	// Jumlah: banyaknya barang sama pada baris ini (hanya susuk, tempat, kotak perhiasan); 0 dianggap 1.
+	Jumlah int `json:"jumlah" binding:"gte=0,lte=300"`
 }
 
 // BarangEditReq adalah payload JSON untuk BarangEdit. TrayID 0 = tanpa baki.
@@ -36,7 +38,7 @@ type BarangEditReq struct {
 	ItemName   string  `json:"item_name" binding:"max=100"`
 	Brand      string  `json:"brand" binding:"max=50"`
 	Karat      string  `json:"karat" binding:"max=10"`
-	WeightGram float64 `json:"weight_gram" binding:"lte=100000"`
+	WeightGram float64 `json:"weight_gram" binding:"gte=0,lte=100000"`
 	HargaBeli  float64 `json:"harga_beli" binding:"gte=0,lte=1000000000000"`
 	Note       string  `json:"note" binding:"max=200"`
 	TrayID     int     `json:"tray_id" binding:"gte=0"`

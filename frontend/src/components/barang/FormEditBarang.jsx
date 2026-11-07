@@ -8,6 +8,7 @@ import Spinner from '../common/Spinner'
 import Popup from '../common/Popup'
 import Pesan from '../common/Pesan'
 import SpesifikasiBarang from './SpesifikasiBarang'
+import { tanpaGram, bolehBaki, JENIS_LABEL } from '../../utils/barang'
 
 // Card edit satu barang di tengah layar (nama/merek, kadar, berat, harga beli, keterangan, baki).
 // baki: daftar baki di lokasi barang. onSelesai(pesan): setelah tersimpan; onTutup().
@@ -16,6 +17,9 @@ import SpesifikasiBarang from './SpesifikasiBarang'
 export default function FormEditBarang({ item, baki, onSelesai, onTutup, onHapus }) {
   const lm = item.jenis === 'logam_mulia'
   const perak = lm && item.bahan === 'perak'
+  // susuk/tempat/kotak: nama, berat opsional; kadar hanya susuk (opsional)
+  const tg = tanpaGram(item.jenis)
+  const tanpaKadar = tg && item.jenis !== 'susuk'
   const [f, setF] = useState({
     item_name: item.item_name,
     brand: item.brand,
@@ -36,10 +40,10 @@ export default function FormEditBarang({ item, baki, onSelesai, onTutup, onHapus
   const bakiBaru = baki.find((b) => String(b.id) === f.tray_id)
   const sesudah = {
     ...item,
-    item_name: lm ? `Logam mulia ${perak ? 'perak ' : ''}${f.brand.trim()}` : f.item_name.trim(),
+    item_name: lm ? `Logam mulia ${perak ? 'perak ' : ''}${f.brand.trim()}` : f.item_name.trim() || (tg ? JENIS_LABEL[item.jenis] : ''),
     brand: lm ? f.brand.trim() : item.brand,
-    karat: lm ? (perak ? '999' : '24K') : f.karat,
-    weight_gram: Number(f.weight_gram),
+    karat: lm ? (perak ? '999' : '24K') : tanpaKadar ? '' : f.karat,
+    weight_gram: Number(f.weight_gram || 0),
     harga_beli: Number(f.harga_beli || 0),
     note: f.note.trim(),
     baki_nama: bakiBaru ? bakiBaru.name : '',
@@ -69,7 +73,7 @@ export default function FormEditBarang({ item, baki, onSelesai, onTutup, onHapus
           item_name: f.item_name,
           brand: f.brand,
           karat: f.karat,
-          weight_gram: Number(f.weight_gram),
+          weight_gram: Number(f.weight_gram || 0),
           harga_beli: Number(f.harga_beli || 0),
           note: f.note,
           tray_id: Number(f.tray_id || 0),
@@ -114,8 +118,8 @@ export default function FormEditBarang({ item, baki, onSelesai, onTutup, onHapus
           </div>
         ) : (
           <div>
-            <label>Nama perhiasan</label>
-            <input list="nama-edit" value={f.item_name} onChange={ubah('item_name')} required />
+            <label>{tg ? 'Nama (opsional)' : 'Nama perhiasan'}</label>
+            <input list="nama-edit" value={f.item_name} onChange={ubah('item_name')} required={!tg} />
             <datalist id="nama-edit">
               {NAMA_UMUM.map((n) => <option key={n} value={n} />)}
             </datalist>
@@ -123,11 +127,11 @@ export default function FormEditBarang({ item, baki, onSelesai, onTutup, onHapus
         )}
         <div>
           <label>Kadar</label>
-          {lm ? (
-            <input value={perak ? '999' : '24K'} disabled />
+          {lm || tanpaKadar ? (
+            <input value={lm ? (perak ? '999' : '24K') : '-'} disabled />
           ) : (
-            <select value={f.karat} onChange={ubah('karat')} required>
-              <option value="">Kadar</option>
+            <select value={f.karat} onChange={ubah('karat')} required={!tg}>
+              <option value="">{tg ? 'Kadar (opsional)' : 'Kadar'}</option>
               <optgroup label="Umum">
                 {KARAT_UMUM.map((n) => <option key={n} value={`${n}K`}>{n}K</option>)}
               </optgroup>
@@ -138,8 +142,8 @@ export default function FormEditBarang({ item, baki, onSelesai, onTutup, onHapus
           )}
         </div>
         <div>
-          <label>Berat (gram)</label>
-          <input type="number" step="0.001" min="0.001" value={f.weight_gram} onChange={ubah('weight_gram')} required />
+          <label>{tg ? 'Berat (gram, opsional)' : 'Berat (gram)'}</label>
+          <input type="number" step="0.001" min={tg ? '0' : '0.001'} value={f.weight_gram} onChange={ubah('weight_gram')} required={!tg} />
         </div>
         <div>
           <label>Harga beli (Rp)</label>
@@ -149,7 +153,7 @@ export default function FormEditBarang({ item, baki, onSelesai, onTutup, onHapus
           <label>Keterangan</label>
           <input value={f.note} onChange={ubah('note')} />
         </div>
-        {(
+        {bolehBaki(item.jenis) && (
           <div>
             <label>Baki</label>
             <select value={f.tray_id} onChange={ubah('tray_id')}>

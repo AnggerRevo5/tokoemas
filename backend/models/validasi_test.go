@@ -29,6 +29,11 @@ func TestValidasiInputNormalDiterima(t *testing.T) {
 		"items":[{"jenis":"perhiasan","item_name":"Cincin","karat":"22K","weight_gram":3.25,"harga_beli":2500000}]}`, &barang); err != nil {
 		t.Fatalf("input barang normal ditolak: %v", err)
 	}
+	var kotak BarangMasukReq
+	if err := bind(t, `{"location_id":2,"category":"stok_awal","entry_date":"2026-11-07",
+		"items":[{"jenis":"kotak_perhiasan","jumlah":20,"weight_gram":0,"harga_beli":5000}]}`, &kotak); err != nil {
+		t.Fatalf("input 20 kotak perhiasan ditolak: %v", err)
+	}
 	var svc ServiceAksiRequest
 	if err := bind(t, `{"action":"diambil","ids":[3],"fees":{"3":75000}}`, &svc); err != nil {
 		t.Fatalf("aksi service normal ditolak: %v", err)
@@ -44,6 +49,10 @@ func TestValidasiMenolakNilaiTidakMasukAkal(t *testing.T) {
 		{"nominal kas di atas 1 triliun", `{"amount":5000000000000}`, &KasReq{}},
 		{"catatan terlalu panjang", `{"note":"` + strings.Repeat("a", 201) + `"}`, &KasReq{}},
 		{"berat barang 1 ton", `{"items":[{"weight_gram":1000000}]}`, &BarangMasukReq{}},
+		{"jumlah susuk lebih dari 300", `{"items":[{"jenis":"susuk","jumlah":301}]}`, &BarangMasukReq{}},
+		{"jumlah negatif", `{"items":[{"jenis":"kotak_perhiasan","jumlah":-1}]}`, &BarangMasukReq{}},
+		{"berat negatif", `{"items":[{"jenis":"susuk","weight_gram":-1}]}`, &BarangMasukReq{}},
+		{"berat edit negatif", `{"weight_gram":-1}`, &BarangEditReq{}},
 		{"nama barang terlalu panjang", `{"items":[{"item_name":"` + strings.Repeat("b", 101) + `"}]}`, &BarangMasukReq{}},
 		{"harga jual raksasa", `{"items":[{"item_id":1,"harga":1e15}]}`, &JualReq{}},
 		{"id barang negatif", `{"item_ids":[-5]}`, &KirimBOReq{}},
