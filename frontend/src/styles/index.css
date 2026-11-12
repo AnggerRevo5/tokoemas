@@ -804,6 +804,8 @@ tbody tr.baris-kosong:hover { background: transparent; }
 .cetak-area td { white-space: normal; vertical-align: top; }
 .cetak-area td.kanan, .cetak-area th.kanan { text-align: right; }
 .cetak-area .table-wrap { max-height: none; }
+.laporan-daftar-barang { margin: 0; padding-left: 20px; }
+.laporan-daftar-barang li + li { margin-top: 2px; }
 .baris-tebal td { font-weight: 650; background: var(--surface-2); }
 
 /* ---------- Skeleton ---------- */

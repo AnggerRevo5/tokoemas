@@ -7,6 +7,18 @@ const tampil = (v, tipe) => {
   return String(v)
 }
 
+const tampilDaftarBarang = (v) => {
+  if (typeof v !== 'string' || !v.trim()) return tampil(v)
+  const barang = v.split(';').map((item) => item.trim()).filter(Boolean)
+  if (barang.length === 0) return ''
+
+  return (
+    <ul className="laporan-daftar-barang">
+      {barang.map((item, i) => <li key={i}>{item}</li>)}
+    </ul>
+  )
+}
+
 // hasil pratinjau/cetak laporan: judul periode dan satu tabel per jenis laporan
 export default function PratinjauLaporan({ hasil, username }) {
   return (
@@ -33,9 +45,14 @@ export default function PratinjauLaporan({ hasil, username }) {
               <tbody>
                 {(t.baris || []).map((b, i) => (
                   <tr key={i} className={(t.tebal || []).includes(i) ? 'baris-tebal' : ''}>
-                    {b.map((v, j) => (
-                      <td key={j} className={t.tipe[j] === 'teks' ? '' : 'kanan'}>{tampil(v, t.tipe[j])}</td>
-                    ))}
+                    {b.map((v, j) => {
+                      const daftarBarangLebur = t.kode === 'lebur' && j === 2
+                      return (
+                        <td key={j} className={t.tipe[j] === 'teks' ? '' : 'kanan'}>
+                          {daftarBarangLebur ? tampilDaftarBarang(v) : tampil(v, t.tipe[j])}
+                        </td>
+                      )
+                    })}
                   </tr>
                 ))}
               </tbody>
