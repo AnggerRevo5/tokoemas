@@ -58,7 +58,7 @@ type BakiNamaReq struct {
 // PindahBakiReq adalah payload JSON untuk BakiPindah.
 type PindahBakiReq struct {
 	ItemIDs []int `json:"item_ids" binding:"max=1000,dive,gt=0"`
-	TrayID  int   `json:"tray_id" binding:"gte=0"`
+	TrayID  *int  `json:"tray_id" binding:"required,gte=0"`
 }
 
 type BarangMasukReq struct {

@@ -262,10 +262,11 @@ func BakiPindah(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		var req models.PindahBakiReq
-		if err := c.ShouldBindJSON(&req); err != nil || len(req.ItemIDs) == 0 || req.TrayID <= 0 {
+		if err := c.ShouldBindJSON(&req); err != nil || len(req.ItemIDs) == 0 || req.TrayID == nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "pilih barang dan baki tujuan"})
 			return
 		}
+		trayTujuan := *req.TrayID
 		// isi satu baki tidak dibatasi; batas ini hanya untuk satu kali permintaan pindah
 		if len(req.ItemIDs) > 2000 {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "maksimal 2000 barang sekali pindah"})
@@ -279,19 +280,23 @@ func BakiPindah(db *sql.DB) gin.HandlerFunc {
 		}
 		defer tx.Rollback()
 
-		var loc int
-		var nama string
-		if err := tx.QueryRow("SELECT location_id, name FROM trays WHERE id = ?", req.TrayID).Scan(&loc, &nama); err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "baki tujuan tidak ditemukan"})
-			return
-		}
-		if cl.Role == "cabang" && loc != cl.LocationID {
-			c.JSON(http.StatusForbidden, gin.H{"error": "bukan baki di lokasi kamu"})
-			return
-		}
 		items, err := services.AmbilBarang(tx, req.ItemIDs)
 		if err != nil {
 			balasKesalahan(c, err)
+			return
+		}
+		var loc int
+		nama := ""
+		if trayTujuan > 0 {
+			if err := tx.QueryRow("SELECT location_id, name FROM trays WHERE id = ?", trayTujuan).Scan(&loc, &nama); err != nil {
+				c.JSON(http.StatusNotFound, gin.H{"error": "baki tujuan tidak ditemukan"})
+				return
+			}
+		} else {
+			loc = items[req.ItemIDs[0]].Location
+		}
+		if cl.Role == "cabang" && loc != cl.LocationID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "bukan baki di lokasi kamu"})
 			return
 		}
 		args := make([]interface{}, 0, len(items))
@@ -301,7 +306,7 @@ func BakiPindah(db *sql.DB) gin.HandlerFunc {
 				return
 			}
 			if it.Location != loc {
-				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s tidak berada di lokasi baki tujuan", it.Name)})
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s tidak berada di lokasi tujuan", it.Name)})
 				return
 			}
 			if !services.BolehBaki(it.Jenis) {
@@ -310,9 +315,11 @@ func BakiPindah(db *sql.DB) gin.HandlerFunc {
 			}
 			args = append(args, it.ID)
 		}
-		if _, err := services.IsiBaki(tx, req.TrayID, loc); err != nil {
-			balasKesalahan(c, err)
-			return
+		if trayTujuan > 0 {
+			if _, err := services.IsiBaki(tx, trayTujuan, loc); err != nil {
+				balasKesalahan(c, err)
+				return
+			}
 		}
 
 		lama := gin.H{}
@@ -328,17 +335,25 @@ func BakiPindah(db *sql.DB) gin.HandlerFunc {
 		}
 		rows.Close()
 
+		var trayID sql.NullInt64
+		if trayTujuan > 0 {
+			trayID = sql.NullInt64{Int64: int64(trayTujuan), Valid: true}
+		}
 		if _, err := tx.Exec("UPDATE items SET tray_id = ? WHERE id IN ("+utils.Placeholders(len(args))+")",
-			append([]interface{}{req.TrayID}, args...)...); err != nil {
+			append([]interface{}{trayID}, args...)...); err != nil {
 			utils.Gagal(c, err)
 			return
 		}
-		services.CatatPerubahan(tx, middleware.Meta(c), "pindah_baki", "items", 0, lama, gin.H{"tray_id": req.TrayID, "item_ids": req.ItemIDs})
+		services.CatatPerubahan(tx, middleware.Meta(c), "pindah_baki", "items", 0, lama, gin.H{"tray_id": trayTujuan, "item_ids": req.ItemIDs})
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%d barang dipindah ke Baki %s", len(items), nama)})
+		pesan := fmt.Sprintf("%d barang dipindah ke Baki %s", len(items), nama)
+		if trayTujuan == 0 {
+			pesan = fmt.Sprintf("%d barang dikeluarkan dari baki", len(items))
+		}
+		c.JSON(http.StatusOK, gin.H{"message": pesan})
 	}
 }
 

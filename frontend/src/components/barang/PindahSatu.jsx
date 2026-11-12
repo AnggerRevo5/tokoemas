@@ -9,6 +9,8 @@ export default function PindahSatu({ item, baki, onSelesai, onTutup, onError }) 
   const [tujuan, setTujuan] = useState('')
   const [loading, setLoading] = useState(false)
   const bakiTujuan = baki.find((b) => String(b.id) === tujuan)
+  const keluarDariBaki = tujuan === '0'
+  const tujuanValid = Boolean(bakiTujuan) || (keluarDariBaki && item.baki_id > 0)
 
   async function pindah() {
     setLoading(true)
@@ -29,9 +31,9 @@ export default function PindahSatu({ item, baki, onSelesai, onTutup, onError }) 
   return (
     <Popup
       judul={`Pindah baki ${item.item_no}`}
-      labelKonfirmasi={bakiTujuan ? `Ya, pindah ke ${bakiTujuan.name}` : 'Pilih baki tujuan'}
+      labelKonfirmasi={bakiTujuan ? `Ya, pindah ke ${bakiTujuan.name}` : keluarDariBaki ? 'Ya, keluarkan dari baki' : 'Pilih baki tujuan'}
       loading={loading}
-      nonaktif={!bakiTujuan}
+      nonaktif={!tujuanValid}
       onKonfirmasi={pindah}
       onTutup={onTutup}
     >
@@ -39,6 +41,7 @@ export default function PindahSatu({ item, baki, onSelesai, onTutup, onError }) 
       <label style={{ display: 'block', marginTop: 12 }}>Pindah ke baki</label>
       <select value={tujuan} onChange={(e) => setTujuan(e.target.value)}>
         <option value="">Pilih baki tujuan</option>
+        {item.baki_id > 0 && <option value="0">Keluar dari baki</option>}
         {baki.map((b) => {
           const sekarang = b.id === item.baki_id
           return (
