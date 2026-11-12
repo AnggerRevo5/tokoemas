@@ -42,7 +42,7 @@ export default function FormEditBarang({ item, baki, onSelesai, onTutup, onHapus
     ...item,
     item_name: lm ? `Logam mulia ${perak ? 'perak ' : ''}${f.brand.trim()}` : f.item_name.trim() || (tg ? JENIS_LABEL[item.jenis] : ''),
     brand: lm ? f.brand.trim() : item.brand,
-    karat: lm ? (perak ? '999' : '24K') : tanpaKadar ? '' : f.karat,
+    karat: lm ? (perak ? '999' : '24K') : tanpaKadar ? '' : item.bahan === 'perak' ? '925' : f.karat,
     weight_gram: Number(f.weight_gram || 0),
     harga_beli: Number(f.harga_beli || 0),
     note: f.note.trim(),
@@ -129,6 +129,8 @@ export default function FormEditBarang({ item, baki, onSelesai, onTutup, onHapus
           <label>Kadar</label>
           {lm || tanpaKadar ? (
             <input value={lm ? (perak ? '999' : '24K') : '-'} disabled />
+          ) : item.bahan === 'perak' ? (
+            <input value="925" disabled />
           ) : (
             <select value={f.karat} onChange={ubah('karat')} required={!tg}>
               <option value="">{tg ? 'Kadar (opsional)' : 'Kadar'}</option>

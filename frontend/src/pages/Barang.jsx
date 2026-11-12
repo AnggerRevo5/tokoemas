@@ -94,7 +94,7 @@ export default function Barang({ me, onUbah }) {
   const bisaDipilih = data.rows.filter(bisaPilih)
   const terpilih = Object.values(pilih)
   const beratTerpilih = terpilih.reduce((s, r) => s + (tanpaGram(r.jenis) ? 0 : r.weight_gram), 0)
-  const adaLM = terpilih.some((r) => r.jenis === 'logam_mulia')
+  const adaLM = terpilih.some((r) => r.jenis === 'logam_mulia' || r.bahan === 'perak')
   const adaTanpaGram = terpilih.some((r) => tanpaGram(r.jenis))
   const semuaDipilih = bisaDipilih.length > 0 && bisaDipilih.every((r) => pilih[r.id])
 

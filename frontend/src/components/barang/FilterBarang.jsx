@@ -34,7 +34,8 @@ export default function FilterBarang({
           <label>Jenis</label>
           <select value={jenisF} onChange={(e) => onJenis(e.target.value)}>
             <option value="semua">Semua</option>
-            <option value="perhiasan">Perhiasan</option>
+            <option value="perhiasan">Perhiasan emas</option>
+            <option value="perhiasan_perak">Perhiasan perak</option>
             <option value="logam_mulia">Logam mulia emas</option>
             <option value="logam_mulia_perak">Logam mulia perak</option>
             <option value="susuk">Susuk emas</option>

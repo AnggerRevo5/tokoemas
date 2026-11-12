@@ -8,7 +8,7 @@ function barisSpesifikasi(r) {
   const lm = r.jenis === 'logam_mulia'
   return [
     ['No', r.item_no],
-    ['Jenis', lm && r.bahan === 'perak' ? 'Logam mulia perak' : JENIS_LABEL[r.jenis] || r.jenis],
+    ['Jenis', r.bahan === 'perak' ? (lm ? 'Logam mulia perak' : 'Perhiasan perak') : JENIS_LABEL[r.jenis] || r.jenis],
     lm ? ['Merek', r.brand || '-'] : ['Nama', r.item_name],
     ['Kadar', r.karat || '-'],
     ['Berat', beratTeks(r.weight_gram)],

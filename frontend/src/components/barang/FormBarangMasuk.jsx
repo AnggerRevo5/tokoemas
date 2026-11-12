@@ -95,12 +95,16 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
   const totalBarang = baris.reduce((s, b) => s + jumlahBaris(b), 0)
   const totalGram = baris.reduce((s, b) => s + (tanpaGram(b.jenis) ? 0 : Number(b.weight_gram || 0)), 0)
   const totalBeli = baris.reduce((s, b) => s + Number(b.harga_beli || 0) * jumlahBaris(b), 0)
-  const labelJenis = (j) => (j === 'perak' ? 'Logam mulia perak' : j === 'logam_mulia' ? 'Logam mulia emas' : JENIS_LABEL[j])
+  // di form: 'perak' = logam mulia perak, 'perhiasan_perak' = perhiasan perak (kadar 925)
+  const jenisServer = (j) => (j === 'perak' ? 'logam_mulia' : j === 'perhiasan_perak' ? 'perhiasan' : j)
+  const labelJenis = (j) =>
+    j === 'perak' ? 'Logam mulia perak' : j === 'perhiasan_perak' ? 'Perhiasan perak' : j === 'logam_mulia' ? 'Logam mulia emas' : JENIS_LABEL[j]
   const namaBaris = (b) =>
     b.jenis === 'logam_mulia' || b.jenis === 'perak' ? b.brand : b.item_name.trim() || JENIS_LABEL[b.jenis]
-  const kadarBaris = (b) => (b.jenis === 'perak' ? '999' : b.jenis === 'logam_mulia' ? '24K' : b.karat || '-')
-  // baki sama dengan server: tempat dan kotak perhiasan tidak pernah masuk baki ('perak' di form = logam mulia)
-  const masukBaki = (b) => bolehBaki(b.jenis === 'perak' ? 'logam_mulia' : b.jenis)
+  const kadarBaris = (b) =>
+    b.jenis === 'perak' ? '999' : b.jenis === 'perhiasan_perak' ? '925' : b.jenis === 'logam_mulia' ? '24K' : b.karat || '-'
+  // baki sama dengan server: tempat dan kotak perhiasan tidak pernah masuk baki
+  const masukBaki = (b) => bolehBaki(jenisServer(b.jenis))
   const namaBaki = (bakiList.find((x) => String(x.id) === fBaki) || {}).name
   const teksBaki = !namaBaki || !baris.some(masukBaki)
     ? 'Tanpa baki'
@@ -127,8 +131,8 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
           note: fNote,
           posisi: wajibHarga ? fPosisi : '',
           items: baris.map((b) => ({
-            jenis: b.jenis === 'perak' ? 'logam_mulia' : b.jenis,
-            bahan: b.jenis === 'perak' ? 'perak' : 'emas',
+            jenis: jenisServer(b.jenis),
+            bahan: b.jenis === 'perak' || b.jenis === 'perhiasan_perak' ? 'perak' : 'emas',
             item_name: b.item_name,
             brand: b.brand,
             karat: b.karat,
@@ -267,6 +271,7 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
                   <option value="perhiasan">Perhiasan</option>
                   <option value="logam_mulia">Logam mulia emas</option>
                   <option value="perak">Logam mulia perak</option>
+                  <option value="perhiasan_perak">Perhiasan perak</option>
                   <option value="susuk">Susuk emas</option>
                   <option value="tempat_perhiasan">Tempat perhiasan</option>
                   <option value="kotak_perhiasan">Kotak perhiasan</option>
@@ -279,7 +284,7 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
                     placeholder={`${JENIS_LABEL[b.jenis]} (opsional)`}
                     aria-label="Nama barang (opsional)"
                   />
-                ) : b.jenis !== 'perhiasan' ? (
+                ) : b.jenis !== 'perhiasan' && b.jenis !== 'perhiasan_perak' ? (
                   <input
                     list={b.jenis === 'perak' ? undefined : 'merek-lm'}
                     value={b.brand}
@@ -299,6 +304,10 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
 
                 {b.jenis === 'tempat_perhiasan' || b.jenis === 'kotak_perhiasan' ? (
                   <input value="-" disabled aria-label="Kadar" />
+                ) : b.jenis === 'perhiasan_perak' ? (
+                  <select value="925" disabled aria-label="Kadar">
+                    <option value="925">925</option>
+                  </select>
                 ) : b.jenis !== 'perhiasan' && b.jenis !== 'susuk' ? (
                   <input value={b.jenis === 'perak' ? '999' : '24K'} disabled />
                 ) : (

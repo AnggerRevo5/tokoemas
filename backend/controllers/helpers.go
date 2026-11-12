@@ -47,9 +47,9 @@ func barangDiBO(c *gin.Context, tx *sql.Tx, ids []int, boID int) (map[int]models
 		cekArgs = append(cekArgs, id)
 	}
 	var lm int
-	tx.QueryRow("SELECT COUNT(*) FROM items WHERE jenis = 'logam_mulia' AND id IN ("+utils.Placeholders(len(cekArgs))+")", cekArgs...).Scan(&lm)
+	tx.QueryRow("SELECT COUNT(*) FROM items WHERE (jenis = 'logam_mulia' OR bahan = 'perak') AND id IN ("+utils.Placeholders(len(cekArgs))+")", cekArgs...).Scan(&lm)
 	if lm > 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "logam mulia tidak bisa dicuci atau dilebur, langsung dijual saja"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "logam mulia dan perhiasan perak tidak bisa dicuci atau dilebur, langsung dijual saja"})
 		return nil, false
 	}
 	return items, true

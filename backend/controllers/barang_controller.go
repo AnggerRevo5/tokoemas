@@ -324,12 +324,16 @@ func BarangCreate(db *sql.DB) gin.HandlerFunc {
 					c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("baris %d: nama perhiasan wajib diisi", baris)})
 					return
 				}
-				k, ok := utils.NormalKarat(it.Karat)
-				if !ok {
-					c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("baris %d: kadar harus 1K sampai 24K", baris)})
-					return
+				if it.Bahan == "perak" {
+					it.Karat = "925" // perhiasan perak hanya berkadar 925
+				} else {
+					k, ok := utils.NormalKarat(it.Karat)
+					if !ok {
+						c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("baris %d: kadar harus 1K sampai 24K", baris)})
+						return
+					}
+					it.Karat = k
 				}
-				it.Karat = k
 				it.Brand = ""
 			default:
 				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("baris %d: jenis barang tidak valid", baris)})
@@ -338,7 +342,7 @@ func BarangCreate(db *sql.DB) gin.HandlerFunc {
 			if !services.BolehBaki(it.Jenis) {
 				it.TrayID = 0 // baki untuk perhiasan, logam mulia (emas atau perak), dan susuk
 			}
-			if it.Jenis != "logam_mulia" {
+			if it.Jenis != "logam_mulia" && it.Jenis != "perhiasan" {
 				it.Bahan = "emas"
 			}
 			if it.HargaBeli < 0 || (beliCustomer && it.HargaBeli <= 0) {
@@ -548,9 +552,13 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 			args = append(args, s)
 		}
 		switch j := c.Query("jenis"); j {
-		case "perhiasan", "hasil_lebur", "susuk", "tempat_perhiasan", "kotak_perhiasan":
+		case "hasil_lebur", "susuk", "tempat_perhiasan", "kotak_perhiasan":
 			dari += " AND i.jenis = ?"
 			args = append(args, j)
+		case "perhiasan": // perhiasan emas
+			dari += " AND i.jenis = 'perhiasan' AND i.bahan = 'emas'"
+		case "perhiasan_perak":
+			dari += " AND i.jenis = 'perhiasan' AND i.bahan = 'perak'"
 		case "logam_mulia": // logam mulia emas
 			dari += " AND i.jenis = 'logam_mulia' AND i.bahan = 'emas'"
 		case "logam_mulia_perak":

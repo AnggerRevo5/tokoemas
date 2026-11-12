@@ -411,6 +411,10 @@ func BarangEdit(db *sql.DB) gin.HandlerFunc {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "nama perhiasan wajib diisi"})
 				return
 			}
+			if lama.Bahan == "perak" {
+				karat = "925" // perhiasan perak hanya berkadar 925
+				break
+			}
 			k, ok := utils.NormalKarat(req.Karat)
 			if !ok {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "kadar harus 1K sampai 24K"})
