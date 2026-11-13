@@ -101,6 +101,9 @@ func ServiceCreate(db *sql.DB) gin.HandlerFunc {
 func ServiceList(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		cl := c.MustGet("claims").(*models.Claims)
+		if !utils.TanggalOpsional(c, "from", "to") {
+			return
+		}
 
 		q := `SELECT s.id, IFNULL(s.job_no,''), s.customer_name, IFNULL(s.customer_phone,''), s.item_name, IFNULL(s.karat,''),
 		             s.weight_gram, s.complaint, IFNULL(s.note,''),
@@ -131,6 +134,19 @@ func ServiceList(db *sql.DB) gin.HandlerFunc {
 			like := "%" + s + "%"
 			q += " AND (s.customer_name LIKE ? OR s.item_name LIKE ? OR IFNULL(s.job_no,'') LIKE ? OR IFNULL(s.service_name,'') LIKE ?)"
 			args = append(args, like, like, like, like)
+		}
+		// filter kadar, berat, asal, tanggal terima, dan penyervice; "i" dipakai bersama pembangun syarat barang
+		if sy, sa := syaratBarang(c, "s", "s.weight_gram", "s.origin_location_id", false); sy != "" {
+			q += sy
+			args = append(args, sa...)
+		}
+		if sy, sa := syaratTanggal(c, "s.received_date"); sy != "" {
+			q += sy
+			args = append(args, sa...)
+		}
+		if sy, sa := syaratOrang(c, "s.service_name"); sy != "" {
+			q += sy
+			args = append(args, sa...)
 		}
 		q += " ORDER BY s.id DESC LIMIT 300"
 

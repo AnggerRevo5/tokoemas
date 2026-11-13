@@ -55,4 +55,15 @@ type LeburListRow struct {
 	SaleDate      *time.Time `json:"sale_date"`
 	Untung        *float64   `json:"untung"`
 	Susut         *float64   `json:"susut"`
+	Items         []LeburItemRow `json:"items"`
+}
+
+// LeburItemRow: satu barang di dalam batch lebur.
+type LeburItemRow struct {
+	ID         int     `json:"id"`
+	ItemNo     string  `json:"item_no"`
+	ItemName   string  `json:"item_name"`
+	Karat      string  `json:"karat"`
+	WeightGram float64 `json:"weight_gram"`
+	Asal       string  `json:"asal"`
 }

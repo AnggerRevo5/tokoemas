@@ -7,6 +7,7 @@ import KotakBatal from '../components/common/KotakBatal'
 import FormTerimaService from '../components/service/FormTerimaService'
 import BarAksiService from '../components/service/BarAksiService'
 import TabelService from '../components/service/TabelService'
+import FilterProduksi, { FILTER_PRODUKSI_KOSONG, paramProduksi } from '../components/common/FilterProduksi'
 
 export default function Service({ me, onUbah }) {
   const isCabang = me.role === 'cabang'
@@ -16,7 +17,7 @@ export default function Service({ me, onUbah }) {
   const [locations, setLocations] = useState([])
   const [rows, setRows] = useState([])
   const [status, setStatus] = useState('aktif')
-  const [cari, setCari] = useState('')
+  const [fp, setFp] = useState(FILTER_PRODUKSI_KOSONG)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
   const [pilih, setPilih] = useState({})
@@ -32,8 +33,8 @@ export default function Service({ me, onUbah }) {
   }, [])
 
   const muat = useCallback(() => {
-    const p = new URLSearchParams({ status })
-    if (cari.trim()) p.set('q', cari.trim())
+    const p = paramProduksi(fp)
+    p.set('status', status)
     api(`/service?${p.toString()}`)
       .then((d) => {
         setRows(d)
@@ -47,7 +48,7 @@ export default function Service({ me, onUbah }) {
       })
       .catch((e) => setError(e.message))
     if (onUbah) onUbah()
-  }, [status, cari])
+  }, [status, fp])
 
   useEffect(() => {
     muat()
@@ -112,7 +113,8 @@ export default function Service({ me, onUbah }) {
       )}
 
       <div className="card">
-        <div className="form-grid">
+        <FilterProduksi f={fp} onUbah={setFp} locations={locations} tampilAsal={!isCabang}
+          labelNama="Cari customer, barang, nota" labelOrang="Penyervice">
           <div>
             <label>Status</label>
             <select value={status} onChange={(e) => { setStatus(e.target.value); setPilih({}) }}>
@@ -123,11 +125,7 @@ export default function Service({ me, onUbah }) {
               <option value="semua">Semua</option>
             </select>
           </div>
-          <div>
-            <label>Cari customer, barang, nota, atau penyervice</label>
-            <input value={cari} onChange={(e) => setCari(e.target.value)} placeholder="Rina, SRV-00001, Anto..." />
-          </div>
-        </div>
+        </FilterProduksi>
         <p className="muted" style={{ marginBottom: 0 }}>{rows.length} barang service</p>
       </div>
 

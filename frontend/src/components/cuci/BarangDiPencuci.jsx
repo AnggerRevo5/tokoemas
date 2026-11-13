@@ -13,20 +13,28 @@ const formatGram = (v) => String(gram(v))
 
 // Kartu "Barang di Pencuci": daftar barang, pilih yang sudah kembali, isi berat sesudah, lalu selesai cuci.
 // onMulai: bersihkan pesan; onSelesai(message): setelah tersimpan; onError(msg).
-export default function BarangDiPencuci({ items, bisaCatat, onMulai, onSelesai, onError }) {
+export default function BarangDiPencuci({ items, fp, statusF, locations, bisaCatat, onMulai, onSelesai, onError }) {
   const [loading, setLoading] = useState(false)
   const [pilih, setPilih] = useState({})
   const [tglItem, setTglItem] = useState(hariIni())
   const [bSesudah, setBSesudah] = useState({})
-  const [cari, setCari] = useState('')
 
+  // memakai filter yang sama dengan Daftar Cuci di atas
   const tampilItems = items.filter((r) => {
-    const s = cari.trim().toLowerCase()
-    if (!s) return true
+    const s = fp.q.trim().toLowerCase()
+    const orang = fp.orang.trim().toLowerCase()
+    const asal = locations.find((l) => String(l.id) === fp.asal)
+    const mulai = r.start_date.slice(0, 10)
     return (
-      r.item_name.toLowerCase().includes(s) ||
-      (r.washer_name || '').toLowerCase().includes(s) ||
-      (r.item_no || '').toLowerCase().includes(s)
+      (!s || r.item_name.toLowerCase().includes(s) || (r.item_no || '').toLowerCase().includes(s)) &&
+      (!fp.karat || r.karat === fp.karat) &&
+      (!fp.berat_min || r.berat_awal >= Number(fp.berat_min)) &&
+      (!fp.berat_max || r.berat_awal <= Number(fp.berat_max)) &&
+      (!asal || r.asal === asal.name) &&
+      (!fp.dari || mulai >= fp.dari) &&
+      (!fp.sampai || mulai <= fp.sampai) &&
+      (!orang || (r.washer_name || '').toLowerCase().includes(orang)) &&
+      (!['menunggu', 'proses'].includes(statusF) || r.job_status === statusF)
     )
   })
   const bisaDipilih = tampilItems.filter((r) => r.job_status === 'proses')
@@ -78,12 +86,7 @@ export default function BarangDiPencuci({ items, bisaCatat, onMulai, onSelesai, 
           : 'Daftar barang yang sedang dalam proses cuci.'}
       </p>
 
-      <div className="form-grid">
-        <div>
-          <label>Cari barang atau pencuci</label>
-          <input value={cari} onChange={(e) => setCari(e.target.value)} placeholder="Cincin, Adip..." />
-        </div>
-      </div>
+      <p className="muted">Mengikuti filter di Daftar Cuci di atas. {tampilItems.length} barang.</p>
 
       <div className="table-wrap">
         <table>

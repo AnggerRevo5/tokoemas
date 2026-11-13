@@ -6,6 +6,7 @@ import FormAksiLebur from '../components/lebur/FormAksiLebur'
 import TabelLebur from '../components/lebur/TabelLebur'
 import PanelSiapJual from '../components/lebur/PanelSiapJual'
 import RiwayatPenjualan from '../components/lebur/RiwayatPenjualan'
+import FilterProduksi, { FILTER_PRODUKSI_KOSONG, paramProduksi } from '../components/common/FilterProduksi'
 
 export default function Lebur({ me }) {
   const bisaCatat = me.role === 'pj' || me.role === 'super_admin'
@@ -13,6 +14,8 @@ export default function Lebur({ me }) {
   const bisaKonfirmasi = me.role === 'owner' || me.role === 'super_admin'
 
   const [filter, setFilter] = useState('berjalan')
+  const [fp, setFp] = useState(FILTER_PRODUKSI_KOSONG)
+  const [locations, setLocations] = useState([])
   const [batches, setBatches] = useState([])
   const [siap, setSiap] = useState([])
   const [penj, setPenj] = useState({ rows: [], total_modal: 0, total_jual: 0, total_untung: 0 })
@@ -23,14 +26,20 @@ export default function Lebur({ me }) {
   const [aksi, setAksi] = useState(null)
 
   const muat = useCallback(() => {
-    api(`/lebur?status=${filter}`).then(setBatches).catch((e) => setError(e.message))
+    const p = paramProduksi(fp)
+    p.set('status', filter)
+    api(`/lebur?${p}`).then(setBatches).catch((e) => setError(e.message))
     api('/penjualan/siap').then(setSiap).catch((e) => setError(e.message))
     api(`/penjualan?from=${dari}&to=${sampai}`).then(setPenj).catch((e) => setError(e.message))
-  }, [filter, dari, sampai])
+  }, [filter, fp, dari, sampai])
 
   useEffect(() => {
     muat()
   }, [muat])
+
+  useEffect(() => {
+    api('/locations').then(setLocations).catch(() => {})
+  }, [])
 
   const batchAksi = aksi ? batches.find((b) => b.id === aksi.id) : null
 
@@ -57,9 +66,10 @@ export default function Lebur({ me }) {
           Angka berat di tabel: awal → setelah dipotong → leburan kotor → cukim.
         </p>
 
-        <div className="form-grid">
+        <FilterProduksi f={fp} onUbah={setFp} locations={locations}
+          labelNama="Nama atau nomor barang" labelOrang="Dicatat oleh (leburan atau cukim)">
           <div>
-            <label>Tampilkan</label>
+            <label>Status</label>
             <select value={filter} onChange={(e) => setFilter(e.target.value)}>
               <option value="berjalan">Sedang berjalan</option>
               <option value="terjual">Sudah terjual</option>
@@ -67,7 +77,7 @@ export default function Lebur({ me }) {
               <option value="semua">Semua</option>
             </select>
           </div>
-        </div>
+        </FilterProduksi>
 
         {aksi && batchAksi && (
           <FormAksiLebur

@@ -31,8 +31,18 @@ export default function TabelDaftarCuci({ rows, bisaCatat, bisaVoid, onAksi }) {
                 <div className="muted">{r.start_date.slice(0, 10)}</div>
               </td>
               <td>{r.cabang}</td>
-              <td style={{ whiteSpace: 'normal', minWidth: 180 }}>
-                {r.item_name} - {gram(r.weight_gram)} g ({r.qty} pcs)
+              <td style={{ whiteSpace: 'normal', minWidth: 260 }}>
+                <b>{r.items.length || r.qty} barang</b>
+                {r.items.map((it) => (
+                  <div key={it.id} style={{ padding: '2px 0' }}>
+                    <b>{it.item_no}</b> {it.item_name} {it.karat}, awal {gram(it.berat_awal)} g
+                    {it.berat_sesudah !== null ? (
+                      <span className="muted"> → sesudah {gram(it.berat_sesudah)} g, susut {gram(it.berat_awal - it.berat_sesudah)} g</span>
+                    ) : it.di_pencuci ? (
+                      <span className="muted"> (di pencuci)</span>
+                    ) : null}
+                  </div>
+                ))}
                 {r.note && <div className="muted">{r.note}</div>}
               </td>
               <td>{r.washer_name || <span className="muted">Belum dikirim</span>}</td>

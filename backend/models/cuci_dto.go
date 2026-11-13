@@ -77,4 +77,16 @@ type CuciListRow struct {
 	CancelReturned   int        `json:"cancel_returned"`
 	BeratAwalSelesai float64    `json:"berat_awal_selesai"`
 	BeratSesudah     float64    `json:"berat_sesudah"`
+	Items            []CuciItemRow `json:"items"`
+}
+
+// CuciItemRow: satu barang di dalam pekerjaan cuci (untuk mencocokkan barang fisik).
+type CuciItemRow struct {
+	ID           int      `json:"id"`
+	ItemNo       string   `json:"item_no"`
+	ItemName     string   `json:"item_name"`
+	Karat        string   `json:"karat"`
+	BeratAwal    float64  `json:"berat_awal"`
+	BeratSesudah *float64 `json:"berat_sesudah"`
+	DiPencuci    bool     `json:"di_pencuci"`
 }

@@ -38,8 +38,13 @@ export default function TabelLebur({ batches, bisaCatat, bisaUndo, onAksi }) {
                 <div className="muted">{b.start_date.slice(0, 10)}</div>
               </td>
               <td style={{ whiteSpace: 'normal', minWidth: 220 }}>
-                {b.item_count} barang
-                <div className="muted">{b.barang}</div>
+                <b>{b.item_count} barang</b>
+                {b.items.map((it) => (
+                  <div key={it.id} style={{ padding: '2px 0' }}>
+                    <b>{it.item_no}</b> {it.item_name} {it.karat}, {gram(it.weight_gram)} g
+                    <span className="muted"> ({it.asal})</span>
+                  </div>
+                ))}
                 {b.note && <div className="muted">{b.note}</div>}
               </td>
               <td className="num">

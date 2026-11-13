@@ -4,6 +4,7 @@ import Pesan from '../components/common/Pesan'
 import FormAksiCuci from '../components/cuci/FormAksiCuci'
 import TabelDaftarCuci from '../components/cuci/TabelDaftarCuci'
 import BarangDiPencuci from '../components/cuci/BarangDiPencuci'
+import FilterProduksi, { FILTER_PRODUKSI_KOSONG, paramProduksi } from '../components/common/FilterProduksi'
 
 export default function Cuci({ me }) {
   const isCabang = me.role === 'cabang'
@@ -11,6 +12,8 @@ export default function Cuci({ me }) {
   const bisaVoid = me.role === 'super_admin'
 
   const [filter, setFilter] = useState('aktif')
+  const [fp, setFp] = useState(FILTER_PRODUKSI_KOSONG)
+  const [locations, setLocations] = useState([])
   const [rows, setRows] = useState([])
   const [items, setItems] = useState([])
   const [error, setError] = useState('')
@@ -18,15 +21,21 @@ export default function Cuci({ me }) {
   const [aksi, setAksi] = useState(null)
 
   const muat = useCallback(() => {
-    api(`/cuci?status=${filter}`).then(setRows).catch((e) => setError(e.message))
+    const p = paramProduksi(fp)
+    p.set('status', filter)
+    api(`/cuci?${p}`).then(setRows).catch((e) => setError(e.message))
     if (!isCabang) {
       api('/cucian/barang').then(setItems).catch(() => {})
     }
-  }, [filter, isCabang])
+  }, [filter, fp, isCabang])
 
   useEffect(() => {
     muat()
   }, [muat])
+
+  useEffect(() => {
+    if (!isCabang) api('/locations').then(setLocations).catch(() => {})
+  }, [isCabang])
 
   function mulaiAksi(jenis, r) {
     setAksi({ jenis, id: r.id, sisa: r.sisa, qty: r.qty, n: Date.now() })
@@ -54,9 +63,10 @@ export default function Cuci({ me }) {
           Kalau tidak jadi dicuci, PJ bisa membatalkan dan mengembalikan barang yang belum selesai.
         </p>
 
-        <div className="form-grid">
+        <FilterProduksi f={fp} onUbah={setFp} locations={locations} tampilAsal={!isCabang}
+          labelNama="Nama atau nomor barang" labelOrang="Pencuci">
           <div>
-            <label>Tampilkan</label>
+            <label>Status</label>
             <select value={filter} onChange={(e) => setFilter(e.target.value)}>
               <option value="aktif">Belum selesai</option>
               <option value="menunggu">Menunggu PJ</option>
@@ -66,7 +76,7 @@ export default function Cuci({ me }) {
               <option value="semua">Semua</option>
             </select>
           </div>
-        </div>
+        </FilterProduksi>
 
         {aksi && (
           <FormAksiCuci
@@ -90,6 +100,9 @@ export default function Cuci({ me }) {
       {!isCabang && (
         <BarangDiPencuci
           items={items}
+          fp={fp}
+          statusF={filter}
+          locations={locations}
           bisaCatat={bisaCatat}
           onMulai={resetPesan}
           onSelesai={(pesan) => {

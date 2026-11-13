@@ -457,6 +457,9 @@ func LeburList(db *sql.DB) gin.HandlerFunc {
 		if _, ok := middleware.BolehLihatLebur(c); !ok {
 			return
 		}
+		if !utils.TanggalOpsional(c, "from", "to") {
+			return
+		}
 		q := `SELECT b.id, b.start_date, b.status, b.item_count, b.source_weight, b.modal,
 		             b.cut_weight, b.leburan_weight, b.cukim_weight, IFNULL(b.cukim_karat,''),
 		             IFNULL(b.note,''), IFNULL(b.cut_note,''), b.leburan_date, b.cukim_date,
@@ -479,9 +482,23 @@ func LeburList(db *sql.DB) gin.HandlerFunc {
 		default:
 			q += " AND b.status NOT IN ('terjual','batal')"
 		}
+		args := []interface{}{}
+		// filter barang (nama, kadar, berat, asal) bekerja lewat barang di dalam batch
+		if sy, sa := syaratBarang(c, "i", "i.weight_gram", "i.origin_location_id", true); sy != "" {
+			q += " AND EXISTS (SELECT 1 FROM items i WHERE i.melt_id = b.id AND i.jenis <> 'hasil_lebur'" + sy + ")"
+			args = append(args, sa...)
+		}
+		if sy, sa := syaratTanggal(c, "b.start_date"); sy != "" {
+			q += sy
+			args = append(args, sa...)
+		}
+		if sy, sa := syaratOrang(c, "u1.username", "u2.username"); sy != "" {
+			q += sy
+			args = append(args, sa...)
+		}
 		q += " ORDER BY b.id DESC LIMIT 200"
 
-		rows, err := db.Query(q)
+		rows, err := db.Query(q, args...)
 		if err != nil {
 			utils.Gagal(c, err)
 			return
@@ -510,10 +527,44 @@ func LeburList(db *sql.DB) gin.HandlerFunc {
 				s := r.SourceWeight - cuk.Float64
 				r.Susut = &s
 			}
+			r.Items = []models.LeburItemRow{}
 			out = append(out, r)
+		}
+		if err := isiBarangLebur(db, out); err != nil {
+			utils.Gagal(c, err)
+			return
 		}
 		c.JSON(http.StatusOK, out)
 	}
+}
+
+// isiBarangLebur: isi daftar barang (nomor, nama, karat, berat, asal) untuk tiap batch lebur.
+func isiBarangLebur(db *sql.DB, batches []models.LeburListRow) error {
+	if len(batches) == 0 {
+		return nil
+	}
+	idx, args := map[int]int{}, []interface{}{}
+	for n, b := range batches {
+		idx[b.ID] = n
+		args = append(args, b.ID)
+	}
+	rows, err := db.Query(
+		`SELECT i.melt_id, i.id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''), i.weight_gram, o.name
+		 FROM items i JOIN locations o ON o.id = i.origin_location_id
+		 WHERE i.jenis <> 'hasil_lebur' AND i.melt_id IN (`+utils.Placeholders(len(args))+`) ORDER BY i.id`, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var batch int
+		var it models.LeburItemRow
+		if err := rows.Scan(&batch, &it.ID, &it.ItemNo, &it.ItemName, &it.Karat, &it.WeightGram, &it.Asal); err != nil {
+			return err
+		}
+		batches[idx[batch]].Items = append(batches[idx[batch]].Items, it)
+	}
+	return rows.Err()
 }
 
 // ---------- BARANG SIAP DIJUAL KE PENADAH ----------

@@ -609,6 +609,9 @@ func CucianBarang(db *sql.DB) gin.HandlerFunc {
 func CuciList(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		cl := c.MustGet("claims").(*models.Claims)
+		if !utils.TanggalOpsional(c, "from", "to") {
+			return
+		}
 		q := `SELECT w.id, w.origin_location_id, l.name, w.item_name, IFNULL(w.karat,''), w.weight_gram, w.qty,
 		             w.washer_name, w.status, w.start_date, w.finish_date, IFNULL(w.note,''),
 		             (SELECT COUNT(*) FROM items i WHERE i.washing_job_id = w.id AND i.status = 'cuci' AND i.is_void = FALSE),
@@ -628,6 +631,20 @@ func CuciList(db *sql.DB) gin.HandlerFunc {
 			args = append(args, s)
 		case "aktif":
 			q += " AND w.status NOT IN ('selesai','batal')"
+		}
+		// filter barang (nama, kadar, berat, asal) bekerja lewat barang di dalam pekerjaan
+		if sy, sa := syaratBarang(c, "i", "IFNULL(x.weight_before, i.weight_gram)", "w.origin_location_id", true); sy != "" {
+			q += ` AND EXISTS (SELECT 1 FROM items i LEFT JOIN washing_job_items x ON x.job_id = i.washing_job_id AND x.item_id = i.id
+							   WHERE i.washing_job_id = w.id AND i.is_void = FALSE` + sy + ")"
+			args = append(args, sa...)
+		}
+		if sy, sa := syaratTanggal(c, "w.start_date"); sy != "" {
+			q += sy
+			args = append(args, sa...)
+		}
+		if sy, sa := syaratOrang(c, "w.washer_name"); sy != "" {
+			q += sy
+			args = append(args, sa...)
 		}
 		q += " ORDER BY w.status ASC, w.id DESC LIMIT 200"
 
@@ -649,8 +666,45 @@ func CuciList(db *sql.DB) gin.HandlerFunc {
 				return
 			}
 			r.FinishDate = utils.PtrTime(fin)
+			r.Items = []models.CuciItemRow{}
 			out = append(out, r)
+		}
+		if err := isiBarangCuci(db, out); err != nil {
+			utils.Gagal(c, err)
+			return
 		}
 		c.JSON(http.StatusOK, out)
 	}
+}
+
+// isiBarangCuci: isi daftar barang (nomor, nama, karat, berat awal dan sesudah) untuk tiap pekerjaan cuci.
+func isiBarangCuci(db *sql.DB, jobs []models.CuciListRow) error {
+	if len(jobs) == 0 {
+		return nil
+	}
+	idx, args := map[int]int{}, []interface{}{}
+	for n, j := range jobs {
+		idx[j.ID] = n
+		args = append(args, j.ID)
+	}
+	rows, err := db.Query(
+		`SELECT i.washing_job_id, i.id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''),
+				IFNULL(x.weight_before, i.weight_gram), x.weight_after, i.status = 'cuci'
+		 FROM items i LEFT JOIN washing_job_items x ON x.job_id = i.washing_job_id AND x.item_id = i.id
+		 WHERE i.is_void = FALSE AND i.washing_job_id IN (`+utils.Placeholders(len(args))+`) ORDER BY i.id`, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var job int
+		var it models.CuciItemRow
+		var sesudah sql.NullFloat64
+		if err := rows.Scan(&job, &it.ID, &it.ItemNo, &it.ItemName, &it.Karat, &it.BeratAwal, &sesudah, &it.DiPencuci); err != nil {
+			return err
+		}
+		it.BeratSesudah = utils.PtrFloat(sesudah)
+		jobs[idx[job]].Items = append(jobs[idx[job]].Items, it)
+	}
+	return rows.Err()
 }
