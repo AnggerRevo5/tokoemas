@@ -134,6 +134,8 @@ func siapkanLaporan(c *gin.Context, db *sql.DB) (string, string, []models.TabelL
 			t, err = services.TabelPenjualanTokoRingkas(db, dari, sampai, loc)
 		case "gadai":
 			t, err = services.TabelGadai(db, dari, sampai, loc)
+		case "talangan_bp":
+			t, err = services.TabelTalanganBP(db, dari, sampai, loc)
 		case "investor":
 			t, err = services.TabelInvestor(db, dari, sampai)
 		case "investor_mutasi":

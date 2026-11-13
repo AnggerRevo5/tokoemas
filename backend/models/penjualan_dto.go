@@ -41,4 +41,5 @@ type PenjualanListRow struct {
 	Barang      string    `json:"barang"`
 	Metode      string    `json:"metode"`
 	Biaya       float64   `json:"biaya"`
+	Konfirmasi  bool      `json:"konfirmasi"`
 }

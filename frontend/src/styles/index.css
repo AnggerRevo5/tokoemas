@@ -786,6 +786,7 @@ tbody tr.baris-kosong:hover { background: transparent; }
   align-items: center;
 }
 .baris-head { margin-top: 14px; font-size: 11.5px; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.baris-talangan { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr) auto; }
 
 .cek-grup { display: flex; flex-wrap: wrap; gap: 10px 24px; margin-bottom: 8px; }
 /* pilihan laporan: kartu sama lebar dalam grid, yang dicentang diberi warna emas */

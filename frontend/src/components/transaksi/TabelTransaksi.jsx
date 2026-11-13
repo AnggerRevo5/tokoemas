@@ -18,7 +18,7 @@ export default function TabelTransaksi({ rows, isKas, bisaVoid, onBatal, onJual,
         <tbody>
           {rows.length === 0 && <BarisKosong kolom="5">Belum ada data</BarisKosong>}
           {rows.map((r) => (
-            <tr key={r.id}>
+            <tr key={r.id} style={r.is_void ? { opacity: 0.55 } : undefined}>
               <td>{r.transaction_date.slice(0, 10)}</td>
               <td>
                 <span className={r.direction === 'in' ? 'tag in' : 'tag out'}>
@@ -34,20 +34,23 @@ export default function TabelTransaksi({ rows, isKas, bisaVoid, onBatal, onJual,
                   <div className="muted">tercatat di kas {r.nama_kas}, tidak mengubah kas ini</div>
                 )}
               </td>
-              <td>{r.note}</td>
+              <td>
+                {r.note}
+                {r.is_void && <div><span className="tag gray">Dibatalkan</span> {r.void_reason}</div>}
+              </td>
               {(bisaVoid || onJual || onGadai) && (
                 <td>
-                  {isKas && onJual && r.dari_penjualan && (
+                  {isKas && onJual && r.dari_penjualan && !r.is_void && (
                     <button type="button" className="mini primary" onClick={() => onJual(r)}>
                       Ubah penjualan
                     </button>
                   )}
-                  {isKas && onGadai && r.gadai_id > 0 && (
+                  {isKas && onGadai && r.gadai_id > 0 && !r.is_void && (
                     <button type="button" className="mini primary" onClick={() => onGadai(r)}>
                       Lihat gadai
                     </button>
                   )}
-                  {bisaVoid && !r.di_kas_lain && !r.dari_penjualan && !(r.gadai_id > 0) && (
+                  {bisaVoid && !r.is_void && !r.di_kas_lain && !r.dari_penjualan && !(r.gadai_id > 0) && (
                     <button type="button" className="mini" style={{ marginLeft: 6 }} onClick={() => onBatal(r.id)}>
                       Batalkan
                     </button>

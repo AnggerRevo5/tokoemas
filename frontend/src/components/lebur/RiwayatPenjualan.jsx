@@ -7,10 +7,45 @@ import BarisKosong from '../common/BarisKosong'
 // Kartu "Riwayat Penjualan ke Penadah": periode, total, tabel, dan pembatalan penjualan.
 // onMulai: bersihkan pesan; onSelesai(message): setelah dibatalkan; onError(msg).
 export default function RiwayatPenjualan({
-  penj, dari, onDari, sampai, onSampai, bisaCatat, onMulai, onSelesai, onError,
+  penj, dari, onDari, sampai, onSampai, bisaCatat, bisaKonfirmasi, onMulai, onSelesai, onError,
 }) {
   const [voidSale, setVoidSale] = useState(null)
   const [alasanSale, setAlasanSale] = useState('')
+  const [edit, setEdit] = useState(null) // catatan yang sedang diedit PJ
+  const [konfirmId, setKonfirmId] = useState(null) // catatan yang menunggu konfirmasi owner
+
+  async function simpanEdit(e) {
+    e.preventDefault()
+    onError('')
+    try {
+      const res = await api(`/penjualan/${edit.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          penadah_name: edit.penadah_name,
+          sale_total: Number(edit.sale_total),
+          sale_date: edit.sale_date,
+          note: edit.note,
+          biaya: Number(edit.biaya || 0),
+        }),
+      })
+      setEdit(null)
+      onSelesai(res.message)
+    } catch (err) {
+      onError(err.message)
+    }
+  }
+
+  async function konfirmasi() {
+    onError('')
+    try {
+      const res = await api(`/penjualan/${konfirmId.id}/konfirmasi`, { method: 'POST', body: JSON.stringify({}) })
+      setKonfirmId(null)
+      onSelesai(res.message)
+    } catch (err) {
+      setKonfirmId(null)
+      onError(err.message)
+    }
+  }
 
   async function batalJual() {
     if (!alasanSale.trim()) {
@@ -67,6 +102,49 @@ export default function RiwayatPenjualan({
         </KotakBatal>
       )}
 
+      {konfirmId && (
+        <KotakBatal onKonfirmasi={konfirmasi} onTutup={() => setKonfirmId(null)} labelKonfirmasi="Ya, konfirmasi" danger={false}>
+          <div>
+            Konfirmasi penjualan ke <b>{konfirmId.penadah_name}</b> senilai <b>{rupiah(konfirmId.sale_total)}</b>
+            {konfirmId.biaya > 0 && ` (potongan ${rupiah(konfirmId.biaya)})`}? Kas back office akan bertambah.
+          </div>
+        </KotakBatal>
+      )}
+
+      {edit && (
+        <form className="panel-aksi" onSubmit={simpanEdit} style={{ marginBottom: 16 }}>
+          <h4>Edit catatan penjualan #{edit.id}</h4>
+          <div className="form-grid">
+            <div>
+              <label>Nama penadah</label>
+              <input value={edit.penadah_name} onChange={(e) => setEdit({ ...edit, penadah_name: e.target.value })} required />
+            </div>
+            <div>
+              <label>Harga laku (Rp)</label>
+              <input type="number" min="1" value={edit.sale_total} onChange={(e) => setEdit({ ...edit, sale_total: e.target.value })} required />
+            </div>
+            <div>
+              <label>Tanggal</label>
+              <input type="date" value={edit.sale_date} onChange={(e) => setEdit({ ...edit, sale_date: e.target.value })} required />
+            </div>
+            {edit.metode === 'qris' && (
+              <div>
+                <label>Potongan QRIS/Debit (Rp)</label>
+                <input type="number" min="0" value={edit.biaya} onChange={(e) => setEdit({ ...edit, biaya: e.target.value })} />
+              </div>
+            )}
+            <div className="span2">
+              <label>Catatan</label>
+              <input value={edit.note} onChange={(e) => setEdit({ ...edit, note: e.target.value })} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <button>Simpan perubahan</button>
+            <button type="button" className="ghost" onClick={() => setEdit(null)}>Batal</button>
+          </div>
+        </form>
+      )}
+
       <div className="table-wrap">
         <table>
           <thead>
@@ -78,7 +156,7 @@ export default function RiwayatPenjualan({
               <th className="num">Harga jual</th>
               <th className="num">Untung / rugi</th>
               <th>PJ</th>
-              {bisaCatat && <th></th>}
+              {(bisaCatat || bisaKonfirmasi) && <th></th>}
             </tr>
           </thead>
           <tbody>
@@ -86,7 +164,10 @@ export default function RiwayatPenjualan({
             {penj.rows.map((r) => (
               <tr key={r.id}>
                 <td>{r.sale_date.slice(0, 10)}</td>
-                <td>{r.penadah_name}</td>
+                <td>
+                  {r.penadah_name}
+                  {!r.konfirmasi && <div><span className="tag warn">Menunggu konfirmasi owner</span></div>}
+                </td>
                 <td style={{ whiteSpace: 'normal', minWidth: 200 }}>
                   {r.barang}
                   {r.note && <div className="muted">{r.note}</div>}
@@ -103,9 +184,26 @@ export default function RiwayatPenjualan({
                   <b>{r.untung < 0 ? 'Rugi ' : 'Untung '}{rupiah(Math.abs(r.untung))}</b>
                 </td>
                 <td>{r.pj}</td>
-                {bisaCatat && (
+                {(bisaCatat || bisaKonfirmasi) && (
                   <td>
-                    <button
+                    {bisaKonfirmasi && !r.konfirmasi && (
+                      <button type="button" className="mini primary-fill" onClick={() => { setKonfirmId(r); onMulai() }}>
+                        Konfirmasi
+                      </button>
+                    )}
+                    {bisaCatat && !r.konfirmasi && (
+                      <button
+                        type="button"
+                        className="mini"
+                        onClick={() => {
+                          setEdit({ id: r.id, penadah_name: r.penadah_name, sale_total: String(r.sale_total), sale_date: r.sale_date.slice(0, 10), note: r.note || '', biaya: String(r.biaya || 0), metode: r.metode })
+                          onMulai()
+                        }}
+                      >
+                        Edit
+                      </button>
+                    )}
+                    {bisaCatat && <button
                       type="button"
                       className="mini"
                       onClick={() => {
@@ -115,7 +213,7 @@ export default function RiwayatPenjualan({
                       }}
                     >
                       Batalkan
-                    </button>
+                    </button>}
                   </td>
                 )}
               </tr>

@@ -90,7 +90,12 @@ type BarangListRow struct {
 	Note         string     `json:"note"`
 	KirimTgl     *time.Time `json:"kirim_tgl"`
 	BelumSampai  bool       `json:"belum_sampai"`
+	Diserahkan   bool       `json:"diserahkan"` // kiriman sudah diserahkan ke kurir
 	BelumNote    string     `json:"belum_sampai_note"`
+	BPNama       string     `json:"bp_nama"`
+	DiterimaDariID int      `json:"diterima_dari_id"` // lokasi pengirim kiriman terakhir yang diterima, 0 bila bukan kiriman
+	DiterimaDari string     `json:"diterima_dari"`
+	DiterimaTgl  string     `json:"diterima_tgl"`
 	Pencuci      string     `json:"pencuci"`
 	CuciTgl      *time.Time `json:"cuci_tgl"`
 	TujuanID     int        `json:"tujuan_id"`
@@ -121,6 +126,7 @@ type TerimaReq struct {
 type BarangOperRequest struct {
 	ItemIDs          []int  `json:"item_ids" binding:"max=1000,dive,gt=0"`
 	TargetLocationID int    `json:"target_location_id" binding:"gte=0"`
+	BPNama           string `json:"bp_nama" binding:"max=30"` // tujuan BP (pihak luar), menggantikan target_location_id
 	Date             string `json:"date" binding:"max=10"`
 }
 

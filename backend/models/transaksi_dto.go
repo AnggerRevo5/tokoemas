@@ -57,6 +57,9 @@ type KasListRow struct {
 	DariPenjualan bool `json:"dari_penjualan"`
 	// GadaiID: kas ini dibuat oleh gadai (dana, pokok, atau biaya); diubah lewat card gadainya. 0 bila bukan.
 	GadaiID int `json:"gadai_id"`
+	// IsVoid dan VoidReason terisi bila transaksi dibatalkan (hanya tampil dengan filter "termasuk yang dibatalkan").
+	IsVoid     bool   `json:"is_void"`
+	VoidReason string `json:"void_reason"`
 }
 
 // StokListRow adalah satu baris respons JSON dari StokList.

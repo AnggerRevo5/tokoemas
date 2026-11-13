@@ -71,7 +71,7 @@ var tabelGadai = []struct{ nama, sql string }{
 	)`},
 }
 
-const enumStatusBarang = "ENUM('tersedia','dikirim','cuci','lebur','terjual','hasil','kembali','digadai','tidak_ditebus') NOT NULL DEFAULT 'tersedia'"
+const enumStatusBarang = "ENUM('tersedia','dikirim','cuci','lebur','terjual','hasil','kembali','digadai','tidak_ditebus','di_bp') NOT NULL DEFAULT 'tersedia'"
 
 // SiapkanSkemaGadai membuat tabel gadai dan menambah status digadai dan tidak_ditebus pada barang bila belum ada.
 func SiapkanSkemaGadai(db *sql.DB) error {

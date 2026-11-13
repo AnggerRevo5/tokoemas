@@ -26,6 +26,7 @@ export default function Barang({ me, onUbah }) {
   const [locId, setLocId] = useState(isCabang ? String(me.location_id) : '')
   const [status, setStatus] = useState('tersedia')
   const [jenisF, setJenisF] = useState('semua')
+  const [asal, setAsal] = useState('semua')
   const [cari, setCari] = useState('')
   const [data, setData] = useState({ rows: [], jumlah: 0, ditampilkan: 0, ada_lagi: false, batas: 200, total_gram: 0, total_gram_perak: 0, total_beli: 0, total_jual: 0 })
   const [batas, setBatas] = useState(LANGKAH_MUAT) // jumlah barang yang diminta; naik tiap tombol Muat lagi
@@ -63,6 +64,7 @@ export default function Barang({ me, onUbah }) {
     if (locId === '') return
     const p = new URLSearchParams({ location_id: locId, status, limit: String(batas) })
     if (jenisF !== 'semua') p.set('jenis', jenisF)
+    if (asal !== 'semua') p.set('asal', asal)
     if (bakiF) p.set('baki_id', bakiF)
     if (cari.trim()) p.set('q', cari.trim())
     api(`/barang?${p.toString()}`)
@@ -85,7 +87,7 @@ export default function Barang({ me, onUbah }) {
       .then((d) => setGadaiMap(Object.fromEntries(d.flatMap((x) => x.barang.map((b) => [b.item_id, x])))))
       .catch(() => {})
     api('/barang/notif').then(setNotif).catch(() => {})
-  }, [locId, status, jenisF, cari, bakiF, batas])
+  }, [locId, status, jenisF, asal, cari, bakiF, batas])
 
   useEffect(() => {
     muat()
@@ -210,6 +212,7 @@ export default function Barang({ me, onUbah }) {
         locId={locId}
         onLocId={(v) => {
           setLocId(v)
+          setAsal('semua')
           setBakiF('')
           setPilih({})
           setBatas(LANGKAH_MUAT)
@@ -223,6 +226,11 @@ export default function Barang({ me, onUbah }) {
         jenisF={jenisF}
         onJenis={(v) => {
           setJenisF(v)
+          setBatas(LANGKAH_MUAT)
+        }}
+        asal={asal}
+        onAsal={(v) => {
+          setAsal(v)
           setBatas(LANGKAH_MUAT)
         }}
         cari={cari}

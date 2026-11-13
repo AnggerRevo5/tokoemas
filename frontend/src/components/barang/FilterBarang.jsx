@@ -3,7 +3,7 @@ import PilihanLokasi from '../common/PilihanLokasi'
 
 // Filter daftar barang (lokasi, status, jenis, cari) dan ringkasan jumlah/berat.
 export default function FilterBarang({
-  isCabang, locations, locId, onLocId, status, onStatus, jenisF, onJenis, cari, onCari, data,
+  isCabang, locations, locId, onLocId, status, onStatus, jenisF, onJenis, asal, onAsal, cari, onCari, data,
 }) {
   return (
     <div className="card">
@@ -25,6 +25,7 @@ export default function FilterBarang({
             <option value="lebur">Dilebur</option>
             <option value="hasil">Hasil lebur</option>
             <option value="terjual">Terjual</option>
+            <option value="di_bp">Di BP</option>
             <option value="digadai">Digadai</option>
             <option value="tidak_ditebus">Tidak ditebus</option>
             <option value="semua">Semua</option>
@@ -42,6 +43,17 @@ export default function FilterBarang({
             <option value="tempat_perhiasan">Tempat perhiasan</option>
             <option value="kotak_perhiasan">Kotak perhiasan</option>
             <option value="hasil_lebur">Hasil lebur</option>
+          </select>
+        </div>
+        <div>
+          <label>Asal barang</label>
+          <select value={asal} onChange={(e) => onAsal(e.target.value)}>
+            <option value="semua">Semua</option>
+            <option value="baru">Baru datang (3 hari terakhir)</option>
+            <option value="sendiri">Barang toko ini sendiri (bukan kiriman)</option>
+            {locations.filter((l) => String(l.id) !== String(locId)).map((l) => (
+              <option key={l.id} value={l.id}>Kiriman dari {l.name}</option>
+            ))}
           </select>
         </div>
         <div>

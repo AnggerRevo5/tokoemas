@@ -22,7 +22,7 @@ export const DESKRIPSI_ROLE = {
 // kelompok menu di sidebar (urutan tampil)
 const GRUP_MENU = [
   { kode: 'dashboard', judul: 'Dashboard', menu: ['dashboard'] },
-  { kode: 'transaksi', judul: 'Transaksi', menu: ['kas', 'stok'] },
+  { kode: 'transaksi', judul: 'Transaksi', menu: ['kas', 'stok', 'riwayat_stok', 'talangan'] },
   { kode: 'produksi', judul: 'Produksi', menu: ['cuci', 'lebur', 'service'] },
   { kode: 'keuangan', judul: 'Keuangan', menu: ['hutang', 'investor', 'labarugi', 'laporan'] },
   { kode: 'pengaturan', judul: 'Pengaturan', menu: ['akun'] },
@@ -36,6 +36,8 @@ export function menuUntuk(role) {
     ['dashboard', 'Dashboard'],
     ['kas', 'Kas'],
     ['stok', 'Stok'],
+    ['riwayat_stok', 'Riwayat Stok'],
+    ['talangan', 'Talangan BP'],
     ['cuci', 'Cuci'],
     ['service', 'Service'],
   ]

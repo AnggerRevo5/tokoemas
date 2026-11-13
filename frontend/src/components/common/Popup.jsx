@@ -14,6 +14,7 @@ export default function Popup({
   danger = false,
   loading = false,
   nonaktif = false,
+  tanpaBatal = false,
 }) {
   useEffect(() => {
     const esc = (e) => {
@@ -46,7 +47,7 @@ export default function Popup({
           >
             {loading && <Spinner />}{labelKonfirmasi}
           </button>
-          <button type="button" className="mini" onClick={onTutup} disabled={loading}>Tidak jadi</button>
+          {!tanpaBatal && <button type="button" className="mini" onClick={onTutup} disabled={loading}>Tidak jadi</button>}
         </div>
       </m.div>
     </div>,

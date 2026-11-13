@@ -16,7 +16,11 @@ export const STATUS_LABEL = {
   terjual: 'Terjual',
   digadai: 'Digadai',
   tidak_ditebus: 'Tidak ditebus',
+  di_bp: 'Di BP',
 }
+
+// pihak luar tanpa akun, tujuan oper barang dan mitra tukar (sama dengan services.DaftarBP di backend)
+export const BP_LIST = ['BP Induk', 'BP Pecinan', 'BP Iss', 'BP Lawang']
 
 export const STATUS_CLASS = {
   tersedia: 'tag in',
@@ -28,11 +32,15 @@ export const STATUS_CLASS = {
   terjual: 'tag gray',
   digadai: 'tag warn',
   tidak_ditebus: 'tag gray',
+  di_bp: 'tag info',
 }
 
 // penjelasan singkat di bawah form aksi barang
 export const KETERANGAN_AKSI = {
-  antar: 'Barang berstatus dalam perjalanan sampai back office menekan Sudah sampai.',
+  antar: 'Barang berstatus Disiapkan dan masih bisa dibatalkan. Setelah diserahkan ke kurir, barang dalam perjalanan sampai back office menekan Sudah sampai.',
+  tarik_bp: 'Barang kembali tersedia di stok back office dan stok bertambah lagi.',
+  serah: 'Barang berstatus dalam perjalanan. Kiriman tidak bisa dibatalkan lagi, penerima yang mengonfirmasi.',
+  batal_kirim: 'Barang kembali tersedia di stok lokasi asal. Stok tidak berubah.',
   sampai: 'Barang masuk ke stok back office.',
   belum: 'Barang tetap di daftar dengan label belum sampai.',
   terima_toko: 'Stok back office berkurang dan stok toko ini bertambah.',
@@ -41,7 +49,7 @@ export const KETERANGAN_AKSI = {
     'Barang masuk ke stok back office dengan berat terbaru yang dicatat PJ. Barang hasil cuci berstatus Bersih, lalu bisa dioper ke toko cabang.',
   belum_kembali: 'Barang tetap tercatat dengan label belum diterima.',
   kirim:
-    'Barang berstatus dalam perjalanan dan masih tercatat di back office sampai akun toko tujuan menekan Sudah diterima.',
+    'Barang berstatus Disiapkan dan masih bisa dibatalkan. Setelah diserahkan ke kurir, barang tercatat di back office sampai akun toko tujuan menekan Sudah diterima. Untuk BP (tanpa akun), stok back office langsung berkurang saat diserahkan ke kurir.',
   lebur:
     'Stok back office berkurang dan barang masuk proses lebur. PJ lalu mencatat berat setelah dipotong, leburan kotor, dan cukim di menu Lebur. Modal dihitung dari jumlah harga beli.',
   cuci:

@@ -55,6 +55,8 @@ export const KATEGORI = {
 
 const SEMUA = {
   biaya_service: 'Biaya service',
+  ke_bp: 'Dikirim ke BP',
+  kembali_bp: 'Ditarik kembali dari BP',
   dari_toko: 'Pemasukan dari toko',
   bayar_hutang: 'Pembayaran hutang',
   kembali_cabang: 'Barang kembali cabang',

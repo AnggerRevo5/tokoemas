@@ -249,42 +249,10 @@ func PenjualanPenadah(db *sql.DB) gin.HandlerFunc {
 		}
 
 		note := strings.TrimSpace(req.Note)
-		// penjualan penadah selalu di back office: tunai, transfer, maupun QRIS/Debit sama-sama menambah kas back office
-		catatKas := fmt.Sprintf("Jual ke penadah %s: %d barang", penadah, len(list))
-		if metode != services.MetodeTunai {
-			catatKas += " (" + services.LabelMetode(metode) + ")"
-		}
-		res, err := tx.Exec(
-			`INSERT INTO cash_transactions (location_id, direction, category, amount, note, transaction_date, created_by, metode)
-			 VALUES (?,?,?,?,?,?,?,?)`,
-			boID, "in", "jual_barang", req.SaleTotal, catatKas, tgl, cl.UserID, metode,
-		)
-		if err != nil {
-			utils.Gagal(c, err)
-			return
-		}
-		cashID, _ := res.LastInsertId()
-
-		var biayaID sql.NullInt64
-		if req.Biaya > 0 {
-			rb, err := tx.Exec(
-				`INSERT INTO cash_transactions (location_id, direction, category, amount, note, transaction_date, created_by, metode)
-				 VALUES (?,?,?,?,?,?,?,?)`,
-				boID, "out", services.KategoriBiayaQRIS, req.Biaya,
-				fmt.Sprintf("Potongan %s jual ke penadah %s", services.LabelMetode(metode), penadah), tgl, cl.UserID, metode,
-			)
-			if err != nil {
-				utils.Gagal(c, err)
-				return
-			}
-			id, _ := rb.LastInsertId()
-			biayaID = sql.NullInt64{Int64: id, Valid: true}
-		}
-
 		res2, err := tx.Exec(
-			`INSERT INTO penadah_sales (sale_date, penadah_name, sale_total, modal, weight_gram, item_count, note, cash_id, created_by, metode, biaya_cash_id)
-			 VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-			tgl, penadah, req.SaleTotal, modal, berat, len(list), sql.NullString{String: note, Valid: note != ""}, cashID, cl.UserID, metode, biayaID,
+			`INSERT INTO penadah_sales (sale_date, penadah_name, sale_total, modal, weight_gram, item_count, note, created_by, metode, konfirmasi, biaya)
+			 VALUES (?,?,?,?,?,?,?,?,?,FALSE,?)`,
+			tgl, penadah, req.SaleTotal, modal, berat, len(list), sql.NullString{String: note, Valid: note != ""}, cl.UserID, metode, req.Biaya,
 		)
 		if err != nil {
 			utils.Gagal(c, err)
@@ -313,7 +281,7 @@ func PenjualanPenadah(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		c.JSON(http.StatusCreated, gin.H{
-			"message": fmt.Sprintf("terjual ke %s, kas back office bertambah", penadah),
+			"message": fmt.Sprintf("penjualan ke %s dicatat, menunggu konfirmasi owner (kas belum bertambah)", penadah),
 			"modal":   modal,
 			"untung":  req.SaleTotal - modal,
 		})
@@ -334,7 +302,8 @@ func PenjualanList(db *sql.DB) gin.HandlerFunc {
 		             IFNULL(s.note,''), IFNULL(u.username,''),
 		             IFNULL((SELECT GROUP_CONCAT(CONCAT(i.item_name,' ',IFNULL(i.karat,''),' ',i.weight_gram,'g') SEPARATOR '; ')
 		                     FROM items i WHERE i.sale_id = s.id),''),
-		             s.metode, IFNULL((SELECT x.amount FROM cash_transactions x WHERE x.id = s.biaya_cash_id AND x.is_void = FALSE),0)
+		             s.metode, IF(s.konfirmasi, IFNULL((SELECT x.amount FROM cash_transactions x WHERE x.id = s.biaya_cash_id AND x.is_void = FALSE),0), s.biaya),
+		             s.konfirmasi
 		      FROM penadah_sales s LEFT JOIN users u ON u.id = s.created_by
 		      WHERE s.is_void = FALSE`
 		args := []interface{}{}
@@ -360,13 +329,15 @@ func PenjualanList(db *sql.DB) gin.HandlerFunc {
 		for rows.Next() {
 			var r models.PenjualanListRow
 			if err := rows.Scan(&r.ID, &r.SaleDate, &r.PenadahName, &r.ItemCount, &r.WeightGram, &r.Modal, &r.SaleTotal,
-				&r.Note, &r.PJ, &r.Barang, &r.Metode, &r.Biaya); err != nil {
+				&r.Note, &r.PJ, &r.Barang, &r.Metode, &r.Biaya, &r.Konfirmasi); err != nil {
 				utils.Gagal(c, err)
 				return
 			}
 			r.Untung = r.SaleTotal - r.Modal
-			totalModal += r.Modal
-			totalJual += r.SaleTotal
+			if r.Konfirmasi { // catatan yang belum dikonfirmasi owner belum dihitung
+				totalModal += r.Modal
+				totalJual += r.SaleTotal
+			}
 			out = append(out, r)
 		}
 		c.JSON(http.StatusOK, gin.H{
@@ -448,5 +419,148 @@ func PenjualanVoid(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{"message": "penjualan dibatalkan, barang dan kas dikembalikan"})
+	}
+}
+
+// ---------- OWNER: KONFIRMASI PENJUALAN PENADAH (kas back office bertambah) ----------
+
+func PenjualanKonfirmasi(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		cl, ok := middleware.HanyaAdminOwner(c)
+		if !ok {
+			return
+		}
+		id, ok := utils.IDParam(c)
+		if !ok {
+			return
+		}
+		boID, err := services.IDBackOffice(db)
+		if err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		tx, err := db.Begin()
+		if err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		defer tx.Rollback()
+
+		var isVoid, konfirmasi bool
+		var tgl, penadah, metode string
+		var total, biaya float64
+		var n int
+		err = tx.QueryRow(
+			"SELECT is_void, konfirmasi, DATE_FORMAT(sale_date,'%Y-%m-%d'), penadah_name, sale_total, biaya, metode, item_count FROM penadah_sales WHERE id = ? FOR UPDATE", id,
+		).Scan(&isVoid, &konfirmasi, &tgl, &penadah, &total, &biaya, &metode, &n)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "penjualan tidak ditemukan"})
+			return
+		}
+		if isVoid || konfirmasi {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "penjualan ini sudah dikonfirmasi atau dibatalkan"})
+			return
+		}
+		catatKas := fmt.Sprintf("Jual ke penadah %s: %d barang", penadah, n)
+		if metode != services.MetodeTunai {
+			catatKas += " (" + services.LabelMetode(metode) + ")"
+		}
+		res, err := tx.Exec(
+			`INSERT INTO cash_transactions (location_id, direction, category, amount, note, transaction_date, created_by, metode)
+			 VALUES (?,?,?,?,?,?,?,?)`,
+			boID, "in", "jual_barang", total, catatKas, tgl, cl.UserID, metode,
+		)
+		if err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		cashID, _ := res.LastInsertId()
+		var biayaID sql.NullInt64
+		if biaya > 0 {
+			rb, err := tx.Exec(
+				`INSERT INTO cash_transactions (location_id, direction, category, amount, note, transaction_date, created_by, metode)
+				 VALUES (?,?,?,?,?,?,?,?)`,
+				boID, "out", services.KategoriBiayaQRIS, biaya,
+				fmt.Sprintf("Potongan %s jual ke penadah %s", services.LabelMetode(metode), penadah), tgl, cl.UserID, metode,
+			)
+			if err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			bid, _ := rb.LastInsertId()
+			biayaID = sql.NullInt64{Int64: bid, Valid: true}
+		}
+		if _, err := tx.Exec("UPDATE penadah_sales SET konfirmasi = TRUE, cash_id = ?, biaya_cash_id = ? WHERE id = ?", cashID, biayaID, id); err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		services.CatatAudit(tx, middleware.Meta(c), "konfirmasi_penadah", "penadah_sales", int64(id), gin.H{"penadah": penadah, "harga_jual": total})
+		if err := tx.Commit(); err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("penjualan ke %s dikonfirmasi, kas back office bertambah", penadah)})
+	}
+}
+
+// ---------- PJ: EDIT CATATAN PENJUALAN PENADAH (sebelum dikonfirmasi owner) ----------
+
+func PenjualanEdit(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		cl, ok := middleware.HanyaPJ(c)
+		if !ok {
+			return
+		}
+		id, ok := utils.IDParam(c)
+		if !ok {
+			return
+		}
+		var req models.PenjualanPenadahRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "data tidak valid"})
+			return
+		}
+		penadah := strings.TrimSpace(req.PenadahName)
+		if penadah == "" || req.SaleTotal <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "nama penadah dan harga jual wajib diisi"})
+			return
+		}
+		tgl, ok := utils.ParseTanggal(c, req.SaleDate)
+		if !ok {
+			return
+		}
+		tx, err := db.Begin()
+		if err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		defer tx.Rollback()
+
+		var isVoid, konfirmasi bool
+		var metode string
+		if err := tx.QueryRow("SELECT is_void, konfirmasi, metode FROM penadah_sales WHERE id = ? FOR UPDATE", id).Scan(&isVoid, &konfirmasi, &metode); err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "penjualan tidak ditemukan"})
+			return
+		}
+		if isVoid || konfirmasi {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "hanya catatan yang belum dikonfirmasi owner yang bisa diedit"})
+			return
+		}
+		if err := services.ValidasiBiaya(metode, req.Biaya, req.SaleTotal); err != nil {
+			balasKesalahan(c, err)
+			return
+		}
+		note := strings.TrimSpace(req.Note)
+		if _, err := tx.Exec("UPDATE penadah_sales SET penadah_name = ?, sale_total = ?, sale_date = ?, note = ?, biaya = ? WHERE id = ?",
+			penadah, req.SaleTotal, tgl, sql.NullString{String: note, Valid: note != ""}, req.Biaya, id); err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		services.CatatAudit(tx, middleware.Meta(c), "edit_penadah", "penadah_sales", int64(id), gin.H{"penadah": penadah, "harga_jual": req.SaleTotal, "oleh": cl.Role})
+		if err := tx.Commit(); err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "catatan penjualan diperbarui"})
 	}
 }

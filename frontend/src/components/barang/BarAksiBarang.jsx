@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { api } from '../../services/api'
 import { gram, hariIni, rupiah } from '../../utils/format'
-import { KETERANGAN_AKSI } from '../../constants/barang'
-import PilihanLokasi from '../common/PilihanLokasi'
+import { KETERANGAN_AKSI, BP_LIST } from '../../constants/barang'
 import PilihMetodeBayar from '../common/PilihMetodeBayar'
 import { BIAYA_KOSONG, nominalBiaya } from '../../utils/biaya'
 import { bolehGratis, tanpaGram } from '../../utils/barang'
@@ -73,9 +72,14 @@ export default function BarAksiBarang({
       }
       let res
       if (aksi === 'kirim') {
+        const keBP = targetAktif.startsWith('bp:')
         res = await api('/barang/oper', {
           method: 'POST',
-          body: JSON.stringify({ item_ids: ids, target_location_id: Number(targetAktif), date: tgl }),
+          body: JSON.stringify({
+            item_ids: ids,
+            date: tgl,
+            ...(keBP ? { bp_nama: targetAktif.slice(3) } : { target_location_id: Number(targetAktif) }),
+          }),
         })
       } else if (aksi === 'terima_toko' || aksi === 'belum_toko') {
         res = await api('/barang/terima-toko', {
@@ -89,6 +93,13 @@ export default function BarAksiBarang({
         })
       } else if (aksi === 'antar') {
         res = await api('/barang/kirim-bo', {
+          method: 'POST',
+          body: JSON.stringify({ item_ids: ids, date: tgl }),
+        })
+      } else if (aksi === 'tarik_bp') {
+        res = await api('/barang/tarik-bp', { method: 'POST', body: JSON.stringify({ item_ids: ids, date: tgl }) })
+      } else if (aksi === 'serah' || aksi === 'batal_kirim') {
+        res = await api(aksi === 'serah' ? '/barang/serah-kurir' : '/barang/batal-kirim', {
           method: 'POST',
           body: JSON.stringify({ item_ids: ids, date: tgl }),
         })
@@ -162,12 +173,18 @@ export default function BarAksiBarang({
       {mode === 'transit_toko' && !isCabang && (
         <div className="muted">Barang sedang menuju toko. Konfirmasi diterima hanya oleh akun toko tujuan.</div>
       )}
+      {mode === 'di_bp' && isCabang && (
+        <div className="muted">Barang ini sedang berada di BP. Penarikan kembali dilakukan owner.</div>
+      )}
+      {mode === 'siap_toko' && isCabang && (
+        <div className="muted">Back office masih menyiapkan kiriman ini. Konfirmasi bisa setelah diserahkan ke kurir.</div>
+      )}
       {mode === 'transit' && isCabang && (
         <div className="muted">Menunggu konfirmasi dari back office.</div>
       )}
       {adaLM && mode === 'back_office' && (
         <div className="muted">
-          Logam mulia hanya bisa dikirim ke toko. Untuk dijual ke penadah, PJ menjualnya lewat menu Lebur.
+          Logam mulia hanya bisa dioper ke toko atau BP. Untuk dijual ke penadah, PJ mencatatnya lewat menu Lebur, lalu owner mengonfirmasi di sana.
         </div>
       )}
 
@@ -214,8 +231,19 @@ export default function BarAksiBarang({
 
             {aksi === 'kirim' && (
               <div>
-                <label>Oper ke toko</label>
-                <PilihanLokasi locations={cabangList} value={targetAktif} onChange={(e) => setTarget(e.target.value)} />
+                <label>Oper ke</label>
+                <select value={targetAktif} onChange={(e) => setTarget(e.target.value)}>
+                  <optgroup label="Toko">
+                    {cabangList.map((l) => (
+                      <option key={l.id} value={String(l.id)}>{l.name}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="BP (tanpa akun)">
+                    {BP_LIST.map((b) => (
+                      <option key={b} value={`bp:${b}`}>{b}</option>
+                    ))}
+                  </optgroup>
+                </select>
               </div>
             )}
 

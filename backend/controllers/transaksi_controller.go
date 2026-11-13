@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -206,6 +207,60 @@ func KasCreate(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
+// kelompokKas: pengelompokan kategori kas untuk filter "Jenis transaksi" di riwayat kas.
+// penadah tidak punya kategori sendiri (memakai jual_barang), jadi dikenali dari catatannya.
+var kelompokKas = map[string][]string{
+	"penjualan":    {"omzet", "jual_qris", "biaya_qris", "jual_barang"},
+	"pembelian":    {"pembelian_customer"},
+	"tukar_bp":     {"kembali_cabang"},
+	"gadai":        {"gadai_dana", "gadai_pokok", "gadai_biaya", "gadai_kembali"},
+	"hutang":       {"bayar_hutang", "pinjaman", "investor", "bulanan_investor", "tarik_investor"},
+	"service":      {"biaya_service"},
+	"operasional":  {"pengeluaran_toko", "operasional", "jual_aset"},
+	"transfer_kas": {"transfer_bo", "dari_toko", "kas_toko", "tambah_kas"},
+}
+
+const catatPenadah = "(x.note LIKE 'Jual ke penadah%' OR x.note LIKE 'Potongan % jual ke penadah%')"
+
+// filterKas membangun syarat tambahan riwayat kas dari query: from, to, arah, kelompok, metode, q.
+func filterKas(c *gin.Context) (string, []interface{}) {
+	q, args := "", []interface{}{}
+	if v := c.Query("from"); v != "" {
+		q += " AND x.transaction_date >= ?"
+		args = append(args, v)
+	}
+	if v := c.Query("to"); v != "" {
+		q += " AND x.transaction_date <= ?"
+		args = append(args, v)
+	}
+	if v := c.Query("arah"); v == "in" || v == "out" {
+		q += " AND x.direction = ?"
+		args = append(args, v)
+	}
+	switch k := c.Query("kelompok"); {
+	case k == "penadah":
+		q += " AND " + catatPenadah
+	case kelompokKas[k] != nil:
+		q += " AND x.category IN (" + utils.Placeholders(len(kelompokKas[k])) + ")"
+		for _, kat := range kelompokKas[k] {
+			args = append(args, kat)
+		}
+		if k == "penjualan" {
+			q += " AND NOT " + catatPenadah
+		}
+	}
+	if v := c.Query("metode"); v == "tunai" || v == "transfer" || v == "qris" {
+		q += " AND x.metode = ?"
+		args = append(args, v)
+	}
+	if v := strings.TrimSpace(c.Query("q")); v != "" {
+		pola := strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(utils.BatasTeks(v, 60))
+		q += " AND x.note LIKE ?"
+		args = append(args, "%"+pola+"%")
+	}
+	return q, args
+}
+
 func KasList(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		cl := c.MustGet("claims").(*models.Claims)
@@ -218,12 +273,25 @@ func KasList(db *sql.DB) gin.HandlerFunc {
 		if cl.Role == "cabang" {
 			lokasi = strconv.Itoa(cl.LocationID)
 		}
+		fil, filArgs := filterKas(c)
+		termasukBatal := c.Query("batal") == "1"
+
+		// halaman: 200 baris per muat, ?limit= untuk memuat lebih banyak (maksimal 2000)
+		batas := 200
+		if v, err := strconv.Atoi(c.Query("limit")); err == nil && v > 0 {
+			batas = v
+		}
+		if batas > 2000 {
+			batas = 2000
+		}
+
 		q := `SELECT x.id, x.location_id, x.direction, x.category, x.amount, IFNULL(x.note,''), x.transaction_date, x.created_at,
 		             IFNULL(l.name,''),
 		             EXISTS (SELECT 1 FROM items j WHERE (j.jual_cash_id = x.id OR j.jual_biaya_cash_id = x.id) AND j.is_void = FALSE),
 		             IFNULL((SELECT g.id FROM gadai g WHERE g.cash_id = x.id AND g.is_void = FALSE LIMIT 1),
 		                    IFNULL((SELECT p.gadai_id FROM gadai_pembayaran p
-		                            WHERE (p.cash_pokok_id = x.id OR p.cash_biaya_id = x.id) AND p.is_void = FALSE LIMIT 1), 0))`
+		                            WHERE (p.cash_pokok_id = x.id OR p.cash_biaya_id = x.id) AND p.is_void = FALSE LIMIT 1), 0)),
+		             x.is_void, IFNULL(x.void_reason,'')`
 		args := []interface{}{}
 		if lokasi != "" {
 			q += ", x.location_id <> ?"
@@ -231,21 +299,19 @@ func KasList(db *sql.DB) gin.HandlerFunc {
 		} else {
 			q += ", FALSE"
 		}
-		q += " FROM cash_transactions x JOIN locations l ON l.id = x.location_id WHERE x.is_void = FALSE"
+		q += " FROM cash_transactions x JOIN locations l ON l.id = x.location_id WHERE 1=1"
+		if !termasukBatal {
+			q += " AND x.is_void = FALSE"
+		}
 		if lokasi != "" {
 			q += ` AND (x.location_id = ? OR x.asal_location_id = ?
 			         OR EXISTS (SELECT 1 FROM items i WHERE i.jual_biaya_cash_id = x.id AND i.location_id = ?))`
 			args = append(args, lokasi, lokasi, lokasi)
 		}
-		if v := c.Query("from"); v != "" {
-			q += " AND x.transaction_date >= ?"
-			args = append(args, v)
-		}
-		if v := c.Query("to"); v != "" {
-			q += " AND x.transaction_date <= ?"
-			args = append(args, v)
-		}
-		q += " ORDER BY x.transaction_date DESC, x.id DESC LIMIT 200"
+		q += fil
+		args = append(args, filArgs...)
+		q += " ORDER BY x.transaction_date DESC, x.id DESC LIMIT ?"
+		args = append(args, batas+1)
 
 		rows, err := db.Query(q, args...)
 		if err != nil {
@@ -258,13 +324,32 @@ func KasList(db *sql.DB) gin.HandlerFunc {
 		for rows.Next() {
 			var r models.KasListRow
 			if err := rows.Scan(&r.ID, &r.LocationID, &r.Direction, &r.Category, &r.Amount, &r.Note, &r.Date, &r.CreatedAt,
-				&r.NamaKas, &r.DariPenjualan, &r.GadaiID, &r.KasLain); err != nil {
+				&r.NamaKas, &r.DariPenjualan, &r.GadaiID, &r.IsVoid, &r.VoidReason, &r.KasLain); err != nil {
 				utils.Gagal(c, err)
 				return
 			}
 			out = append(out, r)
 		}
-		c.JSON(http.StatusOK, out)
+		adaLagi := len(out) > batas
+		if adaLagi {
+			out = out[:batas]
+		}
+
+		// ringkasan seluruh hasil filter (bukan hanya yang tampil), tanpa transaksi dibatalkan dan tanpa baris kas lain
+		tq := "SELECT IFNULL(SUM(IF(x.direction='in', x.amount, 0)),0), IFNULL(SUM(IF(x.direction='out', x.amount, 0)),0) FROM cash_transactions x WHERE x.is_void = FALSE"
+		targs := []interface{}{}
+		if lokasi != "" {
+			tq += " AND x.location_id = ?"
+			targs = append(targs, lokasi)
+		}
+		tq += fil
+		targs = append(targs, filArgs...)
+		var masuk, keluar float64
+		if err := db.QueryRow(tq, targs...).Scan(&masuk, &keluar); err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"rows": out, "total_masuk": masuk, "total_keluar": keluar, "ada_lagi": adaLagi, "batas": batas})
 	}
 }
 

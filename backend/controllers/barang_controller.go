@@ -417,7 +417,7 @@ func BarangCreate(db *sql.DB) gin.HandlerFunc {
 				lastID = id
 				tx.Exec("UPDATE items SET item_no = ? WHERE id = ?", fmt.Sprintf("%s-%05d", services.AwalanKode(it.Jenis), id), id)
 				if kirimKeBO {
-					tx.Exec("UPDATE items SET status = 'dikirim', kirim_tgl = ? WHERE id = ?", tgl, id)
+					tx.Exec("UPDATE items SET status = 'dikirim', kirim_tgl = ?, diserahkan = FALSE WHERE id = ?", tgl, id)
 				}
 				if _, err := tx.Exec(services.SQLStokItem, locID, "in", req.Category, it.ItemName, it.WeightGram, it.Karat,
 					it.Note, tgl, cl.UserID, id); err != nil {
@@ -527,11 +527,13 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 		             IF(i.status = 'cuci', w.start_date, NULL),
 		             IFNULL(i.kirim_ke_location_id,0), IFNULL(k.name,''),
 		             i.harga_jual, i.tanggal_jual, IFNULL(t.id,0), IFNULL(t.no,0), IFNULL(t.name,''), i.purchase_cash_id IS NOT NULL,
-		             IFNULL(jc.metode,''), i.bahan`
+		             IFNULL(jc.metode,''), i.bahan, i.diserahkan, IFNULL(i.bp_nama,''),
+		             IFNULL(i.diterima_dari_id,0), IFNULL(dd.name,''), IFNULL(DATE_FORMAT(i.diterima_tgl,'%Y-%m-%d'),'')`
 		dari := `FROM items i
 		      JOIN locations l ON l.id = i.location_id
 		      JOIN locations o ON o.id = i.origin_location_id
 		      LEFT JOIN locations k ON k.id = i.kirim_ke_location_id
+		      LEFT JOIN locations dd ON dd.id = i.diterima_dari_id
 		      LEFT JOIN washing_jobs w ON w.id = i.washing_job_id
 		      LEFT JOIN trays t ON t.id = i.tray_id AND t.location_id = i.location_id
 		      LEFT JOIN cash_transactions jc ON jc.id = i.jual_cash_id
@@ -572,6 +574,19 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 		if k := c.Query("kas_id"); k != "" {
 			dari += " AND (i.jual_cash_id = ? OR i.jual_biaya_cash_id = ?)"
 			args = append(args, k, k)
+		}
+		// asal barang: sendiri (bukan kiriman), baru (kiriman 3 hari terakhir), atau id lokasi pengirim
+		switch a := c.Query("asal"); a {
+		case "", "semua":
+		case "sendiri":
+			dari += " AND i.diterima_dari_id IS NULL"
+		case "baru":
+			dari += " AND i.status = 'tersedia' AND i.diterima_tgl >= CURDATE() - INTERVAL 3 DAY"
+		default:
+			if n, err := strconv.Atoi(a); err == nil && n > 0 {
+				dari += " AND i.diterima_dari_id = ?"
+				args = append(args, n)
+			}
 		}
 		if b := c.Query("baki_id"); b != "" && b != "0" {
 			dari += " AND i.tray_id = ?"
@@ -618,7 +633,8 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 				&r.Jenis, &r.Brand, &r.Kondisi, &r.HargaBeli,
 				&r.LocationID, &r.Lokasi, &r.OriginID, &r.Asal, &r.Status, &r.EntryDate, &r.Note,
 				&kirim, &r.BelumSampai, &r.BelumNote, &r.Pencuci, &cuciTgl, &r.TujuanID, &r.Tujuan,
-				&hargaJual, &tglJual, &r.BakiID, &r.BakiNo, &r.BakiNama, &r.DariCustomer, &r.Metode, &r.Bahan); err != nil {
+				&hargaJual, &tglJual, &r.BakiID, &r.BakiNo, &r.BakiNama, &r.DariCustomer, &r.Metode, &r.Bahan, &r.Diserahkan, &r.BPNama,
+				&r.DiterimaDariID, &r.DiterimaDari, &r.DiterimaTgl); err != nil {
 				utils.Gagal(c, err)
 				return
 			}

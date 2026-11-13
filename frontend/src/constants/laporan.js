@@ -7,6 +7,7 @@ export const LAPORAN = [
   ['penjualan_toko_ringkas', 'Penjualan toko: ringkasan per lokasi dan metode', 'Keuangan'],
   ['penjualan_toko', 'Penjualan toko: rincian per barang', 'Keuangan'],
   ['gadai', 'Gadai: ringkasan dan jadwal cicilan', 'Keuangan'],
+  ['talangan_bp', 'Talangan dan tukar BP: catatan, rekap selisih, pengajuan', 'Keuangan'],
   ['investor', 'Investor: ringkasan per periode', 'Keuangan'],
   ['investor_mutasi', 'Investor: mutasi setor, tarik, dan bunga', 'Keuangan'],
   ['cuci', 'Cuci', 'Operasional'],

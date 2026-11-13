@@ -17,6 +17,8 @@ import Lebur from '../../pages/Lebur'
 import Barang from '../../pages/Barang'
 import Service from '../../pages/Service'
 import Akun from '../../pages/Akun'
+import Talangan from '../../pages/Talangan'
+import RiwayatStok from '../../pages/RiwayatStok'
 
 const LAYAR_LEBAR = 1024
 const KUNCI_SIDEBAR = 'sidebar'
@@ -37,7 +39,7 @@ export default function AppShell({ onLogout }) {
   const [tab, setTab] = useState('dashboard')
   const [buka, setBuka] = useState(sidebarAwal)
   const [tema, setTema] = useState(temaAwal)
-  const [notif, setNotif] = useState({ menunggu: 0, belum_sampai: 0 })
+  const [notif, setNotif] = useState({ menunggu: 0, belum_sampai: 0, tukar_menunggu: 0, penadah_menunggu: 0 })
   const [notifSvc, setNotifSvc] = useState({ badge: 0 })
   const [notifCuci, setNotifCuci] = useState({ badge: 0 })
 
@@ -96,7 +98,7 @@ export default function AppShell({ onLogout }) {
         grup={grupMenuUntuk(me.role)}
         tab={tab}
         onPilih={pilihMenu}
-        badges={{ stok: notif.menunggu, service: notifSvc.badge, cuci: notifCuci.badge }}
+        badges={{ stok: notif.menunggu, service: notifSvc.badge, cuci: notifCuci.badge, talangan: notif.tukar_menunggu, lebur: notif.penadah_menunggu }}
         me={me}
       />
       <div className="overlay" onClick={() => setBuka(false)} />
@@ -110,6 +112,8 @@ export default function AppShell({ onLogout }) {
           )}
           {tab === 'kas' && bukanPJ && <Transaksi jenis="kas" me={me} />}
           {tab === 'stok' && bukanPJ && <Barang me={me} onUbah={ambilNotif} />}
+          {tab === 'talangan' && bukanPJ && <Talangan me={me} />}
+          {tab === 'riwayat_stok' && bukanPJ && <RiwayatStok me={me} />}
           {tab === 'cuci' && <Cuci me={me} />}
           {tab === 'service' && <Service me={me} onUbah={ambilNotif} />}
           {tab === 'lebur' && bukanCabang && <Lebur me={me} />}

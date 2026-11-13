@@ -69,7 +69,7 @@ func BarangKirimBO(db *sql.DB) gin.HandlerFunc {
 		}
 		for _, it := range items {
 			if _, err := tx.Exec(
-				"UPDATE items SET status = 'dikirim', kirim_tgl = ?, belum_sampai = FALSE, belum_sampai_note = NULL WHERE id = ?",
+				"UPDATE items SET status = 'dikirim', kirim_tgl = ?, diserahkan = FALSE, bp_nama = NULL, belum_sampai = FALSE, belum_sampai_note = NULL WHERE id = ?",
 				tgl, it.ID,
 			); err != nil {
 				utils.Gagal(c, err)
@@ -83,7 +83,7 @@ func BarangKirimBO(db *sql.DB) gin.HandlerFunc {
 			utils.Gagal(c, err)
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%d barang diantar ke back office, menunggu konfirmasi", len(items))})
+		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%d barang diantar ke back office, belum diserahkan ke kurir", len(items))})
 	}
 }
 
@@ -133,6 +133,10 @@ func BarangTerimaBO(db *sql.DB) gin.HandlerFunc {
 		for _, it := range items {
 			if it.Status != "dikirim" {
 				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s tidak sedang dalam perjalanan", it.Name)})
+				return
+			}
+			if !sudahDiserahkan(tx, it.ID) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s belum diserahkan ke kurir oleh pengirim", it.Name)})
 				return
 			}
 		}
@@ -191,8 +195,8 @@ func BarangTerimaBO(db *sql.DB) gin.HandlerFunc {
 			tx.Exec("UPDATE stock_movements SET related_id = ? WHERE id = ?", inID, outID)
 			tx.Exec("UPDATE stock_movements SET related_id = ? WHERE id = ?", outID, inID)
 			if _, err := tx.Exec(
-				"UPDATE items SET location_id = ?, status = 'tersedia', belum_sampai = FALSE, belum_sampai_note = NULL WHERE id = ?",
-				boID, it.ID,
+				"UPDATE items SET location_id = ?, status = 'tersedia', belum_sampai = FALSE, belum_sampai_note = NULL, diterima_dari_id = ?, diterima_tgl = ? WHERE id = ?",
+				boID, it.Location, tgl, it.ID,
 			); err != nil {
 				utils.Gagal(c, err)
 				return
@@ -228,11 +232,21 @@ func BarangOper(db *sql.DB) gin.HandlerFunc {
 		if !ok {
 			return
 		}
-		namaToko, ok := services.CekCabang(db, req.TargetLocationID)
-		if !ok {
+		bp := strings.TrimSpace(req.BPNama)
+		var namaToko string
+		if bp != "" {
+			if !services.BPValid(bp) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "BP tujuan tidak dikenal"})
+				return
+			}
+			namaToko = bp
+		} else if namaToko, ok = services.CekCabang(db, req.TargetLocationID); !ok {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "pilih toko tujuan"})
 			return
 		}
+		// tujuan BP: kirim_ke_location_id kosong dan bp_nama terisi
+		tujuanID := sql.NullInt64{Int64: int64(req.TargetLocationID), Valid: bp == ""}
+		bpArg := utils.StrNull(bp)
 		boID, err := services.IDBackOffice(db)
 		if err != nil {
 			utils.Gagal(c, err)
@@ -263,9 +277,9 @@ func BarangOper(db *sql.DB) gin.HandlerFunc {
 		}
 		for _, it := range items {
 			if _, err := tx.Exec(
-				`UPDATE items SET status = 'dikirim', kirim_ke_location_id = ?, kirim_tgl = ?,
+				`UPDATE items SET status = 'dikirim', kirim_ke_location_id = ?, bp_nama = ?, kirim_tgl = ?, diserahkan = FALSE,
 				        belum_sampai = FALSE, belum_sampai_note = NULL WHERE id = ?`,
-				req.TargetLocationID, tgl, it.ID,
+				tujuanID, bpArg, tgl, it.ID,
 			); err != nil {
 				utils.Gagal(c, err)
 				return
@@ -279,7 +293,7 @@ func BarangOper(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		c.JSON(http.StatusOK, gin.H{
-			"message": fmt.Sprintf("%d barang dioper ke %s, menunggu konfirmasi toko", len(items), namaToko),
+			"message": fmt.Sprintf("%d barang dioper ke %s, belum diserahkan ke kurir", len(items), namaToko),
 		})
 	}
 }
@@ -369,6 +383,10 @@ func BarangTerimaToko(db *sql.DB) gin.HandlerFunc {
 				c.JSON(http.StatusForbidden, gin.H{"error": "bukan barang kiriman untuk toko kamu"})
 				return
 			}
+			if !sudahDiserahkan(tx, b.ID) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s belum diserahkan ke kurir oleh back office", b.Name)})
+				return
+			}
 		}
 		lama := gin.H{}
 		for _, b := range list {
@@ -412,8 +430,8 @@ func BarangTerimaToko(db *sql.DB) gin.HandlerFunc {
 			tx.Exec("UPDATE stock_movements SET related_id = ? WHERE id = ?", outID, inID)
 			if _, err := tx.Exec(
 				`UPDATE items SET location_id = ?, status = 'tersedia', kirim_ke_location_id = NULL,
-				        belum_sampai = FALSE, belum_sampai_note = NULL WHERE id = ?`,
-				b.Tujuan, b.ID,
+				        belum_sampai = FALSE, belum_sampai_note = NULL, diterima_dari_id = ?, diterima_tgl = ? WHERE id = ?`,
+				b.Tujuan, b.Loc, tgl, b.ID,
 			); err != nil {
 				utils.Gagal(c, err)
 				return
@@ -440,26 +458,33 @@ func BarangNotif(db *sql.DB) gin.HandlerFunc {
 			// kiriman dari back office yang harus dikonfirmasi toko ini
 			db.QueryRow(
 				`SELECT COUNT(*), IFNULL(SUM(belum_sampai),0) FROM items
-				 WHERE is_void = FALSE AND status = 'dikirim' AND kirim_ke_location_id = ?`, cl.LocationID,
+				 WHERE is_void = FALSE AND status = 'dikirim' AND diserahkan = TRUE AND kirim_ke_location_id = ?`, cl.LocationID,
 			).Scan(&menunggu, &belum)
 			// barang toko ini yang sedang diantar ke back office
 			db.QueryRow(
 				`SELECT COUNT(*) FROM items
-				 WHERE is_void = FALSE AND status = 'dikirim' AND kirim_ke_location_id IS NULL AND location_id = ?`, cl.LocationID,
+				 WHERE is_void = FALSE AND status = 'dikirim' AND kirim_ke_location_id IS NULL AND bp_nama IS NULL AND location_id = ?`, cl.LocationID,
 			).Scan(&keluar)
 		} else {
 			// kiriman dari toko yang harus dikonfirmasi back office
 			db.QueryRow(
 				`SELECT COUNT(*), IFNULL(SUM(belum_sampai),0) FROM items
-				 WHERE is_void = FALSE AND status IN ('dikirim','kembali') AND kirim_ke_location_id IS NULL`,
+				 WHERE is_void = FALSE AND status IN ('dikirim','kembali') AND diserahkan = TRUE AND kirim_ke_location_id IS NULL AND bp_nama IS NULL`,
 			).Scan(&menunggu, &belum)
 			// barang yang sedang dioper ke toko
 			db.QueryRow(
 				`SELECT COUNT(*) FROM items
-				 WHERE is_void = FALSE AND status = 'dikirim' AND kirim_ke_location_id IS NOT NULL`,
+				 WHERE is_void = FALSE AND status = 'dikirim' AND (kirim_ke_location_id IS NOT NULL OR bp_nama IS NOT NULL)`,
 			).Scan(&keluar)
 		}
-		c.JSON(http.StatusOK, gin.H{"menunggu": menunggu, "belum_sampai": belum, "keluar": keluar})
+		// pekerjaan menunggu owner: pengajuan tukar BP dan penjualan penadah yang belum dikonfirmasi
+		var tukarMenunggu, penadahMenunggu int
+		if cl.Role == "owner" || cl.Role == "super_admin" {
+			db.QueryRow("SELECT COUNT(*) FROM tukar_bp WHERE status = 'diajukan'").Scan(&tukarMenunggu)
+			db.QueryRow("SELECT COUNT(*) FROM penadah_sales WHERE is_void = FALSE AND konfirmasi = FALSE").Scan(&penadahMenunggu)
+		}
+		c.JSON(http.StatusOK, gin.H{"menunggu": menunggu, "belum_sampai": belum, "keluar": keluar,
+			"tukar_menunggu": tukarMenunggu, "penadah_menunggu": penadahMenunggu})
 	}
 }
 
@@ -599,3 +624,9 @@ func BarangTerimaKembali(db *sql.DB) gin.HandlerFunc {
 }
 
 // ---------- DAFTAR BARANG DI PENCUCI (dengan berat awal) ----------
+
+// sudahDiserahkan: kiriman baru baru bisa dikonfirmasi penerima setelah pengirim menandai sudah diserahkan ke kurir.
+func sudahDiserahkan(tx *sql.Tx, id int) bool {
+	var ok bool
+	return tx.QueryRow("SELECT diserahkan FROM items WHERE id = ?", id).Scan(&ok) == nil && ok
+}

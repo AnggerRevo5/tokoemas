@@ -1,6 +1,6 @@
 // barang yang boleh dicentang di daftar stok
 export const bisaPilih = (r) =>
-  r.status === 'tersedia' || r.status === 'dikirim' || r.status === 'cuci' || r.status === 'kembali'
+  r.status === 'tersedia' || r.status === 'dikirim' || r.status === 'cuci' || r.status === 'kembali' || r.status === 'di_bp'
 
 // label jenis barang
 export const JENIS_LABEL = {
@@ -31,7 +31,8 @@ export const barisBaru = (dari) => ({
 })
 
 // Menentukan "mode" dari barang yang dicentang:
-// campur, transit (menuju back office), transit_toko (menuju toko), kembali (dari PJ), cuci,
+// campur, transit (menuju back office), transit_toko (menuju toko), siap/siap_toko (sama, tapi belum diserahkan ke kurir),
+// kembali (dari PJ), cuci,
 // back_office / cabang (barang tersedia di lokasi itu). tipeLok(id) = tipe lokasi.
 export function tentukanMode(terpilih, tipeLok) {
   if (terpilih.length === 0) return null
@@ -40,11 +41,16 @@ export function tentukanMode(terpilih, tipeLok) {
   if (statusSet.size > 1) return 'campur'
 
   if (statusSet.has('dikirim')) {
-    const keToko = terpilih.filter((r) => r.tujuan_id > 0).length
-    if (keToko === terpilih.length) return 'transit_toko'
-    if (keToko === 0) return 'transit'
+    const keToko = terpilih.filter((r) => r.tujuan_id > 0 || r.bp_nama).length
+    // disiapkan (belum diserahkan ke kurir): pengirim masih bisa membatalkan
+    const siap = terpilih.filter((r) => !r.diserahkan).length
+    if (siap > 0 && siap < terpilih.length) return 'campur'
+    const akhiran = siap ? 'siap' : 'transit'
+    if (keToko === terpilih.length) return `${akhiran}_toko`
+    if (keToko === 0) return akhiran
     return 'campur'
   }
+  if (statusSet.has('di_bp')) return 'di_bp'
   if (statusSet.has('kembali')) return 'kembali'
   if (statusSet.has('cuci')) return 'cuci'
 
@@ -57,6 +63,11 @@ export function tentukanMode(terpilih, tipeLok) {
 // bisaGadai: satu atau beberapa barang tersedia dari lokasi yang sama dipilih oleh akun yang boleh menggadaikan.
 // adaTanpaGram: ada susuk/tempat/kotak yang dipilih (tidak bisa dicuci atau dilebur).
 export function aksiUntukMode(mode, { isCabang, adaLM, adaTanpaGram, bisaGadai }) {
+  // disiapkan: pengirim (toko untuk kiriman ke back office, back office untuk oper ke toko) serah ke kurir atau batal
+  if (mode === 'siap' || (mode === 'siap_toko' && !isCabang)) {
+    return [['serah', 'Sudah diserahkan ke kurir'], ['batal_kirim', 'Batal kirim']]
+  }
+  if (mode === 'di_bp' && !isCabang) return [['tarik_bp', 'Tarik kembali dari BP']]
   if (mode === 'transit' && !isCabang) return [['sampai', 'Sudah sampai'], ['belum', 'Belum sampai']]
   if (mode === 'transit_toko' && isCabang) {
     return [['terima_toko', 'Sudah diterima'], ['belum_toko', 'Belum diterima']]
@@ -66,10 +77,10 @@ export function aksiUntukMode(mode, { isCabang, adaLM, adaTanpaGram, bisaGadai }
   }
   const gadai = bisaGadai ? [['gadai', 'Digadaikan']] : []
   if (mode === 'back_office' && !isCabang) {
-    if (adaTanpaGram) return [['kirim', 'Jual (oper ke toko)']]
+    if (adaTanpaGram) return [['kirim', 'Oper toko']]
     return adaLM
-      ? [['kirim', 'Jual (oper ke toko)'], ...gadai]
-      : [['kirim', 'Jual (oper ke toko)'], ['cuci', 'Cuci'], ['lebur', 'Lebur']]
+      ? [['kirim', 'Oper toko'], ...gadai]
+      : [['kirim', 'Oper toko'], ['cuci', 'Cuci'], ['lebur', 'Lebur']]
   }
   if (mode === 'cabang') return [['antar', 'Antar ke back office'], ['jual', 'Jual'], ...gadai]
   return []

@@ -10,6 +10,7 @@ import RiwayatPenjualan from '../components/lebur/RiwayatPenjualan'
 export default function Lebur({ me }) {
   const bisaCatat = me.role === 'pj' || me.role === 'super_admin'
   const bisaUndo = me.role === 'super_admin'
+  const bisaKonfirmasi = me.role === 'owner' || me.role === 'super_admin'
 
   const [filter, setFilter] = useState('berjalan')
   const [batches, setBatches] = useState([])
@@ -105,6 +106,7 @@ export default function Lebur({ me }) {
         sampai={sampai}
         onSampai={setSampai}
         bisaCatat={bisaCatat}
+        bisaKonfirmasi={bisaKonfirmasi}
         onMulai={resetPesan}
         onSelesai={(pesan) => {
           setInfo(pesan)

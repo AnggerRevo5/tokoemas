@@ -6,6 +6,7 @@ import FormTransaksi from '../components/transaksi/FormTransaksi'
 import TabelTransaksi from '../components/transaksi/TabelTransaksi'
 import PenjualanDariKas from '../components/transaksi/PenjualanDariKas'
 import CardGadai from '../components/barang/CardGadai'
+import FilterKas, { FILTER_KAS_KOSONG } from '../components/transaksi/FilterKas'
 
 export default function Transaksi({ jenis, me }) {
   const isKas = jenis === 'kas'
@@ -14,6 +15,10 @@ export default function Transaksi({ jenis, me }) {
   const [locations, setLocations] = useState([])
   const [locId, setLocId] = useState(me.role === 'cabang' ? me.location_id : 1)
   const [rows, setRows] = useState([])
+  const [filter, setFilter] = useState(FILTER_KAS_KOSONG) // hanya untuk riwayat kas
+  const [limit, setLimit] = useState(200)
+  const [ringkas, setRingkas] = useState({ masuk: 0, keluar: 0 })
+  const [adaLagi, setAdaLagi] = useState(false)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
   const [voidId, setVoidId] = useState(null)
@@ -33,11 +38,34 @@ export default function Transaksi({ jenis, me }) {
       .catch((e) => setError(e.message))
   }, [])
 
+  const ubahFilter = useCallback((bagian) => {
+    setFilter((f) => ({ ...f, ...bagian }))
+    setLimit(200)
+  }, [])
+
   const muat = useCallback(() => {
-    api(`/${jenis}?location_id=${locId}`)
-      .then(setRows)
+    if (!isKas) {
+      api(`/${jenis}?location_id=${locId}`)
+        .then(setRows)
+        .catch((e) => setError(e.message))
+      return
+    }
+    const p = new URLSearchParams({ location_id: locId, limit })
+    if (filter.dari) p.set('from', filter.dari)
+    if (filter.sampai) p.set('to', filter.sampai)
+    if (filter.arah) p.set('arah', filter.arah)
+    if (filter.kelompok) p.set('kelompok', filter.kelompok)
+    if (filter.metode) p.set('metode', filter.metode)
+    if (filter.q) p.set('q', filter.q)
+    if (filter.batal) p.set('batal', '1')
+    api(`/kas?${p}`)
+      .then((d) => {
+        setRows(d.rows)
+        setRingkas({ masuk: d.total_masuk, keluar: d.total_keluar })
+        setAdaLagi(d.ada_lagi)
+      })
       .catch((e) => setError(e.message))
-  }, [jenis, locId])
+  }, [jenis, isKas, locId, filter, limit])
 
   useEffect(() => {
     muat()
@@ -107,6 +135,15 @@ export default function Transaksi({ jenis, me }) {
       <div className="card" style={{ marginTop: 16 }}>
         <h3>Riwayat{lokasi ? ` - ${lokasi.name}` : ''}</h3>
 
+        {isKas && (
+          <FilterKas
+            filter={filter}
+            onUbah={ubahFilter}
+            onReset={() => { setFilter(FILTER_KAS_KOSONG); setLimit(200) }}
+            ringkas={ringkas}
+          />
+        )}
+
         {voidId && (
           <Popup
             judul={`Batalkan transaksi #${voidId}?`}
@@ -159,6 +196,11 @@ export default function Transaksi({ jenis, me }) {
           onJual={isKas ? (r) => { setError(''); setInfo(''); setKasJual(r) } : undefined}
           onGadai={isKas ? bukaGadai : undefined}
         />
+        {isKas && adaLagi && (
+          <button type="button" className="ghost" style={{ marginTop: 12 }} onClick={() => setLimit((l) => l + 200)}>
+            Muat lebih banyak
+          </button>
+        )}
       </div>
     </div>
   )

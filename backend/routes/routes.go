@@ -35,6 +35,7 @@ func Setup(r *gin.Engine, db *sql.DB) {
 	// Transaksi kas dan stok
 	auth.POST("/kas", controllers.KasCreate(db))
 	auth.GET("/kas", controllers.KasList(db))
+	auth.GET("/stok/riwayat", controllers.RiwayatStok(db))
 	auth.POST("/stok", controllers.StokCreate(db))
 	auth.GET("/stok", controllers.StokList(db))
 	auth.POST("/kas/:id/void", controllers.VoidTransaksi(db, "cash_transactions"))
@@ -50,6 +51,9 @@ func Setup(r *gin.Engine, db *sql.DB) {
 	auth.GET("/barang/notif", controllers.BarangNotif(db))
 	auth.POST("/barang/oper", controllers.BarangOper(db))
 	auth.POST("/barang/terima-toko", controllers.BarangTerimaToko(db))
+	auth.POST("/barang/serah-kurir", controllers.BarangSerahKurir(db))
+	auth.POST("/barang/batal-kirim", controllers.BarangBatalKirim(db))
+	auth.POST("/barang/tarik-bp", controllers.BarangTarikBP(db))
 	auth.POST("/barang/terima-kembali", controllers.BarangTerimaKembali(db))
 	// /barang/selesai-cuci ditutup: langsung mengembalikan barang ke stok tanpa konfirmasi owner
 	// (tidak dipakai frontend; alur yang berlaku adalah /cucian/selesai lalu /barang/terima-kembali).
@@ -91,6 +95,21 @@ func Setup(r *gin.Engine, db *sql.DB) {
 	auth.POST("/penjualan", controllers.PenjualanPenadah(db))
 	auth.GET("/penjualan", controllers.PenjualanList(db))
 	auth.POST("/penjualan/void/:id", controllers.PenjualanVoid(db))
+	auth.POST("/penjualan/:id/konfirmasi", controllers.PenjualanKonfirmasi(db))
+	auth.PUT("/penjualan/:id", controllers.PenjualanEdit(db))
+
+	// Talangan dan tukar barang dengan BP (toko menginput, owner memantau dan menyetujui)
+	auth.GET("/talangan", controllers.TalanganList(db))
+	auth.POST("/talangan", controllers.TalanganCreate(db))
+	auth.PUT("/talangan/:id", controllers.TalanganEdit(db))
+	auth.POST("/talangan/:id/konfirmasi", controllers.TalanganKonfirmasi(db))
+	auth.POST("/talangan/:id/batal", controllers.TalanganBatal(db))
+	auth.GET("/talangan/:id/riwayat", controllers.TalanganRiwayat(db))
+	auth.GET("/tukar/:id/riwayat", controllers.TukarRiwayat(db))
+	auth.GET("/tukar", controllers.TukarList(db))
+	auth.POST("/tukar", controllers.TukarAjukan(db))
+	auth.POST("/tukar/:id/setujui", controllers.TukarSetujui(db))
+	auth.POST("/tukar/:id/batal", controllers.TukarBatal(db))
 
 	// Gadai logam mulia: dana masuk, cicilan bulanan, tebus lebih cepat, barang kembali atau tidak ditebus
 	auth.GET("/gadai", controllers.GadaiList(db))
@@ -122,6 +141,7 @@ func Setup(r *gin.Engine, db *sql.DB) {
 	auth.GET("/laporan/labarugi", controllers.LabaRugi(db))
 	auth.GET("/laporan/preview", controllers.LaporanPreview(db))
 	auth.GET("/laporan/pdf", controllers.LaporanPDF(db))
+	auth.GET("/laporan/excel", controllers.LegacyLaporanExcel(db))
 
 	// Service
 	auth.POST("/service", controllers.ServiceCreate(db))

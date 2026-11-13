@@ -1,10 +1,14 @@
 import { AnimatePresence } from 'motion/react'
 import { rupiah } from '../../utils/format'
 import { STATUS_LABEL, STATUS_CLASS } from '../../constants/barang'
+import { hariIni } from '../../utils/format'
 import { bisaPilih, bolehBaki } from '../../utils/barang'
 import useAnimasiDaftar from '../../hooks/useAnimasiDaftar'
 import BarisAnimasi from '../common/BarisAnimasi'
 import BarisKosong from '../common/BarisKosong'
+
+// kiriman yang diterima dalam 3 hari terakhir (sama dengan filter Baru datang di server)
+const barangBaru = (r) => r.status === 'tersedia' && !!r.diterima_tgl && (new Date(hariIni()) - new Date(r.diterima_tgl)) / 86400000 <= 3
 
 export default function TabelBarang({
   rows, pilih, onToggle, semuaDipilih, onToggleSemua, bisaVoid, onBatal, onEdit, onPindah, gadaiMap = {}, onGadai, onJual,
@@ -63,6 +67,11 @@ export default function TabelBarang({
                 ) : (
                   <>{r.item_name} {r.karat}</>
                 )}
+                {barangBaru(r) && (
+                  <div>
+                    <span className="tag info">Baru dari {r.diterima_dari}</span> <span className="muted">{r.diterima_tgl}</span>
+                  </div>
+                )}
               </td>
               <td>{r.baki_nama || '-'}</td>
               <td className="num">{r.weight_gram > 0 ? `${r.weight_gram} g` : '-'}</td>
@@ -89,11 +98,11 @@ export default function TabelBarang({
                 {r.status === 'dikirim' && r.belum_sampai ? (
                   <span className="tag out">{r.tujuan_id > 0 ? 'Belum diterima' : 'Belum sampai'}</span>
                 ) : (
-                  <span className={STATUS_CLASS[r.status]}>{STATUS_LABEL[r.status]}</span>
+                  <span className={STATUS_CLASS[r.status]}>{r.status === 'dikirim' && !r.diserahkan ? 'Disiapkan (belum ke kurir)' : r.status === 'di_bp' ? `Di ${r.bp_nama}` : STATUS_LABEL[r.status]}</span>
                 )}
                 {r.status === 'dikirim' && (
                   <div className="muted">
-                    {r.tujuan_id > 0 ? `menuju ${r.tujuan}` : 'menuju Back Office'}
+                    {r.tujuan_id > 0 ? `menuju ${r.tujuan}` : r.bp_nama ? `menuju ${r.bp_nama}` : 'menuju Back Office'}
                     {r.kirim_tgl && `, ${r.kirim_tgl.slice(0, 10)}`}
                   </div>
                 )}

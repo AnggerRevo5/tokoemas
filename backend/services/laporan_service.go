@@ -23,7 +23,7 @@ var OpKeluar = map[string]bool{"pengeluaran_toko": true, "pembelian_customer": t
 
 var DanaNonOp = map[string]bool{"investor": true, "pinjaman": true, "bayar_hutang": true, "gadai_dana": true, "gadai_pokok": true, "tarik_investor": true}
 
-var DaftarLaporan = []string{"kas", "labarugi", "hutang", "penjualan", "penjualan_toko", "penjualan_toko_ringkas", "investor", "investor_mutasi", "gadai", "cuci", "lebur", "stok"}
+var DaftarLaporan = []string{"kas", "labarugi", "hutang", "penjualan", "penjualan_toko", "penjualan_toko_ringkas", "investor", "investor_mutasi", "gadai", "talangan_bp", "cuci", "lebur", "stok"}
 
 var namaKategori = map[string]string{
 	"omzet": "Hasil jual (omzet)", "biaya_service": "Biaya service", "tambah_kas": "Tambahan kas", "pengeluaran_toko": "Pengeluaran toko",
@@ -38,7 +38,7 @@ var namaKategori = map[string]string{
 	"lebur": "Masuk proses lebur", "leburan_kotor": "Leburan kotor", "murnikan": "Dimurnikan jadi cukim",
 	"cukim": "Cukim", "jual_penadah": "Jual ke penadah", "laku": "Laku", "pegadaian": "Pegadaian", "jual": "Jual",
 	"gadai_dana": "Dana gadai diterima", "gadai_pokok": "Pembayaran pokok gadai", "gadai_biaya": "Biaya gadai (bunga dan denda)",
-	"gadai_kembali": "Kembali dari gadai", "tarik_investor": "Penarikan pokok investor",
+	"gadai_kembali": "Kembali dari gadai", "ke_bp": "Dikirim ke BP", "kembali_bp": "Ditarik kembali dari BP", "tarik_investor": "Penarikan pokok investor",
 }
 
 func labelK(k string) string {
@@ -325,7 +325,7 @@ func TabelPenjualan(db *sql.DB, dari, sampai string) (models.TabelLaporan, error
 		       s.weight_gram, s.modal, s.sale_total, IFNULL(u.username,''), IFNULL(s.note,'')
 		FROM penadah_sales s
 		LEFT JOIN users u ON u.id = s.created_by
-		WHERE s.is_void = FALSE AND s.sale_date BETWEEN ? AND ?
+		WHERE s.is_void = FALSE AND s.konfirmasi = TRUE AND s.sale_date BETWEEN ? AND ?
 		ORDER BY s.sale_date, s.id`, dari, sampai)
 	if err != nil {
 		return t, err
