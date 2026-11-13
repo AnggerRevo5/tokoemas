@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../services/api'
-import { awalBulan, hariIni } from '../utils/format'
+import { awalBulan, hariIni, gram } from '../utils/format'
 import Pesan from '../components/common/Pesan'
 import FormAksiLebur from '../components/lebur/FormAksiLebur'
 import TabelLebur from '../components/lebur/TabelLebur'
@@ -41,6 +41,9 @@ export default function Lebur({ me }) {
     api('/locations').then(setLocations).catch(() => {})
   }, [])
 
+  // ringkasan dari daftar yang tampil (mengikuti filter)
+  const jumlah = (arr, f) => arr.reduce((s, x) => s + f(x), 0)
+  const sudahCukim = batches.filter((b) => b.cukim_weight !== null && b.cukim_weight !== undefined)
   const batchAksi = aksi ? batches.find((b) => b.id === aksi.id) : null
 
   function bukaAksi(jenis, b) {
@@ -78,6 +81,13 @@ export default function Lebur({ me }) {
             </select>
           </div>
         </FilterProduksi>
+
+        <div className="total-bar">
+          <span>Total: <b className="utama">{batches.length}</b> batch, <b>{jumlah(batches, (b) => b.items.length)}</b> barang, <b>{gram(jumlah(batches, (b) => b.source_weight))}</b> g (berat awal)</span>
+          {sudahCukim.length > 0 && (
+            <span>Sudah cukim: {sudahCukim.length} batch, {gram(jumlah(sudahCukim, (b) => b.source_weight))} g jadi {gram(jumlah(sudahCukim, (b) => b.cukim_weight))} g, susut <b>{gram(jumlah(sudahCukim, (b) => b.source_weight - b.cukim_weight))}</b> g</span>
+          )}
+        </div>
 
         {aksi && batchAksi && (
           <FormAksiLebur

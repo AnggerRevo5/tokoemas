@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../services/api'
+import { gram } from '../utils/format'
 import Pesan from '../components/common/Pesan'
 import FormAksiCuci from '../components/cuci/FormAksiCuci'
 import TabelDaftarCuci from '../components/cuci/TabelDaftarCuci'
@@ -48,6 +49,10 @@ export default function Cuci({ me }) {
     setInfo('')
   }
 
+  // ringkasan dari daftar yang tampil (mengikuti filter); berat awal = berat sebelum cuci
+  const barangCuci = rows.flatMap((r) => r.items)
+  const ditimbang = barangCuci.filter((i) => i.berat_sesudah !== null)
+  const jumlah = (arr, f) => arr.reduce((s, x) => s + f(x), 0)
   const itemJob = aksi && aksi.jenis === 'kirim' ? items.filter((i) => i.job_id === aksi.id) : []
 
   return (
@@ -77,6 +82,13 @@ export default function Cuci({ me }) {
             </select>
           </div>
         </FilterProduksi>
+
+        <div className="total-bar">
+          <span>Total: <b className="utama">{barangCuci.length}</b> barang di {rows.length} pekerjaan, <b>{gram(jumlah(barangCuci, (i) => i.berat_awal))}</b> g (berat awal)</span>
+          {ditimbang.length > 0 && (
+            <span>Sudah ditimbang ulang: {ditimbang.length} barang, {gram(jumlah(ditimbang, (i) => i.berat_awal))} g jadi {gram(jumlah(ditimbang, (i) => i.berat_sesudah))} g, susut <b>{gram(jumlah(ditimbang, (i) => i.berat_awal - i.berat_sesudah))}</b> g</span>
+          )}
+        </div>
 
         {aksi && (
           <FormAksiCuci

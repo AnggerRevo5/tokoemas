@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../services/api'
-import { toggleId } from '../utils/format'
+import { toggleId, gram } from '../utils/format'
 import { STATUS_SERVICE, aksiUntuk } from '../constants/service'
 import Pesan from '../components/common/Pesan'
 import KotakBatal from '../components/common/KotakBatal'
@@ -55,6 +55,9 @@ export default function Service({ me, onUbah }) {
   }, [muat])
 
   const terpilih = rows.filter((r) => pilih[r.id])
+  // ringkasan dari daftar yang tampil (mengikuti filter)
+  const jumlah = (arr, f) => arr.reduce((s, x) => s + f(x), 0)
+  const sudahServis = rows.filter((r) => r.weight_after !== null && r.weight_after !== undefined)
   const statusSet = new Set(terpilih.map((r) => r.status))
   const statusPilih = statusSet.size === 1 ? [...statusSet][0] : null
   const aksiTersedia = statusPilih ? aksiUntuk(statusPilih, me.role) : []
@@ -126,7 +129,12 @@ export default function Service({ me, onUbah }) {
             </select>
           </div>
         </FilterProduksi>
-        <p className="muted" style={{ marginBottom: 0 }}>{rows.length} barang service</p>
+        <div className="total-bar">
+          <span>Total: <b className="utama">{rows.length}</b> barang service, <b>{gram(jumlah(rows, (r) => r.weight_gram))}</b> g</span>
+          {sudahServis.length > 0 && (
+            <span>Sudah selesai servis: {sudahServis.length} barang, {gram(jumlah(sudahServis, (r) => r.weight_gram))} g jadi {gram(jumlah(sudahServis, (r) => r.weight_after))} g</span>
+          )}
+        </div>
       </div>
 
       {terpilih.length > 0 && (
