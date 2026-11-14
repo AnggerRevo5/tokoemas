@@ -37,8 +37,8 @@ export default function BarangDiPencuci({ items, fp, statusF, locations, bisaCat
       (!['menunggu', 'proses'].includes(statusF) || r.job_status === statusF)
     )
   })
-  const bisaDipilih = tampilItems.filter((r) => r.job_status === 'proses')
-  const terpilih = items.filter((r) => pilih[r.id] && r.job_status === 'proses')
+  const bisaDipilih = tampilItems.filter((r) => r.job_status === 'proses' && r.sudah_dikirim)
+  const terpilih = items.filter((r) => pilih[r.id] && r.job_status === 'proses' && r.sudah_dikirim)
   const nilaiSesudah = (r) => (bSesudah[r.id] !== undefined ? bSesudah[r.id] : String(gram(r.berat_awal)))
   const totalAwal = terpilih.reduce((s, r) => s + r.berat_awal, 0)
   const totalSesudah = terpilih.reduce((s, r) => s + (Number(nilaiSesudah(r)) || 0), 0)
@@ -115,7 +115,7 @@ export default function BarangDiPencuci({ items, fp, statusF, locations, bisaCat
                     <input
                       type="checkbox"
                       checked={!!pilih[r.id]}
-                      disabled={r.job_status !== 'proses'}
+                      disabled={r.job_status !== 'proses' || !r.sudah_dikirim}
                       onChange={() => setPilih((p) => toggleId(p, r.id))}
                     />
                   </td>

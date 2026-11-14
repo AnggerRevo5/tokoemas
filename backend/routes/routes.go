@@ -77,6 +77,7 @@ func Setup(r *gin.Engine, db *sql.DB) {
 	auth.POST("/cuci/:id/kembali", controllers.CuciKembali(db))
 	auth.POST("/cuci/:id/void", controllers.CuciVoid(db))
 	auth.POST("/cuci/:id/kirim", controllers.CuciKirim(db))
+	auth.POST("/cucian/kirim", controllers.CuciKirimTerpilih(db))
 	auth.GET("/cucian/barang", controllers.CucianBarang(db))
 	auth.POST("/cucian/selesai", controllers.CuciSelesaiBarang(db))
 	auth.GET("/cucian/notif", controllers.CucianNotif(db))

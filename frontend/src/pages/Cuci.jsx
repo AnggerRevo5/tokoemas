@@ -18,6 +18,7 @@ export default function Cuci({ me }) {
   const [locations, setLocations] = useState([])
   const [rows, setRows] = useState([])
   const [items, setItems] = useState([])
+  const [pilihKirim, setPilihKirim] = useState({})
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
   const [aksi, setAksi] = useState(null)
@@ -42,6 +43,55 @@ export default function Cuci({ me }) {
 
   function mulaiAksi(jenis, r) {
     setAksi({ jenis, id: r.id, sisa: r.sisa, qty: r.qty, n: Date.now() })
+    setPilihKirim({})
+    setError('')
+    setInfo('')
+  }
+
+  const barangBelumKirim = rows.flatMap((r) =>
+    r.items
+      .filter((i) => i.di_pencuci && !i.sudah_dikirim)
+      .map((i) => ({ ...i, job_id: r.id, weight_gram: i.berat_awal })),
+  )
+  const terpilihKirim = Object.values(pilihKirim)
+  const semuaDipilih = barangBelumKirim.length > 0 && barangBelumKirim.every((i) => pilihKirim[i.id])
+
+  function toggleKirim(jobId, item) {
+    if (!pilihKirim[item.id] && terpilihKirim.length >= 300) {
+      setError('Maksimal 300 barang sekali kirim')
+      return
+    }
+    setPilihKirim((p) => {
+      if (p[item.id]) {
+        const n = { ...p }
+        delete n[item.id]
+        return n
+      }
+      return { ...p, [item.id]: { ...item, job_id: jobId, weight_gram: item.berat_awal } }
+    })
+  }
+
+  function toggleSemuaKirim() {
+    const belumTerpilih = barangBelumKirim.filter((i) => !pilihKirim[i.id])
+    if (!semuaDipilih && terpilihKirim.length + belumTerpilih.length > 300) {
+      setError('Maksimal 300 barang sekali kirim; dipilih hingga batas tersebut')
+    }
+    setPilihKirim((p) => {
+      const n = { ...p }
+      let sisa = 300 - Object.keys(p).length
+      barangBelumKirim.forEach((i) => {
+        if (semuaDipilih) delete n[i.id]
+        else if (!p[i.id] && sisa > 0) {
+          n[i.id] = i
+          sisa--
+        }
+      })
+      return n
+    })
+  }
+
+  function mulaiKirim() {
+    setAksi({ jenis: 'kirim', n: Date.now() })
     setError('')
     setInfo('')
   }
@@ -55,7 +105,6 @@ export default function Cuci({ me }) {
   const barangCuci = rows.flatMap((r) => r.items)
   const ditimbang = barangCuci.filter((i) => i.berat_sesudah !== null)
   const jumlah = (arr, f) => arr.reduce((s, x) => s + f(x), 0)
-  const itemJob = aksi && aksi.jenis === 'kirim' ? items.filter((i) => i.job_id === aksi.id) : []
 
   return (
     <div>
@@ -64,8 +113,8 @@ export default function Cuci({ me }) {
       <div className="card">
         <h3>Daftar Cuci</h3>
         <p className="muted">
-          Owner memilih barang di menu Stok lalu klik Cuci. PJ menimbang tiap barang (berat awal) lalu mengirimnya
-          ke pencuci. Saat barang kembali, PJ menimbang lagi (berat sesudah) dan mencatat susutnya. Barang yang
+          Owner memilih barang di menu Stok lalu klik Cuci. PJ memilih barang yang akan dikirim, menimbang tiap
+          barang (berat awal), lalu mengirimnya ke pencuci. Saat barang kembali, PJ menimbang lagi (berat sesudah) dan mencatat susutnya. Barang yang
           selesai dikembalikan ke back office dengan berat terbaru, lalu owner mengonfirmasi sudah diterima.
           Kalau tidak jadi dicuci, PJ bisa membatalkan dan mengembalikan barang yang belum selesai.
         </p>
@@ -102,15 +151,40 @@ export default function Cuci({ me }) {
           )}
         </div>
 
+        {bisaCatat && barangBelumKirim.length > 0 && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '12px 0' }}>
+            <input type="checkbox" checked={semuaDipilih} onChange={toggleSemuaKirim} />
+            Pilih semua barang yang menunggu dikirim
+          </label>
+        )}
+        {bisaCatat && barangBelumKirim.length > 0 && (
+          <p className="muted">Maksimal 300 barang dalam satu kali pengiriman.</p>
+        )}
+
+        {bisaCatat && terpilihKirim.length > 0 && (
+          <div className="card action-bar" style={{ margin: '12px 0' }}>
+            <span><b>{terpilihKirim.length}</b> barang dipilih</span>
+            <div className="aksi-tombol">
+              <button type="button" className="mini primary" onClick={mulaiKirim}>
+                Kirim ke pencuci
+              </button>
+              <button type="button" className="mini" onClick={() => setPilihKirim({})}>
+                Batal pilih
+              </button>
+            </div>
+          </div>
+        )}
+
         {aksi && (
           <FormAksiCuci
             key={aksi.n}
             aksi={aksi}
-            itemJob={itemJob}
+            itemJob={aksi.jenis === 'kirim' ? terpilihKirim : []}
             onMulai={resetPesan}
             onSelesai={(pesan) => {
               setInfo(pesan)
               setAksi(null)
+              setPilihKirim({})
               muat()
             }}
             onError={setError}
@@ -118,7 +192,15 @@ export default function Cuci({ me }) {
           />
         )}
 
-        <TabelDaftarCuci rows={rows} bisaCatat={bisaCatat} bisaVoid={bisaVoid} onAksi={mulaiAksi} />
+        <TabelDaftarCuci
+          rows={rows}
+          bisaCatat={bisaCatat}
+          bisaVoid={bisaVoid}
+          pilihKirim={pilihKirim}
+          batasPilihTercapai={terpilihKirim.length >= 300}
+          onToggleKirim={toggleKirim}
+          onAksi={mulaiAksi}
+        />
       </div>
 
       {!isCabang && (

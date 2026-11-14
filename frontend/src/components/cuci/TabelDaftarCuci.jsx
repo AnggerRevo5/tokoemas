@@ -7,7 +7,9 @@ import Stepper from '../common/Stepper'
 const KODE_LANGKAH = Object.keys(STATUS_CUCI).filter((k) => k !== 'batal')
 const LANGKAH = KODE_LANGKAH.map((k) => STATUS_CUCI[k][0])
 
-export default function TabelDaftarCuci({ rows, bisaCatat, bisaVoid, onAksi }) {
+export default function TabelDaftarCuci({
+  rows, bisaCatat, bisaVoid, pilihKirim, batasPilihTercapai, onToggleKirim, onAksi,
+}) {
   return (
     <div className="table-wrap">
       <table>
@@ -35,11 +37,22 @@ export default function TabelDaftarCuci({ rows, bisaCatat, bisaVoid, onAksi }) {
                 <b>{r.items.length || r.qty} barang</b>
                 {r.items.map((it) => (
                   <div key={it.id} style={{ padding: '2px 0' }}>
+                    {bisaCatat && (
+                      <input
+                        type="checkbox"
+                        checked={!!pilihKirim[it.id]}
+                        disabled={!it.di_pencuci || it.sudah_dikirim || (batasPilihTercapai && !pilihKirim[it.id])}
+                        onChange={() => onToggleKirim(r.id, it)}
+                        aria-label={`Pilih ${it.item_no} untuk dikirim ke pencuci`}
+                      />
+                    )}{' '}
                     <b>{it.item_no}</b> {it.item_name} {it.karat}, awal {gram(it.berat_awal)} g
                     {it.berat_sesudah !== null ? (
                       <span className="muted"> → sesudah {gram(it.berat_sesudah)} g, susut {gram(it.berat_awal - it.berat_sesudah)} g</span>
-                    ) : it.di_pencuci ? (
+                    ) : it.sudah_dikirim ? (
                       <span className="muted"> (di pencuci)</span>
+                    ) : it.di_pencuci ? (
+                      <span className="muted"> (menunggu dikirim)</span>
                     ) : null}
                   </div>
                 ))}
@@ -66,11 +79,6 @@ export default function TabelDaftarCuci({ rows, bisaCatat, bisaVoid, onAksi }) {
                 <Stepper ringkas langkah={LANGKAH} aktif={KODE_LANGKAH.indexOf(r.status)} batal={r.status === 'batal'} />
               </td>
               <td>
-                {bisaCatat && r.status === 'menunggu' && (
-                  <button type="button" className="mini primary" onClick={() => onAksi('kirim', r)}>
-                    Kirim ke pencuci
-                  </button>
-                )}{' '}
                 {bisaCatat && (r.status === 'menunggu' || r.status === 'proses') && r.sisa > 0 && (
                   <button type="button" className="mini" onClick={() => onAksi('kembali', r)}>
                     Batalkan, kembalikan ke back office

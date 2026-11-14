@@ -4,8 +4,7 @@ import { hariIni, gram } from '../../utils/format'
 import FormAksi from '../common/FormAksi'
 import BarisKosong from '../common/BarisKosong'
 
-// Form konfirmasi aksi pada satu pekerjaan cuci: kirim ke pencuci, batalkan dan kembalikan, atau batal (salah input).
-// aksi = { jenis: 'kirim' | 'kembali' | 'batal', id, sisa, qty }; itemJob = barang pada pekerjaan itu (untuk kirim).
+// Form konfirmasi aksi cuci: kirim barang terpilih, batalkan dan kembalikan, atau batal (salah input).
 export default function FormAksiCuci({ aksi, itemJob, onMulai, onSelesai, onError, onTutup }) {
   const [loading, setLoading] = useState(false)
   const [tgl, setTgl] = useState(hariIni())
@@ -14,7 +13,7 @@ export default function FormAksiCuci({ aksi, itemJob, onMulai, onSelesai, onErro
   const [bAwal, setBAwal] = useState(() => {
     const awal = {}
     itemJob.forEach((i) => {
-      awal[i.id] = String(gram(i.berat_awal))
+      awal[i.id] = String(gram(i.berat_awal ?? i.weight_gram))
     })
     return awal
   })
@@ -26,7 +25,7 @@ export default function FormAksiCuci({ aksi, itemJob, onMulai, onSelesai, onErro
     try {
       let res
       if (aksi.jenis === 'kirim') {
-        res = await api(`/cuci/${aksi.id}/kirim`, {
+        res = await api('/cucian/kirim', {
           method: 'POST',
           body: JSON.stringify({
             washer_name: pencuci,
@@ -73,7 +72,7 @@ export default function FormAksiCuci({ aksi, itemJob, onMulai, onSelesai, onErro
       {aksi.jenis === 'kirim' && (
         <>
           <div>
-            Kirim pekerjaan cuci #{aksi.id} ke pencuci. Timbang tiap barang dan isi berat awalnya.
+            Kirim {itemJob.length} barang terpilih ke pencuci. Timbang tiap barang dan isi berat awalnya.
           </div>
           <div className="form-grid">
             <div>
@@ -99,7 +98,7 @@ export default function FormAksiCuci({ aksi, itemJob, onMulai, onSelesai, onErro
                 {itemJob.map((i) => (
                   <tr key={i.id}>
                     <td>{i.item_no} {i.item_name} {i.karat}</td>
-                    <td className="num">{gram(i.weight_gram)} g</td>
+                    <td className="num">{gram(i.berat_awal ?? i.weight_gram)} g</td>
                     <td>
                       <input
                         type="number"

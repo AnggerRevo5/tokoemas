@@ -523,8 +523,14 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 		             i.jenis, IFNULL(i.brand,''), i.kondisi, i.harga_beli,
 		             i.location_id, l.name, i.origin_location_id, o.name, i.status, i.entry_date, IFNULL(i.note,''),
 		             i.kirim_tgl, i.belum_sampai, IFNULL(i.belum_sampai_note,''),
-		             IF(i.status = 'cuci', IFNULL(w.washer_name,''), ''),
-		             IF(i.status = 'cuci', w.start_date, NULL),
+		             IF(i.status = 'cuci',
+		                IF(x.weight_before IS NOT NULL, COALESCE(NULLIF(x.washer_name,''), IFNULL(w.washer_name,'')),
+		                   IF(w.status = 'proses' AND NOT EXISTS (SELECT 1 FROM washing_job_items x0 WHERE x0.job_id = w.id),
+		                      IFNULL(w.washer_name,''), '')), ''),
+		             IF(i.status = 'cuci',
+		                IF(x.weight_before IS NOT NULL, COALESCE(x.sent_date, w.washer_sent_date),
+		                   IF(w.status = 'proses' AND NOT EXISTS (SELECT 1 FROM washing_job_items x0 WHERE x0.job_id = w.id),
+		                      w.washer_sent_date, NULL)), NULL),
 		             IFNULL(i.kirim_ke_location_id,0), IFNULL(k.name,''),
 		             i.harga_jual, i.tanggal_jual, IFNULL(t.id,0), IFNULL(t.no,0), IFNULL(t.name,''), i.purchase_cash_id IS NOT NULL,
 		             IFNULL(jc.metode,''), i.bahan, i.diserahkan, IFNULL(i.bp_nama,''),
@@ -535,6 +541,7 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 		      LEFT JOIN locations k ON k.id = i.kirim_ke_location_id
 		      LEFT JOIN locations dd ON dd.id = i.diterima_dari_id
 		      LEFT JOIN washing_jobs w ON w.id = i.washing_job_id
+		      LEFT JOIN washing_job_items x ON x.job_id = i.washing_job_id AND x.item_id = i.id
 		      LEFT JOIN trays t ON t.id = i.tray_id AND t.location_id = i.location_id
 		      LEFT JOIN cash_transactions jc ON jc.id = i.jual_cash_id
 		      WHERE i.is_void = FALSE`
@@ -593,8 +600,9 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 			args = append(args, b)
 		}
 		if s := strings.TrimSpace(c.Query("q")); s != "" {
-			dari += " AND (i.item_name LIKE ? OR IFNULL(i.note,'') LIKE ? OR (i.status = 'cuci' AND IFNULL(w.washer_name,'') LIKE ?))"
-			args = append(args, "%"+s+"%", "%"+s+"%", "%"+s+"%")
+			dari += ` AND (i.item_name LIKE ? OR IFNULL(i.note,'') LIKE ? OR
+				(i.status = 'cuci' AND (IFNULL(w.washer_name,'') LIKE ? OR IFNULL(x.washer_name,'') LIKE ?)))`
+			args = append(args, "%"+s+"%", "%"+s+"%", "%"+s+"%", "%"+s+"%")
 		}
 
 		// jumlah barang dan total berat/harga dihitung dari seluruh barang yang cocok, bukan hanya baris yang tampil

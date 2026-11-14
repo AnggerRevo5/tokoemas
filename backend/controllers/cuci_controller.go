@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -172,7 +173,16 @@ func CucianNotif(db *sql.DB) gin.HandlerFunc {
 		cl := c.MustGet("claims").(*models.Claims)
 		n := 0
 		if cl.Role == "pj" || cl.Role == "super_admin" {
-			db.QueryRow("SELECT COUNT(*) FROM washing_jobs WHERE is_void = FALSE AND status = 'menunggu'").Scan(&n)
+			db.QueryRow(`
+				SELECT COUNT(DISTINCT w.id)
+				FROM washing_jobs w
+				JOIN items i ON i.washing_job_id = w.id AND i.status = 'cuci' AND i.is_void = FALSE
+				LEFT JOIN washing_job_items x ON x.job_id = w.id AND x.item_id = i.id
+				WHERE w.is_void = FALSE
+				  AND w.status IN ('menunggu','proses')
+				  AND NOT (x.weight_before IS NOT NULL OR (w.status = 'proses' AND
+				       NOT EXISTS (SELECT 1 FROM washing_job_items x0 WHERE x0.job_id = w.id)))
+			`).Scan(&n)
 		}
 		c.JSON(http.StatusOK, gin.H{"badge": n})
 	}
@@ -248,18 +258,38 @@ func CuciVoid(db *sql.DB) gin.HandlerFunc {
 // ---------- PJ: KIRIM KE PENCUCI DENGAN BERAT AWAL ----------
 
 func CuciKirim(db *sql.DB) gin.HandlerFunc {
+	return kirimCuci(db, false)
+}
+
+func CuciKirimTerpilih(db *sql.DB) gin.HandlerFunc {
+	return kirimCuci(db, true)
+}
+
+func kirimCuci(db *sql.DB, banyakPekerjaan bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		cl, ok := middleware.HanyaPJ(c)
 		if !ok {
 			return
 		}
-		id, ok := utils.IDParam(c)
-		if !ok {
-			return
+		jobID := 0
+		if !banyakPekerjaan {
+			id, ok := utils.IDParam(c)
+			if !ok {
+				return
+			}
+			jobID = id
 		}
 		var req models.CuciKirimRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "data tidak valid"})
+			return
+		}
+		if len(req.Weights) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "pilih minimal satu barang"})
+			return
+		}
+		if len(req.Weights) > 300 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "maksimal 300 barang sekali proses"})
 			return
 		}
 		nama := strings.TrimSpace(req.WasherName)
@@ -271,6 +301,20 @@ func CuciKirim(db *sql.DB) gin.HandlerFunc {
 		if !ok {
 			return
 		}
+		timbang := make(map[int]float64, len(req.Weights))
+		ids := make([]int, 0, len(req.Weights))
+		for _, w := range req.Weights {
+			if w.ItemID <= 0 || w.Weight <= 0 || w.Weight > 100000 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "berat awal harus lebih dari 0 dan maksimal 100000 gram"})
+				return
+			}
+			if _, ada := timbang[w.ItemID]; ada {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "barang yang sama tidak boleh dipilih lebih dari sekali"})
+				return
+			}
+			timbang[w.ItemID] = w.Weight
+			ids = append(ids, w.ItemID)
+		}
 
 		tx, err := db.Begin()
 		if err != nil {
@@ -279,83 +323,108 @@ func CuciKirim(db *sql.DB) gin.HandlerFunc {
 		}
 		defer tx.Rollback()
 
-		var status string
-		var isVoid bool
-		err = tx.QueryRow("SELECT status, is_void FROM washing_jobs WHERE id = ? FOR UPDATE", id).Scan(&status, &isVoid)
-		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "pekerjaan cuci tidak ditemukan"})
-			return
+		args := make([]interface{}, 0, len(ids))
+		for _, id := range ids {
+			args = append(args, id)
 		}
-		if isVoid || status != "menunggu" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "pekerjaan cuci ini sudah dikirim atau dibatalkan"})
-			return
-		}
-
 		rows, err := tx.Query(
-			"SELECT id, item_name, weight_gram FROM items WHERE washing_job_id = ? AND status = 'cuci' AND is_void = FALSE FOR UPDATE", id)
+			`SELECT i.id, i.item_name, i.weight_gram, i.washing_job_id, i.status, i.is_void,
+			        w.status, w.is_void, x.weight_before,
+			        EXISTS (SELECT 1 FROM washing_job_items x0 WHERE x0.job_id = w.id)
+			 FROM items i
+			 JOIN washing_jobs w ON w.id = i.washing_job_id
+			 LEFT JOIN washing_job_items x ON x.job_id = w.id AND x.item_id = i.id
+			 WHERE i.id IN (`+utils.Placeholders(len(args))+`)
+			 ORDER BY w.id, i.id FOR UPDATE`, args...)
 		if err != nil {
 			utils.Gagal(c, err)
 			return
 		}
 		type brg struct {
-			Name string
-			W    float64
+			ID           int
+			Name         string
+			Weight       float64
+			JobID        int
+			ItemStatus   string
+			ItemVoid     bool
+			JobStatus    string
+			JobVoid      bool
+			WeightBefore sql.NullFloat64
+			AdaRiwayat   bool
 		}
-		items := map[int]brg{}
+		items := make([]brg, 0, len(ids))
 		for rows.Next() {
-			var iid int
 			var b brg
-			if err := rows.Scan(&iid, &b.Name, &b.W); err != nil {
+			if err := rows.Scan(&b.ID, &b.Name, &b.Weight, &b.JobID, &b.ItemStatus, &b.ItemVoid,
+				&b.JobStatus, &b.JobVoid, &b.WeightBefore, &b.AdaRiwayat); err != nil {
 				rows.Close()
 				utils.Gagal(c, err)
 				return
 			}
-			items[iid] = b
+			items = append(items, b)
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			utils.Gagal(c, err)
+			return
 		}
 		rows.Close()
-		if len(items) == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "tidak ada barang dalam pekerjaan cuci ini"})
+		if len(items) != len(ids) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ada barang yang tidak ditemukan atau bukan barang cuci"})
 			return
 		}
 
-		timbang := map[int]float64{}
-		for _, w := range req.Weights {
-			if w.Weight <= 0 {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "berat awal harus lebih dari 0"})
+		pekerjaan := make(map[int][]int)
+		jobIDs := make([]int, 0)
+		for _, it := range items {
+			if jobID > 0 && it.JobID != jobID {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "barang bukan bagian dari pekerjaan cuci ini"})
 				return
 			}
-			timbang[w.ItemID] = w.Weight
-		}
-		for iid, it := range items {
-			if _, ada := timbang[iid]; !ada {
-				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("berat awal %s belum diisi", it.Name)})
+			if it.JobVoid || (it.JobStatus != "menunggu" && it.JobStatus != "proses") {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("pekerjaan cuci %d sudah selesai atau dibatalkan", it.JobID)})
 				return
 			}
-		}
-		for iid, it := range items {
+			legacySudahDikirim := it.JobStatus == "proses" && !it.AdaRiwayat
+			if it.ItemVoid || it.ItemStatus != "cuci" || it.WeightBefore.Valid || legacySudahDikirim {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s sudah dikirim atau tidak lagi menunggu", it.Name)})
+				return
+			}
 			if _, err := tx.Exec(
-				`INSERT INTO washing_job_items (job_id, item_id, weight_system, weight_before) VALUES (?,?,?,?)
-				 ON DUPLICATE KEY UPDATE weight_before = VALUES(weight_before)`,
-				id, iid, it.W, timbang[iid],
+				`INSERT INTO washing_job_items
+				 (job_id, item_id, weight_system, weight_before, washer_name, sent_date) VALUES (?,?,?,?,?,?)
+				 ON DUPLICATE KEY UPDATE weight_before = VALUES(weight_before),
+				 washer_name = VALUES(washer_name), sent_date = VALUES(sent_date)`,
+				it.JobID, it.ID, it.Weight, timbang[it.ID], nama, tgl,
 			); err != nil {
 				utils.Gagal(c, err)
 				return
 			}
+			if _, ada := pekerjaan[it.JobID]; !ada {
+				jobIDs = append(jobIDs, it.JobID)
+			}
+			pekerjaan[it.JobID] = append(pekerjaan[it.JobID], it.ID)
 		}
-		if _, err := tx.Exec(
-			"UPDATE washing_jobs SET status = 'proses', washer_name = ?, washer_sent_date = ?, sent_by = ? WHERE id = ?",
-			nama, tgl, cl.UserID, id,
-		); err != nil {
-			utils.Gagal(c, err)
-			return
+		sort.Ints(jobIDs)
+		for _, id := range jobIDs {
+			itemIDs := pekerjaan[id]
+			if _, err := tx.Exec(
+				"UPDATE washing_jobs SET status = 'proses', washer_name = ?, washer_sent_date = ?, sent_by = ? WHERE id = ?",
+				nama, tgl, cl.UserID, id,
+			); err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			services.CatatAudit(tx, middleware.Meta(c), "cuci_kirim", "washing_jobs", int64(id), gin.H{
+				"pencuci": nama, "tanggal": tgl, "barang": itemIDs,
+			})
 		}
-		services.CatatAudit(tx, middleware.Meta(c), "cuci_kirim", "washing_jobs", int64(id), gin.H{"pencuci": nama, "berat_awal": timbang})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("dikirim ke pencuci %s, berat awal %d barang tercatat", nama, len(items))})
+		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%d barang dikirim ke pencuci %s", len(items), nama)})
 	}
 }
 
@@ -402,7 +471,9 @@ func CuciSelesaiBarang(db *sql.DB) gin.HandlerFunc {
 
 		rows, err := tx.Query(
 			`SELECT i.id, i.item_name, i.status, IFNULL(i.washing_job_id,0), IFNULL(w.status,''), i.weight_gram,
-			        IFNULL(x.weight_before, i.weight_gram)
+			        IFNULL(x.weight_before, i.weight_gram),
+			        (x.weight_before IS NOT NULL OR (w.status = 'proses' AND
+			         NOT EXISTS (SELECT 1 FROM washing_job_items x0 WHERE x0.job_id = w.id)))
 			 FROM items i
 			 LEFT JOIN washing_jobs w ON w.id = i.washing_job_id
 			 LEFT JOIN washing_job_items x ON x.job_id = i.washing_job_id AND x.item_id = i.id
@@ -412,18 +483,19 @@ func CuciSelesaiBarang(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		type brg struct {
-			ID        int
-			Name      string
-			Status    string
-			Job       int
-			JobStatus string
-			Sistem    float64
-			Awal      float64
+			ID           int
+			Name         string
+			Status       string
+			Job          int
+			JobStatus    string
+			Sistem       float64
+			Awal         float64
+			SudahDikirim bool
 		}
 		list := []brg{}
 		for rows.Next() {
 			var b brg
-			if err := rows.Scan(&b.ID, &b.Name, &b.Status, &b.Job, &b.JobStatus, &b.Sistem, &b.Awal); err != nil {
+			if err := rows.Scan(&b.ID, &b.Name, &b.Status, &b.Job, &b.JobStatus, &b.Sistem, &b.Awal, &b.SudahDikirim); err != nil {
 				rows.Close()
 				utils.Gagal(c, err)
 				return
@@ -437,7 +509,7 @@ func CuciSelesaiBarang(db *sql.DB) gin.HandlerFunc {
 		}
 
 		for _, b := range list {
-			if b.Status != "cuci" || b.JobStatus != "proses" {
+			if b.Status != "cuci" || !b.SudahDikirim {
 				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s belum dikirim ke pencuci atau tidak sedang dicuci", b.Name)})
 				return
 			}
@@ -574,13 +646,20 @@ func CucianBarang(db *sql.DB) gin.HandlerFunc {
 		}
 		rows, err := db.Query(`
 			SELECT i.id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''), i.weight_gram, o.name,
-			       w.id, w.status, IFNULL(w.washer_name,''), w.start_date, w.washer_sent_date,
-			       IFNULL(x.weight_before, i.weight_gram)
+			       w.id, w.status,
+			       IF(x.weight_before IS NULL, '', COALESCE(NULLIF(x.washer_name,''), IFNULL(w.washer_name,''))),
+			       w.start_date,
+			       IF(x.weight_before IS NULL, NULL, COALESCE(x.sent_date, w.washer_sent_date)),
+			       IFNULL(x.weight_before, i.weight_gram),
+			       (x.weight_before IS NOT NULL OR (w.status = 'proses' AND
+			        NOT EXISTS (SELECT 1 FROM washing_job_items x0 WHERE x0.job_id = w.id)))
 			FROM items i
 			JOIN washing_jobs w ON w.id = i.washing_job_id
 			JOIN locations o ON o.id = i.origin_location_id
 			LEFT JOIN washing_job_items x ON x.job_id = w.id AND x.item_id = i.id
 			WHERE i.is_void = FALSE AND i.status = 'cuci' AND w.is_void = FALSE
+			  AND (x.weight_before IS NOT NULL OR (w.status = 'proses' AND
+			       NOT EXISTS (SELECT 1 FROM washing_job_items x0 WHERE x0.job_id = w.id)))
 			ORDER BY w.id DESC, i.id`)
 		if err != nil {
 			utils.Gagal(c, err)
@@ -593,7 +672,7 @@ func CucianBarang(db *sql.DB) gin.HandlerFunc {
 			var r models.CucianBarangRow
 			var sent sql.NullTime
 			if err := rows.Scan(&r.ID, &r.ItemNo, &r.ItemName, &r.Karat, &r.WeightGram, &r.Asal,
-				&r.JobID, &r.JobStatus, &r.Pencuci, &r.StartDate, &sent, &r.BeratAwal); err != nil {
+				&r.JobID, &r.JobStatus, &r.Pencuci, &r.StartDate, &sent, &r.BeratAwal, &r.SudahDikirim); err != nil {
 				utils.Gagal(c, err)
 				return
 			}
@@ -613,7 +692,9 @@ func CuciList(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		q := `SELECT w.id, w.origin_location_id, l.name, w.item_name, IFNULL(w.karat,''), w.weight_gram, w.qty,
-		             w.washer_name, w.status, w.start_date, w.finish_date, IFNULL(w.note,''),
+		             COALESCE(NULLIF((SELECT GROUP_CONCAT(DISTINCT NULLIF(xp.washer_name,'') SEPARATOR ', ')
+		                              FROM washing_job_items xp WHERE xp.job_id = w.id),''), w.washer_name),
+		             w.status, w.start_date, w.finish_date, IFNULL(w.note,''),
 		             (SELECT COUNT(*) FROM items i WHERE i.washing_job_id = w.id AND i.status = 'cuci' AND i.is_void = FALSE),
 		             IFNULL(w.cancel_reason,''), IFNULL(w.cancel_returned,0),
 		             IFNULL((SELECT SUM(x.weight_before) FROM washing_job_items x WHERE x.job_id = w.id AND x.weight_after IS NOT NULL),0),
@@ -626,7 +707,25 @@ func CuciList(db *sql.DB) gin.HandlerFunc {
 			args = append(args, cl.LocationID)
 		}
 		switch s := c.Query("status"); s {
-		case "menunggu", "proses", "selesai", "batal":
+		case "menunggu":
+			q += ` AND EXISTS (
+				SELECT 1 FROM items i
+				LEFT JOIN washing_job_items x ON x.job_id = i.washing_job_id AND x.item_id = i.id
+				WHERE i.washing_job_id = w.id AND w.status IN ('menunggu','proses')
+				  AND i.status = 'cuci' AND i.is_void = FALSE
+				  AND NOT (x.weight_before IS NOT NULL OR (w.status = 'proses' AND
+				       NOT EXISTS (SELECT 1 FROM washing_job_items x0 WHERE x0.job_id = w.id)))
+			)`
+		case "proses":
+			q += ` AND EXISTS (
+				SELECT 1 FROM items i
+				LEFT JOIN washing_job_items x ON x.job_id = i.washing_job_id AND x.item_id = i.id
+				WHERE i.washing_job_id = w.id AND w.status = 'proses'
+				  AND i.status = 'cuci' AND i.is_void = FALSE
+				  AND (x.weight_before IS NOT NULL OR (w.status = 'proses' AND
+				       NOT EXISTS (SELECT 1 FROM washing_job_items x0 WHERE x0.job_id = w.id)))
+			)`
+		case "selesai", "batal":
 			q += " AND w.status = ?"
 			args = append(args, s)
 		case "aktif":
@@ -643,8 +742,10 @@ func CuciList(db *sql.DB) gin.HandlerFunc {
 			args = append(args, sa...)
 		}
 		if sy, sa := syaratOrang(c, "w.washer_name"); sy != "" {
-			q += sy
-			args = append(args, sa...)
+			q += ` AND (IFNULL(w.washer_name,'') LIKE ? OR EXISTS (
+				SELECT 1 FROM washing_job_items xp WHERE xp.job_id = w.id AND IFNULL(xp.washer_name,'') LIKE ?
+			))`
+			args = append(args, sa[0], sa[0])
 		}
 		q += " ORDER BY w.status ASC, w.id DESC LIMIT 200"
 
@@ -694,7 +795,9 @@ func isiBarangCuci(db *sql.DB, jobs []models.CuciListRow, c *gin.Context, tampil
 	args = append(args, argsBarang...)
 	rows, err := db.Query(
 		`SELECT i.washing_job_id, i.id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''),
-				IFNULL(x.weight_before, i.weight_gram), x.weight_after, i.status = 'cuci'
+			IFNULL(x.weight_before, i.weight_gram), x.weight_after, i.status = 'cuci',
+			(x.weight_before IS NOT NULL OR (w.status = 'proses' AND
+			 NOT EXISTS (SELECT 1 FROM washing_job_items x0 WHERE x0.job_id = w.id)))
 		 FROM items i
 		 JOIN washing_jobs w ON w.id = i.washing_job_id
 		 LEFT JOIN washing_job_items x ON x.job_id = i.washing_job_id AND x.item_id = i.id
@@ -707,7 +810,7 @@ func isiBarangCuci(db *sql.DB, jobs []models.CuciListRow, c *gin.Context, tampil
 		var job int
 		var it models.CuciItemRow
 		var sesudah sql.NullFloat64
-		if err := rows.Scan(&job, &it.ID, &it.ItemNo, &it.ItemName, &it.Karat, &it.BeratAwal, &sesudah, &it.DiPencuci); err != nil {
+		if err := rows.Scan(&job, &it.ID, &it.ItemNo, &it.ItemName, &it.Karat, &it.BeratAwal, &sesudah, &it.DiPencuci, &it.SudahDikirim); err != nil {
 			return err
 		}
 		it.BeratSesudah = utils.PtrFloat(sesudah)

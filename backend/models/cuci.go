@@ -31,10 +31,12 @@ type WashingJob struct {
 
 // WashingJobItem mencerminkan tabel washing_job_items (berat awal dan sesudah per barang).
 type WashingJobItem struct {
-	ID           int      `json:"id"`
-	JobID        int      `json:"job_id"`
-	ItemID       int      `json:"item_id"`
-	WeightSystem float64  `json:"weight_system"`
-	WeightBefore *float64 `json:"weight_before"`
-	WeightAfter  *float64 `json:"weight_after"`
+	ID           int        `json:"id"`
+	JobID        int        `json:"job_id"`
+	ItemID       int        `json:"item_id"`
+	WeightSystem float64    `json:"weight_system"`
+	WeightBefore *float64   `json:"weight_before"`
+	WeightAfter  *float64   `json:"weight_after"`
+	WasherName   string     `json:"washer_name"`
+	SentDate     *time.Time `json:"sent_date"`
 }

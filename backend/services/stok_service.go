@@ -23,8 +23,10 @@ func SelesaiCuci(tx *sql.Tx, ids []int, tgl string, meta MetaAudit, boID int) er
 		args = append(args, id)
 	}
 	rows, err := tx.Query(
-		`SELECT i.id, i.item_name, IFNULL(i.karat,''), i.weight_gram, IFNULL(i.washing_job_id,0), IFNULL(w.washer_name,'')
+		`SELECT i.id, i.item_name, IFNULL(i.karat,''), i.weight_gram, IFNULL(i.washing_job_id,0),
+		        COALESCE(NULLIF(x.washer_name,''), IFNULL(w.washer_name,''))
 		 FROM items i LEFT JOIN washing_jobs w ON w.id = i.washing_job_id
+		 LEFT JOIN washing_job_items x ON x.job_id = i.washing_job_id AND x.item_id = i.id
 		 WHERE i.id IN (`+utils.Placeholders(len(args))+`)`, args...)
 	if err != nil {
 		return err
