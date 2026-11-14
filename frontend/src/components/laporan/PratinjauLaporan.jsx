@@ -9,8 +9,8 @@ const tampil = (v, tipe) => {
 
 const tampilDaftarBarang = (v) => {
   if (typeof v !== 'string' || !v.trim()) return tampil(v)
-  const barang = v.split(';').map((item) => item.trim()).filter(Boolean)
-  if (barang.length === 0) return ''
+  const barang = v.split(/[;\r\n]+/).map((item) => item.trim()).filter(Boolean)
+  if (barang.length < 2) return tampil(v)
 
   return (
     <ul className="laporan-daftar-barang">
@@ -46,10 +46,10 @@ export default function PratinjauLaporan({ hasil, username }) {
                 {(t.baris || []).map((b, i) => (
                   <tr key={i} className={(t.tebal || []).includes(i) ? 'baris-tebal' : ''}>
                     {b.map((v, j) => {
-                      const daftarBarangLebur = t.kode === 'lebur' && j === 2
+                      const kolomBarang = t.kolom[j] === 'Barang'
                       return (
                         <td key={j} className={t.tipe[j] === 'teks' ? '' : 'kanan'}>
-                          {daftarBarangLebur ? tampilDaftarBarang(v) : tampil(v, t.tipe[j])}
+                          {kolomBarang ? tampilDaftarBarang(v) : tampil(v, t.tipe[j])}
                         </td>
                       )
                     })}

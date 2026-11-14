@@ -15,6 +15,7 @@ export default function Lebur({ me }) {
 
   const [filter, setFilter] = useState('berjalan')
   const [fp, setFp] = useState(FILTER_PRODUKSI_KOSONG)
+  const [tampilkanSeluruhBatch, setTampilkanSeluruhBatch] = useState(false)
   const [locations, setLocations] = useState([])
   const [batches, setBatches] = useState([])
   const [siap, setSiap] = useState([])
@@ -28,10 +29,11 @@ export default function Lebur({ me }) {
   const muat = useCallback(() => {
     const p = paramProduksi(fp)
     p.set('status', filter)
+    if (tampilkanSeluruhBatch) p.set('tampilkan_semua', 'true')
     api(`/lebur?${p}`).then(setBatches).catch((e) => setError(e.message))
     api('/penjualan/siap').then(setSiap).catch((e) => setError(e.message))
     api(`/penjualan?from=${dari}&to=${sampai}`).then(setPenj).catch((e) => setError(e.message))
-  }, [filter, fp, dari, sampai])
+  }, [filter, fp, tampilkanSeluruhBatch, dari, sampai])
 
   useEffect(() => {
     muat()
@@ -43,6 +45,12 @@ export default function Lebur({ me }) {
 
   // ringkasan dari daftar yang tampil (mengikuti filter)
   const jumlah = (arr, f) => arr.reduce((s, x) => s + f(x), 0)
+  const filterBarangAktif = Boolean(
+    fp.q.trim() || fp.karat || Number(fp.berat_min) > 0 || Number(fp.berat_max) > 0 || fp.asal,
+  )
+  const totalBeratTampil = !tampilkanSeluruhBatch && filterBarangAktif
+    ? jumlah(batches, (b) => jumlah(b.items, (it) => it.weight_gram))
+    : jumlah(batches, (b) => b.source_weight)
   const sudahCukim = batches.filter((b) => b.cukim_weight !== null && b.cukim_weight !== undefined)
   const batchAksi = aksi ? batches.find((b) => b.id === aksi.id) : null
 
@@ -80,10 +88,20 @@ export default function Lebur({ me }) {
               <option value="semua">Semua</option>
             </select>
           </div>
+          <div style={{ display: 'flex', alignItems: 'end' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+              <input
+                type="checkbox"
+                checked={tampilkanSeluruhBatch}
+                onChange={(e) => setTampilkanSeluruhBatch(e.target.checked)}
+              />
+              Tampilkan seluruh batch
+            </label>
+          </div>
         </FilterProduksi>
 
         <div className="total-bar">
-          <span>Total: <b className="utama">{batches.length}</b> batch, <b>{jumlah(batches, (b) => b.items.length)}</b> barang, <b>{gram(jumlah(batches, (b) => b.source_weight))}</b> g (berat awal)</span>
+          <span>Total: <b className="utama">{batches.length}</b> batch, <b>{jumlah(batches, (b) => b.items.length)}</b> barang, <b>{gram(totalBeratTampil)}</b> g (berat awal)</span>
           {sudahCukim.length > 0 && (
             <span>Sudah cukim: {sudahCukim.length} batch, {gram(jumlah(sudahCukim, (b) => b.source_weight))} g jadi {gram(jumlah(sudahCukim, (b) => b.cukim_weight))} g, susut <b>{gram(jumlah(sudahCukim, (b) => b.source_weight - b.cukim_weight))}</b> g</span>
           )}

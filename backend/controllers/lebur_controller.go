@@ -530,7 +530,7 @@ func LeburList(db *sql.DB) gin.HandlerFunc {
 			r.Items = []models.LeburItemRow{}
 			out = append(out, r)
 		}
-		if err := isiBarangLebur(db, out); err != nil {
+		if err := isiBarangLebur(db, out, c, c.Query("tampilkan_semua") == "true"); err != nil {
 			utils.Gagal(c, err)
 			return
 		}
@@ -539,7 +539,7 @@ func LeburList(db *sql.DB) gin.HandlerFunc {
 }
 
 // isiBarangLebur: isi daftar barang (nomor, nama, karat, berat, asal) untuk tiap batch lebur.
-func isiBarangLebur(db *sql.DB, batches []models.LeburListRow) error {
+func isiBarangLebur(db *sql.DB, batches []models.LeburListRow, c *gin.Context, tampilkanSemua bool) error {
 	if len(batches) == 0 {
 		return nil
 	}
@@ -548,10 +548,15 @@ func isiBarangLebur(db *sql.DB, batches []models.LeburListRow) error {
 		idx[b.ID] = n
 		args = append(args, b.ID)
 	}
+	syarat, argsBarang := "", []interface{}{}
+	if !tampilkanSemua {
+		syarat, argsBarang = syaratBarang(c, "i", "i.weight_gram", "i.origin_location_id", true)
+	}
+	args = append(args, argsBarang...)
 	rows, err := db.Query(
 		`SELECT i.melt_id, i.id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''), i.weight_gram, o.name
 		 FROM items i JOIN locations o ON o.id = i.origin_location_id
-		 WHERE i.jenis <> 'hasil_lebur' AND i.melt_id IN (`+utils.Placeholders(len(args))+`) ORDER BY i.id`, args...)
+		 WHERE i.jenis <> 'hasil_lebur' AND i.melt_id IN (`+utils.Placeholders(len(idx))+`)`+syarat+` ORDER BY i.id`, args...)
 	if err != nil {
 		return err
 	}
