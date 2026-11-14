@@ -78,17 +78,8 @@ export default function Lebur({ me }) {
         </p>
 
         <FilterProduksi f={fp} onUbah={setFp} locations={locations}
-          labelNama="Nama atau nomor barang" labelOrang="Dicatat oleh (leburan atau cukim)">
-          <div>
-            <label>Status</label>
-            <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-              <option value="berjalan">Sedang berjalan</option>
-              <option value="terjual">Sudah terjual</option>
-              <option value="batal">Dibatalkan</option>
-              <option value="semua">Semua</option>
-            </select>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'end' }}>
+          labelNama="Nama atau nomor barang" labelOrang="Dicatat oleh (leburan atau cukim)"
+          aksiTambahan={
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
               <input
                 type="checkbox"
@@ -97,6 +88,15 @@ export default function Lebur({ me }) {
               />
               Tampilkan seluruh batch
             </label>
+          }>
+          <div>
+            <label>Status</label>
+            <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+              <option value="berjalan">Sedang berjalan</option>
+              <option value="terjual">Sudah terjual</option>
+              <option value="batal">Dibatalkan</option>
+              <option value="semua">Semua</option>
+            </select>
           </div>
         </FilterProduksi>
 

@@ -15,7 +15,7 @@ export function paramProduksi(f) {
 
 // Filter bersama untuk menu Cuci, Lebur, dan Service. children = filter status milik halaman.
 // labelOrang: nama kolom orangnya (Pencuci, Penyervice, Dicatat oleh); tampilAsal=false untuk akun cabang.
-export default function FilterProduksi({ f, onUbah, locations, tampilAsal = true, labelNama, labelOrang, children }) {
+export default function FilterProduksi({ f, onUbah, locations, tampilAsal = true, labelNama, labelOrang, children, aksiTambahan }) {
   const set = (bagian) => onUbah({ ...f, ...bagian })
   const aktif = JSON.stringify(f) !== JSON.stringify(FILTER_PRODUKSI_KOSONG)
   return (
@@ -65,10 +65,15 @@ export default function FilterProduksi({ f, onUbah, locations, tampilAsal = true
           </div>
         )}
       </div>
-      {aktif && (
-        <button type="button" className="mini" style={{ marginTop: 8 }} onClick={() => onUbah(FILTER_PRODUKSI_KOSONG)}>
-          Reset filter
-        </button>
+      {(aktif || aksiTambahan) && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, marginTop: 8 }}>
+          {aktif && (
+            <button type="button" className="mini" onClick={() => onUbah(FILTER_PRODUKSI_KOSONG)}>
+              Reset filter
+            </button>
+          )}
+          {aksiTambahan}
+        </div>
       )}
     </div>
   )
