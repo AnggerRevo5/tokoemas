@@ -669,7 +669,7 @@ func CuciList(db *sql.DB) gin.HandlerFunc {
 			r.Items = []models.CuciItemRow{}
 			out = append(out, r)
 		}
-		if err := isiBarangCuci(db, out); err != nil {
+		if err := isiBarangCuci(db, out, c, c.Query("tampilkan_semua") == "true"); err != nil {
 			utils.Gagal(c, err)
 			return
 		}
@@ -678,7 +678,7 @@ func CuciList(db *sql.DB) gin.HandlerFunc {
 }
 
 // isiBarangCuci: isi daftar barang (nomor, nama, karat, berat awal dan sesudah) untuk tiap pekerjaan cuci.
-func isiBarangCuci(db *sql.DB, jobs []models.CuciListRow) error {
+func isiBarangCuci(db *sql.DB, jobs []models.CuciListRow, c *gin.Context, tampilkanSemua bool) error {
 	if len(jobs) == 0 {
 		return nil
 	}
@@ -687,11 +687,18 @@ func isiBarangCuci(db *sql.DB, jobs []models.CuciListRow) error {
 		idx[j.ID] = n
 		args = append(args, j.ID)
 	}
+	syarat, argsBarang := "", []interface{}{}
+	if !tampilkanSemua {
+		syarat, argsBarang = syaratBarang(c, "i", "IFNULL(x.weight_before, i.weight_gram)", "w.origin_location_id", true)
+	}
+	args = append(args, argsBarang...)
 	rows, err := db.Query(
 		`SELECT i.washing_job_id, i.id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''),
 				IFNULL(x.weight_before, i.weight_gram), x.weight_after, i.status = 'cuci'
-		 FROM items i LEFT JOIN washing_job_items x ON x.job_id = i.washing_job_id AND x.item_id = i.id
-		 WHERE i.is_void = FALSE AND i.washing_job_id IN (`+utils.Placeholders(len(args))+`) ORDER BY i.id`, args...)
+		 FROM items i
+		 JOIN washing_jobs w ON w.id = i.washing_job_id
+		 LEFT JOIN washing_job_items x ON x.job_id = i.washing_job_id AND x.item_id = i.id
+		 WHERE i.is_void = FALSE AND i.washing_job_id IN (`+utils.Placeholders(len(idx))+`)`+syarat+` ORDER BY i.id`, args...)
 	if err != nil {
 		return err
 	}

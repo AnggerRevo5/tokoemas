@@ -14,6 +14,7 @@ export default function Cuci({ me }) {
 
   const [filter, setFilter] = useState('aktif')
   const [fp, setFp] = useState(FILTER_PRODUKSI_KOSONG)
+  const [tampilkanSeluruhBatch, setTampilkanSeluruhBatch] = useState(false)
   const [locations, setLocations] = useState([])
   const [rows, setRows] = useState([])
   const [items, setItems] = useState([])
@@ -24,11 +25,12 @@ export default function Cuci({ me }) {
   const muat = useCallback(() => {
     const p = paramProduksi(fp)
     p.set('status', filter)
+    if (tampilkanSeluruhBatch) p.set('tampilkan_semua', 'true')
     api(`/cuci?${p}`).then(setRows).catch((e) => setError(e.message))
     if (!isCabang) {
       api('/cucian/barang').then(setItems).catch(() => {})
     }
-  }, [filter, fp, isCabang])
+  }, [filter, fp, tampilkanSeluruhBatch, isCabang])
 
   useEffect(() => {
     muat()
@@ -69,7 +71,17 @@ export default function Cuci({ me }) {
         </p>
 
         <FilterProduksi f={fp} onUbah={setFp} locations={locations} tampilAsal={!isCabang}
-          labelNama="Nama atau nomor barang" labelOrang="Pencuci">
+          labelNama="Nama atau nomor barang" labelOrang="Pencuci"
+          aksiTambahan={
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+              <input
+                type="checkbox"
+                checked={tampilkanSeluruhBatch}
+                onChange={(e) => setTampilkanSeluruhBatch(e.target.checked)}
+              />
+              Tampilkan seluruh batch
+            </label>
+          }>
           <div>
             <label>Status</label>
             <select value={filter} onChange={(e) => setFilter(e.target.value)}>
