@@ -22,7 +22,7 @@ export default function FilterBarang({
             <option value="tersedia">Tersedia</option>
             <option value="dikirim">Dalam perjalanan</option>
             <option value="cuci">Proses cuci</option>
-            <option value="lebur">Dilebur</option>
+            <option value="lebur">Antrean / proses lebur</option>
             <option value="hasil">Hasil lebur</option>
             <option value="terjual">Terjual</option>
             <option value="di_bp">Di BP</option>

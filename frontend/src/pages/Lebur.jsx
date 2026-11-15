@@ -4,6 +4,7 @@ import { awalBulan, hariIni, gram } from '../utils/format'
 import Pesan from '../components/common/Pesan'
 import FormAksiLebur from '../components/lebur/FormAksiLebur'
 import TabelLebur from '../components/lebur/TabelLebur'
+import AntrianLebur from '../components/lebur/AntrianLebur'
 import PanelSiapJual from '../components/lebur/PanelSiapJual'
 import RiwayatPenjualan from '../components/lebur/RiwayatPenjualan'
 import FilterProduksi, { FILTER_PRODUKSI_KOSONG, paramProduksi } from '../components/common/FilterProduksi'
@@ -18,6 +19,7 @@ export default function Lebur({ me }) {
   const [tampilkanSeluruhBatch, setTampilkanSeluruhBatch] = useState(false)
   const [locations, setLocations] = useState([])
   const [batches, setBatches] = useState([])
+  const [antrian, setAntrian] = useState([])
   const [siap, setSiap] = useState([])
   const [penj, setPenj] = useState({ rows: [], total_modal: 0, total_jual: 0, total_untung: 0 })
   const [dari, setDari] = useState(awalBulan())
@@ -31,9 +33,12 @@ export default function Lebur({ me }) {
     p.set('status', filter)
     if (tampilkanSeluruhBatch) p.set('tampilkan_semua', 'true')
     api(`/lebur?${p}`).then(setBatches).catch((e) => setError(e.message))
+    if (['pj', 'owner', 'super_admin'].includes(me.role)) {
+      api('/lebur/antrian').then(setAntrian).catch((e) => setError(e.message))
+    }
     api('/penjualan/siap').then(setSiap).catch((e) => setError(e.message))
     api(`/penjualan?from=${dari}&to=${sampai}`).then(setPenj).catch((e) => setError(e.message))
-  }, [filter, fp, tampilkanSeluruhBatch, dari, sampai])
+  }, [filter, fp, tampilkanSeluruhBatch, dari, sampai, me.role])
 
   useEffect(() => {
     muat()
@@ -72,8 +77,9 @@ export default function Lebur({ me }) {
       <div className="card">
         <h3>Proses Lebur</h3>
         <p className="muted">
-          Owner memulai lebur dari menu Stok (centang perhiasan di back office, klik Lebur). PJ mencatat:
-          berat setelah dipotong dan leburan kotor, lalu cukim. Cukim dijual ke penadah di bagian bawah.
+          Owner memilih barang di Stok untuk dimasukkan ke antrean tanpa mengelompokkannya. PJ lalu memilih barang
+          yang dijadikan satu batch, mencatat berat setelah dipotong dan leburan kotor, lalu cukim. Cukim dijual ke
+          penadah di bagian bawah.
           Angka berat di tabel: awal → setelah dipotong → leburan kotor → cukim.
         </p>
 
@@ -106,6 +112,19 @@ export default function Lebur({ me }) {
             <span>Sudah cukim: {sudahCukim.length} batch, {gram(jumlah(sudahCukim, (b) => b.source_weight))} g jadi {gram(jumlah(sudahCukim, (b) => b.cukim_weight))} g, susut <b>{gram(jumlah(sudahCukim, (b) => b.source_weight - b.cukim_weight))}</b> g</span>
           )}
         </div>
+
+        {['pj', 'owner', 'super_admin'].includes(me.role) && (
+          <AntrianLebur
+            rows={antrian}
+            role={me.role}
+            onSelesai={(pesan) => {
+              setInfo(pesan)
+              setError('')
+              muat()
+            }}
+            onError={setError}
+          />
+        )}
 
         {aksi && batchAksi && (
           <FormAksiLebur

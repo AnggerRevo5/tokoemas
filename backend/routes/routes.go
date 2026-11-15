@@ -85,6 +85,9 @@ func Setup(r *gin.Engine, db *sql.DB) {
 	// Lebur
 	auth.POST("/lebur/:id/kembali", controllers.LeburKembali(db))
 	auth.POST("/lebur", controllers.LeburMulai(db))
+	auth.GET("/lebur/antrian", controllers.LeburAntrian(db))
+	auth.POST("/lebur/antrian/batal", controllers.LeburAntrianBatal(db))
+	auth.POST("/lebur/batch", controllers.LeburBuatBatch(db))
 	auth.GET("/lebur", controllers.LeburList(db))
 	auth.POST("/lebur/:id/leburan", controllers.LeburCatatLeburan(db))
 	auth.POST("/lebur/:id/cukim", controllers.LeburCatatCukim(db))

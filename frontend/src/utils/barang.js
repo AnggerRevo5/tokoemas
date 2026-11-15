@@ -80,7 +80,7 @@ export function aksiUntukMode(mode, { isCabang, adaLM, adaTanpaGram, bisaGadai }
     if (adaTanpaGram) return [['kirim', 'Oper toko']]
     return adaLM
       ? [['kirim', 'Oper toko'], ...gadai]
-      : [['kirim', 'Oper toko'], ['cuci', 'Cuci'], ['lebur', 'Lebur']]
+      : [['kirim', 'Oper toko'], ['cuci', 'Cuci'], ['lebur', 'Antrekan untuk dilebur']]
   }
   if (mode === 'cabang') return [['antar', 'Antar ke back office'], ['jual', 'Jual'], ...gadai]
   return []

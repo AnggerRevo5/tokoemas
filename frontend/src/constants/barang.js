@@ -11,6 +11,7 @@ export const STATUS_LABEL = {
   dikirim: 'Dalam perjalanan',
   cuci: 'Proses cuci',
   lebur: 'Dilebur',
+  lebur_antrean: 'Antrean lebur (menunggu PJ)',
   hasil: 'Hasil lebur',
   kembali: 'Dikembalikan ke back office',
   terjual: 'Terjual',
@@ -27,6 +28,7 @@ export const STATUS_CLASS = {
   dikirim: 'tag warn',
   cuci: 'tag info',
   lebur: 'tag info',
+  lebur_antrean: 'tag warn',
   hasil: 'tag gray',
   kembali: 'tag warn',
   terjual: 'tag gray',
@@ -51,7 +53,7 @@ export const KETERANGAN_AKSI = {
   kirim:
     'Barang berstatus Disiapkan dan masih bisa dibatalkan. Setelah diserahkan ke kurir, barang tercatat di back office sampai akun toko tujuan menekan Sudah diterima. Untuk BP (tanpa akun), stok back office langsung berkurang saat diserahkan ke kurir.',
   lebur:
-    'Stok back office berkurang dan barang masuk proses lebur. PJ lalu mencatat berat setelah dipotong, leburan kotor, dan cukim di menu Lebur. Modal dihitung dari jumlah harga beli.',
+    'Barang masuk antrean PJ untuk dilebur dan tidak bisa dipakai untuk transaksi lain. PJ memilih barang mana yang digabung menjadi satu batch. Stok berkurang saat PJ membentuk batch.',
   cuci:
     'Stok back office berkurang dan barang masuk antrean cuci. PJ yang mengirimnya ke pencuci dan mencatat saat selesai di menu Cuci. Barang yang selesai berstatus Bersih.',
   gadai:

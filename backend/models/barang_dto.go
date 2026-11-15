@@ -72,42 +72,42 @@ type BarangMasukReq struct {
 
 // BarangListRow adalah satu baris respons JSON dari BarangList.
 type BarangListRow struct {
-	ID           int        `json:"id"`
-	ItemNo       string     `json:"item_no"`
-	ItemName     string     `json:"item_name"`
-	Karat        string     `json:"karat"`
-	WeightGram   float64    `json:"weight_gram"`
-	Jenis        string     `json:"jenis"`
-	Brand        string     `json:"brand"`
-	Kondisi      string     `json:"kondisi"`
-	HargaBeli    float64    `json:"harga_beli"`
-	LocationID   int        `json:"location_id"`
-	Lokasi       string     `json:"lokasi"`
-	OriginID     int        `json:"origin_location_id"`
-	Asal         string     `json:"asal"`
-	Status       string     `json:"status"`
-	EntryDate    time.Time  `json:"entry_date"`
-	Note         string     `json:"note"`
-	KirimTgl     *time.Time `json:"kirim_tgl"`
-	BelumSampai  bool       `json:"belum_sampai"`
-	Diserahkan   bool       `json:"diserahkan"` // kiriman sudah diserahkan ke kurir
-	BelumNote    string     `json:"belum_sampai_note"`
-	BPNama       string     `json:"bp_nama"`
-	DiterimaDariID int      `json:"diterima_dari_id"` // lokasi pengirim kiriman terakhir yang diterima, 0 bila bukan kiriman
-	DiterimaDari string     `json:"diterima_dari"`
-	DiterimaTgl  string     `json:"diterima_tgl"`
-	Pencuci      string     `json:"pencuci"`
-	CuciTgl      *time.Time `json:"cuci_tgl"`
-	TujuanID     int        `json:"tujuan_id"`
-	Tujuan       string     `json:"tujuan"`
-	HargaJual    *float64   `json:"harga_jual"`
-	TanggalJual  *time.Time `json:"tanggal_jual"`
-	BakiID       int        `json:"baki_id"`
-	BakiNo       int        `json:"baki_no"`
-	BakiNama     string     `json:"baki_nama"`
-	Bahan        string     `json:"bahan"` // emas | perak
-	DariCustomer bool       `json:"dari_customer"`
-	Metode       string     `json:"metode"` // tunai | transfer | qris untuk barang terjual dari Stok, kosong bila belum/lewat penadah
+	ID             int        `json:"id"`
+	ItemNo         string     `json:"item_no"`
+	ItemName       string     `json:"item_name"`
+	Karat          string     `json:"karat"`
+	WeightGram     float64    `json:"weight_gram"`
+	Jenis          string     `json:"jenis"`
+	Brand          string     `json:"brand"`
+	Kondisi        string     `json:"kondisi"`
+	HargaBeli      float64    `json:"harga_beli"`
+	LocationID     int        `json:"location_id"`
+	Lokasi         string     `json:"lokasi"`
+	OriginID       int        `json:"origin_location_id"`
+	Asal           string     `json:"asal"`
+	Status         string     `json:"status"`
+	EntryDate      time.Time  `json:"entry_date"`
+	Note           string     `json:"note"`
+	KirimTgl       *time.Time `json:"kirim_tgl"`
+	BelumSampai    bool       `json:"belum_sampai"`
+	Diserahkan     bool       `json:"diserahkan"` // kiriman sudah diserahkan ke kurir
+	BelumNote      string     `json:"belum_sampai_note"`
+	BPNama         string     `json:"bp_nama"`
+	DiterimaDariID int        `json:"diterima_dari_id"` // lokasi pengirim kiriman terakhir yang diterima, 0 bila bukan kiriman
+	DiterimaDari   string     `json:"diterima_dari"`
+	DiterimaTgl    string     `json:"diterima_tgl"`
+	Pencuci        string     `json:"pencuci"`
+	CuciTgl        *time.Time `json:"cuci_tgl"`
+	TujuanID       int        `json:"tujuan_id"`
+	Tujuan         string     `json:"tujuan"`
+	HargaJual      *float64   `json:"harga_jual"`
+	TanggalJual    *time.Time `json:"tanggal_jual"`
+	BakiID         int        `json:"baki_id"`
+	BakiNo         int        `json:"baki_no"`
+	BakiNama       string     `json:"baki_nama"`
+	Bahan          string     `json:"bahan"` // emas | perak
+	DariCustomer   bool       `json:"dari_customer"`
+	Metode         string     `json:"metode"` // tunai | transfer | qris untuk barang terjual dari Stok, kosong bila belum/lewat penadah
 }
 
 type KirimBOReq struct {

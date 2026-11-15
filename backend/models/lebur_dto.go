@@ -15,6 +15,28 @@ type LeburMulaiRequest struct {
 	Note      string `json:"note" binding:"max=200"`
 }
 
+type LeburBuatBatchRequest struct {
+	ItemIDs   []int  `json:"item_ids" binding:"max=300,dive,gt=0"`
+	StartDate string `json:"start_date" binding:"max=10"`
+	Note      string `json:"note" binding:"max=200"`
+}
+
+type LeburAntrianBatalRequest struct {
+	ItemIDs []int `json:"item_ids" binding:"max=300,dive,gt=0"`
+}
+
+type LeburAntrianRow struct {
+	ID         int       `json:"id"`
+	ItemNo     string    `json:"item_no"`
+	ItemName   string    `json:"item_name"`
+	Karat      string    `json:"karat"`
+	WeightGram float64   `json:"weight_gram"`
+	HargaBeli  float64   `json:"harga_beli"`
+	Asal       string    `json:"asal"`
+	QueuedDate time.Time `json:"queued_date"`
+	Note       string    `json:"note"`
+}
+
 // LeburCatatLeburanRequest adalah payload JSON untuk LeburCatatLeburan.
 type LeburCatatLeburanRequest struct {
 	CutWeight     float64 `json:"cut_weight" binding:"lte=100000"`
@@ -33,28 +55,28 @@ type LeburCatatCukimRequest struct {
 
 // LeburListRow adalah satu baris respons JSON dari LeburList.
 type LeburListRow struct {
-	ID            int        `json:"id"`
-	StartDate     time.Time  `json:"start_date"`
-	Status        string     `json:"status"`
-	ItemCount     int        `json:"item_count"`
-	SourceWeight  float64    `json:"source_weight"`
-	Modal         float64    `json:"modal"`
-	CutWeight     *float64   `json:"cut_weight"`
-	LeburanWeight *float64   `json:"leburan_weight"`
-	CukimWeight   *float64   `json:"cukim_weight"`
-	CukimKarat    string     `json:"cukim_karat"`
-	Note          string     `json:"note"`
-	CutNote       string     `json:"cut_note"`
-	LeburanDate   *time.Time `json:"leburan_date"`
-	CukimDate     *time.Time `json:"cukim_date"`
-	LeburanBy     string     `json:"leburan_by"`
-	CukimBy       string     `json:"cukim_by"`
-	Barang        string     `json:"barang"`
-	SaleTotal     *float64   `json:"sale_total"`
-	Penadah       string     `json:"penadah"`
-	SaleDate      *time.Time `json:"sale_date"`
-	Untung        *float64   `json:"untung"`
-	Susut         *float64   `json:"susut"`
+	ID            int            `json:"id"`
+	StartDate     time.Time      `json:"start_date"`
+	Status        string         `json:"status"`
+	ItemCount     int            `json:"item_count"`
+	SourceWeight  float64        `json:"source_weight"`
+	Modal         float64        `json:"modal"`
+	CutWeight     *float64       `json:"cut_weight"`
+	LeburanWeight *float64       `json:"leburan_weight"`
+	CukimWeight   *float64       `json:"cukim_weight"`
+	CukimKarat    string         `json:"cukim_karat"`
+	Note          string         `json:"note"`
+	CutNote       string         `json:"cut_note"`
+	LeburanDate   *time.Time     `json:"leburan_date"`
+	CukimDate     *time.Time     `json:"cukim_date"`
+	LeburanBy     string         `json:"leburan_by"`
+	CukimBy       string         `json:"cukim_by"`
+	Barang        string         `json:"barang"`
+	SaleTotal     *float64       `json:"sale_total"`
+	Penadah       string         `json:"penadah"`
+	SaleDate      *time.Time     `json:"sale_date"`
+	Untung        *float64       `json:"untung"`
+	Susut         *float64       `json:"susut"`
 	Items         []LeburItemRow `json:"items"`
 }
 

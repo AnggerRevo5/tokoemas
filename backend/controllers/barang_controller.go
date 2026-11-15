@@ -521,7 +521,9 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 
 		kolom := `SELECT i.id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''), i.weight_gram,
 		             i.jenis, IFNULL(i.brand,''), i.kondisi, i.harga_beli,
-		             i.location_id, l.name, i.origin_location_id, o.name, i.status, i.entry_date, IFNULL(i.note,''),
+		             i.location_id, l.name, i.origin_location_id, o.name,
+		             IF(i.status = 'lebur' AND EXISTS (SELECT 1 FROM melt_queue_items q WHERE q.item_id = i.id),
+		                'lebur_antrean', i.status), i.entry_date, IFNULL(i.note,''),
 		             i.kirim_tgl, i.belum_sampai, IFNULL(i.belum_sampai_note,''),
 		             IF(i.status = 'cuci',
 		                IF(x.weight_before IS NOT NULL, COALESCE(NULLIF(x.washer_name,''), IFNULL(w.washer_name,'')),

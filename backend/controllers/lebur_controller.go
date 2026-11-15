@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -129,54 +130,345 @@ func LeburMulai(db *sql.DB) gin.HandlerFunc {
 		if !ok {
 			return
 		}
-		ids := services.Kunci(items)
-		args := make([]interface{}, 0, len(ids))
-		for _, id := range ids {
-			args = append(args, id)
-		}
-		var modal, berat float64
-		if err := tx.QueryRow(
-			"SELECT IFNULL(SUM(harga_beli),0), IFNULL(SUM(weight_gram),0) FROM items WHERE id IN ("+utils.Placeholders(len(args))+")",
-			args...,
-		).Scan(&modal, &berat); err != nil {
-			utils.Gagal(c, err)
-			return
-		}
-
 		note := strings.TrimSpace(req.Note)
-		res, err := tx.Exec(
-			`INSERT INTO melt_batches (start_date, status, item_count, source_weight, modal, note, created_by)
-			 VALUES (?, 'proses', ?, ?, ?, ?, ?)`,
-			tgl, len(ids), berat, modal, sql.NullString{String: note, Valid: note != ""}, cl.UserID,
-		)
-		if err != nil {
-			utils.Gagal(c, err)
-			return
-		}
-		batchID, _ := res.LastInsertId()
-
+		ids := services.Kunci(items)
 		for _, it := range items {
-			if _, err := tx.Exec(services.SQLStokItem, boID, "out", "lebur", it.Name, it.Weight, it.Karat,
-				fmt.Sprintf("Masuk proses lebur #%d", batchID), tgl, cl.UserID, it.ID); err != nil {
+			if _, err := tx.Exec("UPDATE items SET status = 'lebur', melt_id = NULL WHERE id = ?", it.ID); err != nil {
 				utils.Gagal(c, err)
 				return
 			}
-			if _, err := tx.Exec("UPDATE items SET status = 'lebur', melt_id = ? WHERE id = ?", batchID, it.ID); err != nil {
+			if _, err := tx.Exec(
+				`INSERT INTO melt_queue_items (item_id, queued_date, note, queued_by) VALUES (?,?,?,?)`,
+				it.ID, tgl, note, cl.UserID,
+			); err != nil {
 				utils.Gagal(c, err)
 				return
 			}
+			services.CatatAudit(tx, middleware.Meta(c), "lebur_antre", "melt_queue_items", int64(it.ID), gin.H{
+				"queued_date": tgl, "note": note,
+			})
 		}
-		services.CatatAudit(tx, middleware.Meta(c), "lebur_mulai", "melt_batches", batchID, gin.H{"jumlah": len(ids), "berat": berat, "modal": modal})
 
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
 			return
 		}
 		c.JSON(http.StatusCreated, gin.H{
-			"id":      batchID,
-			"message": fmt.Sprintf("%d barang masuk proses lebur (lebur #%d). PJ mencatat hasilnya di menu Lebur", len(items), batchID),
+			"message": fmt.Sprintf("%d barang masuk antrean lebur untuk dikelompokkan PJ", len(ids)),
 		})
 	}
+}
+
+func LeburAntrian(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if _, ok := middleware.HanyaPeran(c, "pj", "owner", "super_admin"); !ok {
+			return
+		}
+		rows, err := db.Query(`
+			SELECT i.id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''), i.weight_gram,
+			       i.harga_beli, o.name, q.queued_date, q.note
+			FROM melt_queue_items q
+			JOIN items i ON i.id = q.item_id
+			JOIN locations o ON o.id = i.origin_location_id
+			WHERE i.is_void = FALSE AND i.status = 'lebur' AND i.melt_id IS NULL
+			ORDER BY q.queued_date, q.created_at, i.id`)
+		if err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		defer rows.Close()
+		out := []models.LeburAntrianRow{}
+		for rows.Next() {
+			var r models.LeburAntrianRow
+			if err := rows.Scan(&r.ID, &r.ItemNo, &r.ItemName, &r.Karat, &r.WeightGram,
+				&r.HargaBeli, &r.Asal, &r.QueuedDate, &r.Note); err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			out = append(out, r)
+		}
+		if err := rows.Err(); err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		c.JSON(http.StatusOK, out)
+	}
+}
+
+func LeburAntrianBatal(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		_, ok := middleware.HanyaAdminOwner(c)
+		if !ok {
+			return
+		}
+		var req models.LeburAntrianBatalRequest
+		if err := c.ShouldBindJSON(&req); err != nil || len(req.ItemIDs) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "pilih minimal satu barang antrean"})
+			return
+		}
+		if len(req.ItemIDs) > 300 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "maksimal 300 barang sekali proses"})
+			return
+		}
+		ids, args, ok := leburIDsUnik(c, req.ItemIDs)
+		if !ok {
+			return
+		}
+		tx, err := db.Begin()
+		if err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		defer tx.Rollback()
+
+		items, err := services.AmbilBarang(tx, ids)
+		if err != nil {
+			balasKesalahan(c, err)
+			return
+		}
+		rows, err := tx.Query(
+			`SELECT q.item_id FROM melt_queue_items q
+			 JOIN items i ON i.id = q.item_id
+			 WHERE q.item_id IN (`+utils.Placeholders(len(args))+`)
+			   AND i.status = 'lebur' AND i.melt_id IS NULL AND i.is_void = FALSE
+			 ORDER BY q.item_id FOR UPDATE`, args...)
+		if err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		queued := map[int]bool{}
+		for rows.Next() {
+			var id int
+			if err := rows.Scan(&id); err != nil {
+				rows.Close()
+				utils.Gagal(c, err)
+				return
+			}
+			queued[id] = true
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			utils.Gagal(c, err)
+			return
+		}
+		rows.Close()
+		if len(queued) != len(ids) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ada barang yang bukan lagi dalam antrean lebur"})
+			return
+		}
+		for _, id := range ids {
+			it := items[id]
+			if it.Status != "lebur" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s tidak lagi menunggu proses lebur", it.Name)})
+				return
+			}
+			result, err := tx.Exec(
+				"UPDATE items SET status = 'tersedia' WHERE id = ? AND status = 'lebur' AND melt_id IS NULL", id)
+			if err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			n, err := result.RowsAffected()
+			if err != nil || n != 1 {
+				utils.Gagal(c, fmt.Errorf("barang %s tidak berhasil ditarik dari antrean lebur", it.Name))
+				return
+			}
+			result, err = tx.Exec("DELETE FROM melt_queue_items WHERE item_id = ?", id)
+			if err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			n, err = result.RowsAffected()
+			if err != nil || n != 1 {
+				utils.Gagal(c, fmt.Errorf("barang %s tidak berhasil dihapus dari antrean lebur", it.Name))
+				return
+			}
+			services.CatatAudit(tx, middleware.Meta(c), "lebur_antre_batal", "items", int64(id), gin.H{"status": "tersedia"})
+		}
+		if err := tx.Commit(); err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%d barang ditarik dari antrean lebur dan kembali tersedia", len(ids))})
+	}
+}
+
+func LeburBuatBatch(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		cl, ok := middleware.HanyaPJ(c)
+		if !ok {
+			return
+		}
+		var req models.LeburBuatBatchRequest
+		if err := c.ShouldBindJSON(&req); err != nil || len(req.ItemIDs) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "pilih minimal satu barang untuk membentuk batch"})
+			return
+		}
+		if len(req.ItemIDs) > 300 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "maksimal 300 barang dalam satu batch"})
+			return
+		}
+		ids, args, ok := leburIDsUnik(c, req.ItemIDs)
+		if !ok {
+			return
+		}
+		tgl, ok := utils.ParseTanggal(c, req.StartDate)
+		if !ok {
+			return
+		}
+		boID, err := services.IDBackOffice(db)
+		if err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		tx, err := db.Begin()
+		if err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		defer tx.Rollback()
+
+		items, err := services.AmbilBarang(tx, ids)
+		if err != nil {
+			balasKesalahan(c, err)
+			return
+		}
+		rows, err := tx.Query(
+			`SELECT q.item_id, q.note, i.harga_beli, i.bahan FROM melt_queue_items q
+			 JOIN items i ON i.id = q.item_id
+			 WHERE q.item_id IN (`+utils.Placeholders(len(args))+`)
+			   AND i.is_void = FALSE AND i.status = 'lebur' AND i.melt_id IS NULL
+			 ORDER BY q.item_id FOR UPDATE`, args...)
+		if err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		type antrian struct {
+			Note  string
+			Harga float64
+			Bahan string
+		}
+		queued := map[int]antrian{}
+		for rows.Next() {
+			var id int
+			var q antrian
+			if err := rows.Scan(&id, &q.Note, &q.Harga, &q.Bahan); err != nil {
+				rows.Close()
+				utils.Gagal(c, err)
+				return
+			}
+			queued[id] = q
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			utils.Gagal(c, err)
+			return
+		}
+		rows.Close()
+		if len(queued) != len(ids) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ada barang yang tidak lagi dalam antrean lebur"})
+			return
+		}
+
+		var modal, berat float64
+		catatan := map[string]bool{}
+		for _, id := range ids {
+			it := items[id]
+			if it.Status != "lebur" || it.Location != boID || services.TanpaGram(it.Jenis) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s tidak memenuhi syarat untuk dibentuk menjadi batch", it.Name)})
+				return
+			}
+			if queued[id].Bahan != "emas" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s bukan barang emas yang dapat dilebur", it.Name)})
+				return
+			}
+			modal += queued[id].Harga
+			berat += it.Weight
+			if note := strings.TrimSpace(queued[id].Note); note != "" {
+				catatan[note] = true
+			}
+		}
+		note := strings.TrimSpace(req.Note)
+		if note != "" {
+			catatan[note] = true
+		}
+		notes := make([]string, 0, len(catatan))
+		for n := range catatan {
+			notes = append(notes, n)
+		}
+		sort.Strings(notes)
+		catatanBatch := utils.BatasTeks(strings.Join(notes, "; "), 200)
+
+		res, err := tx.Exec(
+			`INSERT INTO melt_batches (start_date, status, item_count, source_weight, modal, note, created_by)
+			 VALUES (?, 'proses', ?, ?, ?, ?, ?)`,
+			tgl, len(ids), berat, modal, sql.NullString{String: catatanBatch, Valid: catatanBatch != ""}, cl.UserID,
+		)
+		if err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		batchID, err := res.LastInsertId()
+		if err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		for _, id := range ids {
+			it := items[id]
+			if _, err := tx.Exec(services.SQLStokItem, boID, "out", "lebur", it.Name, it.Weight, it.Karat,
+				fmt.Sprintf("Masuk proses lebur #%d", batchID), tgl, cl.UserID, it.ID); err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			result, err := tx.Exec(
+				"UPDATE items SET melt_id = ? WHERE id = ? AND status = 'lebur' AND melt_id IS NULL", batchID, id)
+			if err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			n, err := result.RowsAffected()
+			if err != nil || n != 1 {
+				utils.Gagal(c, fmt.Errorf("barang %s tidak berhasil dimasukkan ke batch", it.Name))
+				return
+			}
+			result, err = tx.Exec("DELETE FROM melt_queue_items WHERE item_id = ?", id)
+			if err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			n, err = result.RowsAffected()
+			if err != nil || n != 1 {
+				utils.Gagal(c, fmt.Errorf("barang %s tidak berhasil dikeluarkan dari antrean lebur", it.Name))
+				return
+			}
+		}
+		services.CatatAudit(tx, middleware.Meta(c), "lebur_mulai", "melt_batches", batchID, gin.H{
+			"jumlah": len(ids), "berat": berat, "modal": modal, "items": ids,
+		})
+		if err := tx.Commit(); err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		c.JSON(http.StatusCreated, gin.H{
+			"id": batchID, "message": fmt.Sprintf("%d barang masuk proses lebur sebagai batch #%d", len(ids), batchID),
+		})
+	}
+}
+
+func leburIDsUnik(c *gin.Context, itemIDs []int) ([]int, []interface{}, bool) {
+	ids := make([]int, 0, len(itemIDs))
+	args := make([]interface{}, 0, len(itemIDs))
+	seen := make(map[int]bool, len(itemIDs))
+	for _, id := range itemIDs {
+		if id <= 0 || seen[id] {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "daftar barang tidak valid atau mengandung duplikat"})
+			return nil, nil, false
+		}
+		seen[id] = true
+		ids = append(ids, id)
+		args = append(args, id)
+	}
+	return ids, args, true
 }
 
 // ---------- 2. PJ: BERAT SETELAH POTONG DAN LEBURAN KOTOR ----------
