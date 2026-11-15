@@ -15,6 +15,7 @@ import SpesifikasiBarang from '../components/barang/SpesifikasiBarang'
 import FilterBarang from '../components/barang/FilterBarang'
 import BarAksiBarang from '../components/barang/BarAksiBarang'
 import TabelBarang from '../components/barang/TabelBarang'
+import FormTukarTambah from '../components/barang/FormTukarTambah'
 
 const LANGKAH_MUAT = 200
 
@@ -44,6 +45,7 @@ export default function Barang({ me, onUbah }) {
   const [pindahItem, setPindahItem] = useState(null)
   const [gadaiItem, setGadaiItem] = useState(null)
   const [jualItem, setJualItem] = useState(null)
+  const [tukarBuka, setTukarBuka] = useState(false)
   const [gadaiMap, setGadaiMap] = useState({}) // gadai yang berjalan per id barang
 
   const [voidItem, setVoidItem] = useState(null)
@@ -196,6 +198,23 @@ export default function Barang({ me, onUbah }) {
           setStatus('dikirim')
         }}
       />
+
+      {(isCabang || me.role === 'owner' || me.role === 'super_admin') && (
+        <div style={{ margin: '12px 0' }}>
+          <button type="button" className="mini primary-fill" onClick={() => { resetPesan(); setTukarBuka(true) }}>Tukar tambah</button>
+        </div>
+      )}
+      {tukarBuka && (
+        <FormTukarTambah
+          me={me}
+          locations={locations}
+          onTutup={() => setTukarBuka(false)}
+          onSelesai={(pesan) => {
+            setInfo(pesan)
+            selesai()
+          }}
+        />
+      )}
 
       <FormBarangMasuk
         me={me}
