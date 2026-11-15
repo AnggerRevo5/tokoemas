@@ -1,9 +1,10 @@
 import { gram, rupiah } from '../../utils/format'
 import PilihanLokasi from '../common/PilihanLokasi'
+import { KARAT } from '../../constants/barang'
 
-// Filter daftar barang (lokasi, status, jenis, cari) dan ringkasan jumlah/berat.
+// Filter daftar barang (lokasi, status, jenis, asal, cari, kadar, berat) dan ringkasan jumlah/berat.
 export default function FilterBarang({
-  isCabang, locations, locId, onLocId, status, onStatus, jenisF, onJenis, asal, onAsal, cari, onCari, data,
+  isCabang, locations, locId, onLocId, status, onStatus, jenisF, onJenis, asal, onAsal, cari, onCari, kadar, beratMin, beratMax, onKadarBerat, data,
 }) {
   return (
     <div className="card">
@@ -59,6 +60,22 @@ export default function FilterBarang({
         <div>
           <label>Cari nama, keterangan, atau pencuci</label>
           <input value={cari} onChange={(e) => onCari(e.target.value)} placeholder="Cincin, Adip..." />
+        </div>
+        <div>
+          <label>Kadar</label>
+          <select value={kadar} onChange={(e) => onKadarBerat({ kadar: e.target.value })}>
+            <option value="">Semua</option>
+            {KARAT.map((n) => <option key={n} value={`${n}K`}>{n}K</option>)}
+            <option value="999">999 (perak)</option>
+          </select>
+        </div>
+        <div>
+          <label>Berat dari (g)</label>
+          <input type="number" step="0.001" min="0" value={beratMin} onChange={(e) => onKadarBerat({ beratMin: e.target.value })} />
+        </div>
+        <div>
+          <label>Berat sampai (g)</label>
+          <input type="number" step="0.001" min="0" value={beratMax} onChange={(e) => onKadarBerat({ beratMax: e.target.value })} />
         </div>
       </div>
       <p className="muted" style={{ marginBottom: 0 }}>

@@ -24,3 +24,18 @@ func TestSyaratBarang(t *testing.T) {
 		t.Fatalf("q harus diabaikan bila denganNama=false: %s %v", sy, args)
 	}
 }
+
+func TestSyaratKadarBerat(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest("GET", "/?karat=999&berat_min=1&berat_max=2.5", nil)
+	sy, args := syaratKadarBerat(c, "i", "i.weight_gram")
+	if len(args) != 3 || args[0] != "999" || args[1] != 1.0 || args[2] != 2.5 {
+		t.Fatalf("argumen salah: %v (%s)", args, sy)
+	}
+	c, _ = gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest("GET", "/?karat=99", nil) // bukan kadar yang dikenal: diabaikan
+	if sy, args := syaratKadarBerat(c, "i", "i.weight_gram"); sy != "" || len(args) != 0 {
+		t.Fatalf("kadar tidak dikenal harus diabaikan: %s %v", sy, args)
+	}
+}

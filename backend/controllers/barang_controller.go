@@ -601,6 +601,9 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 			dari += " AND i.tray_id = ?"
 			args = append(args, b)
 		}
+		kb, ak := syaratKadarBerat(c, "i", "i.weight_gram")
+		dari += kb
+		args = append(args, ak...)
 		if s := strings.TrimSpace(c.Query("q")); s != "" {
 			dari += ` AND (i.item_name LIKE ? OR IFNULL(i.note,'') LIKE ? OR
 				(i.status = 'cuci' AND (IFNULL(w.washer_name,'') LIKE ? OR IFNULL(x.washer_name,'') LIKE ?)))`
