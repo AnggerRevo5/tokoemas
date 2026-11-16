@@ -21,7 +21,7 @@ const LANGKAH_MUAT = 200
 
 export default function Barang({ me, onUbah }) {
   const isCabang = me.role === 'cabang'
-  const bisaVoid = me.role === 'super_admin'
+  const bisaVoid = ['super_admin', 'owner', 'cabang'].includes(me.role)
 
   const [locations, setLocations] = useState([])
   const [locId, setLocId] = useState(isCabang ? String(me.location_id) : '')
