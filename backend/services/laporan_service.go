@@ -114,7 +114,7 @@ func TabelKas(db *sql.DB, dari, sampai, loc string) (models.TabelLaporan, error)
 	}
 	t.Baris = append(t.Baris,
 		[]interface{}{"TOTAL", "", "", masuk, keluar, "", ""},
-		[]interface{}{"SELISIH (masuk dikurangi keluar)", "", "", masuk - keluar, nil, "", ""},
+		[]interface{}{"Sisa Saldo", "", "", masuk - keluar, nil, "", ""},
 	)
 	t.Tebal = []int{len(t.Baris) - 2, len(t.Baris) - 1}
 	return t, nil
@@ -165,6 +165,7 @@ func TabelStok(db *sql.DB, dari, sampai, loc string) (models.TabelLaporan, error
 	t.Baris = append(t.Baris,
 		[]interface{}{"TOTAL MASUK", "", "", "", "", "", masuk, "", ""},
 		[]interface{}{"TOTAL KELUAR", "", "", "", "", "", keluar, "", ""},
+		[]interface{}{"Sisa Saldo", "", "", "", "", "", masuk - keluar, "", ""},
 	)
 	t.Tebal = []int{len(t.Baris) - 2, len(t.Baris) - 1}
 	return t, nil
