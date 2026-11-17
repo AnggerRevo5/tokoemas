@@ -64,6 +64,9 @@ func main() {
 	if err := services.SiapkanSkemaBP(db); err != nil {
 		log.Fatal(err)
 	}
+	if err := services.SiapkanSkemaTukarTambah(db); err != nil {
+		log.Fatal(err)
+	}
 	services.SiapkanIndeks(db)
 	services.SeedUsers(db)
 

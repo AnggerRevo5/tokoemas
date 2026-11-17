@@ -210,7 +210,7 @@ func KasCreate(db *sql.DB) gin.HandlerFunc {
 // kelompokKas: pengelompokan kategori kas untuk filter "Jenis transaksi" di riwayat kas.
 // penadah tidak punya kategori sendiri (memakai jual_barang), jadi dikenali dari catatannya.
 var kelompokKas = map[string][]string{
-	"penjualan":    {"omzet", "jual_qris", "biaya_qris", "jual_barang"},
+	"penjualan":    {"omzet", "jual_qris", "biaya_qris", "jual_barang", "tukar_tambah_masuk", "tukar_tambah_keluar"},
 	"pembelian":    {"pembelian_customer"},
 	"tukar_bp":     {"kembali_cabang"},
 	"gadai":        {"gadai_dana", "gadai_pokok", "gadai_biaya", "gadai_kembali"},

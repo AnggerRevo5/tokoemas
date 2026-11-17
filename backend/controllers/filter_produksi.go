@@ -19,7 +19,25 @@ func syaratBarang(c *gin.Context, a, beratExpr, kolomAsal string, denganNama boo
 		kond += " AND (" + a + ".item_name LIKE ? OR IFNULL(" + a + ".item_no,'') LIKE ?)"
 		args = append(args, p, p)
 	}
-	if k, ok := utils.NormalKarat(c.Query("karat")); ok {
+	k2, a2 := syaratKadarBerat(c, a, beratExpr)
+	kond += k2
+	args = append(args, a2...)
+	if n, err := strconv.Atoi(c.Query("asal")); err == nil && n > 0 {
+		kond += " AND " + kolomAsal + " = ?"
+		args = append(args, n)
+	}
+	return kond, args
+}
+
+// syaratKadarBerat: filter kadar (query karat: 1K-24K, atau 999 untuk perak) dan rentang berat (berat_min, berat_max).
+// Dipakai Cuci, Lebur, Service lewat syaratBarang, dan Stok langsung.
+func syaratKadarBerat(c *gin.Context, a, beratExpr string) (string, []interface{}) {
+	kond, args := "", []interface{}{}
+	k, ok := utils.NormalKarat(c.Query("karat"))
+	if !ok && strings.TrimSpace(c.Query("karat")) == "999" {
+		k, ok = "999", true
+	}
+	if ok {
 		kond += " AND " + a + ".karat = ?"
 		args = append(args, k)
 	}
@@ -30,10 +48,6 @@ func syaratBarang(c *gin.Context, a, beratExpr, kolomAsal string, denganNama boo
 	if v, err := strconv.ParseFloat(c.Query("berat_max"), 64); err == nil && v > 0 {
 		kond += " AND " + beratExpr + " <= ?"
 		args = append(args, v)
-	}
-	if n, err := strconv.Atoi(c.Query("asal")); err == nil && n > 0 {
-		kond += " AND " + kolomAsal + " = ?"
-		args = append(args, n)
 	}
 	return kond, args
 }

@@ -15,12 +15,13 @@ import SpesifikasiBarang from '../components/barang/SpesifikasiBarang'
 import FilterBarang from '../components/barang/FilterBarang'
 import BarAksiBarang from '../components/barang/BarAksiBarang'
 import TabelBarang from '../components/barang/TabelBarang'
+import FormTukarTambah from '../components/barang/FormTukarTambah'
 
 const LANGKAH_MUAT = 200
 
 export default function Barang({ me, onUbah }) {
   const isCabang = me.role === 'cabang'
-  const bisaVoid = me.role === 'super_admin'
+  const bisaVoid = ['super_admin', 'owner', 'cabang'].includes(me.role)
 
   const [locations, setLocations] = useState([])
   const [locId, setLocId] = useState(isCabang ? String(me.location_id) : '')
@@ -28,6 +29,9 @@ export default function Barang({ me, onUbah }) {
   const [jenisF, setJenisF] = useState('semua')
   const [asal, setAsal] = useState('semua')
   const [cari, setCari] = useState('')
+  const [kadar, setKadar] = useState('')
+  const [beratMin, setBeratMin] = useState('')
+  const [beratMax, setBeratMax] = useState('')
   const [data, setData] = useState({ rows: [], jumlah: 0, ditampilkan: 0, ada_lagi: false, batas: 200, total_gram: 0, total_gram_perak: 0, total_beli: 0, total_jual: 0 })
   const [batas, setBatas] = useState(LANGKAH_MUAT) // jumlah barang yang diminta; naik tiap tombol Muat lagi
   const [notif, setNotif] = useState({ menunggu: 0, belum_sampai: 0, keluar: 0 })
@@ -41,6 +45,7 @@ export default function Barang({ me, onUbah }) {
   const [pindahItem, setPindahItem] = useState(null)
   const [gadaiItem, setGadaiItem] = useState(null)
   const [jualItem, setJualItem] = useState(null)
+  const [tukarBuka, setTukarBuka] = useState(false)
   const [gadaiMap, setGadaiMap] = useState({}) // gadai yang berjalan per id barang
 
   const [voidItem, setVoidItem] = useState(null)
@@ -67,6 +72,9 @@ export default function Barang({ me, onUbah }) {
     if (asal !== 'semua') p.set('asal', asal)
     if (bakiF) p.set('baki_id', bakiF)
     if (cari.trim()) p.set('q', cari.trim())
+    if (kadar) p.set('karat', kadar)
+    if (beratMin) p.set('berat_min', beratMin)
+    if (beratMax) p.set('berat_max', beratMax)
     api(`/barang?${p.toString()}`)
       .then((d) => {
         setData(d)
@@ -87,7 +95,7 @@ export default function Barang({ me, onUbah }) {
       .then((d) => setGadaiMap(Object.fromEntries(d.flatMap((x) => x.barang.map((b) => [b.item_id, x])))))
       .catch(() => {})
     api('/barang/notif').then(setNotif).catch(() => {})
-  }, [locId, status, jenisF, asal, cari, bakiF, batas])
+  }, [locId, status, jenisF, asal, cari, kadar, beratMin, beratMax, bakiF, batas])
 
   useEffect(() => {
     muat()
@@ -191,6 +199,23 @@ export default function Barang({ me, onUbah }) {
         }}
       />
 
+      {(isCabang || me.role === 'owner' || me.role === 'super_admin') && (
+        <div style={{ margin: '12px 0' }}>
+          <button type="button" className="mini primary-fill" onClick={() => { resetPesan(); setTukarBuka(true) }}>Tukar tambah</button>
+        </div>
+      )}
+      {tukarBuka && (
+        <FormTukarTambah
+          me={me}
+          locations={locations}
+          onTutup={() => setTukarBuka(false)}
+          onSelesai={(pesan) => {
+            setInfo(pesan)
+            selesai()
+          }}
+        />
+      )}
+
       <FormBarangMasuk
         me={me}
         isCabang={isCabang}
@@ -236,6 +261,15 @@ export default function Barang({ me, onUbah }) {
         cari={cari}
         onCari={(v) => {
           setCari(v)
+          setBatas(LANGKAH_MUAT)
+        }}
+        kadar={kadar}
+        beratMin={beratMin}
+        beratMax={beratMax}
+        onKadarBerat={(b) => {
+          if ('kadar' in b) setKadar(b.kadar)
+          if ('beratMin' in b) setBeratMin(b.beratMin)
+          if ('beratMax' in b) setBeratMax(b.beratMax)
           setBatas(LANGKAH_MUAT)
         }}
         data={data}

@@ -444,8 +444,9 @@ func BarangCreate(db *sql.DB) gin.HandlerFunc {
 
 func BarangVoid(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		_, ok := middleware.HanyaSuperAdmin(c)
-		if !ok {
+		cl := c.MustGet("claims").(*models.Claims)
+		if cl.Role != "super_admin" && cl.Role != "owner" && cl.Role != "cabang" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "tidak punya akses menghapus barang"})
 			return
 		}
 		id, ok := utils.IDParam(c)
@@ -468,10 +469,17 @@ func BarangVoid(db *sql.DB) gin.HandlerFunc {
 		var isVoid bool
 		var harga float64
 		var cashID sql.NullInt64
-		err = tx.QueryRow("SELECT status, is_void, harga_beli, purchase_cash_id FROM items WHERE id = ? FOR UPDATE", id).
-			Scan(&status, &isVoid, &harga, &cashID)
+		var lokasi int
+		var baru bool
+		err = tx.QueryRow("SELECT status, is_void, harga_beli, purchase_cash_id, location_id, entry_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) FROM items WHERE id = ? FOR UPDATE", id).
+			Scan(&status, &isVoid, &harga, &cashID, &lokasi, &baru)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "barang tidak ditemukan"})
+			return
+		}
+		// Cabang: hanya toko sendiri; barang beli customer (ada kas pembelian) hanya dalam 7 hari. Owner dan Super Admin bebas.
+		if cl.Role == "cabang" && (cl.LocationID != lokasi || (cashID.Valid && !baru)) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "cabang hanya bisa menghapus barang tokonya sendiri, dan barang beli customer paling lama 7 hari"})
 			return
 		}
 		if isVoid {
@@ -601,6 +609,9 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 			dari += " AND i.tray_id = ?"
 			args = append(args, b)
 		}
+		kb, ak := syaratKadarBerat(c, "i", "i.weight_gram")
+		dari += kb
+		args = append(args, ak...)
 		if s := strings.TrimSpace(c.Query("q")); s != "" {
 			dari += ` AND (i.item_name LIKE ? OR IFNULL(i.note,'') LIKE ? OR
 				(i.status = 'cuci' AND (IFNULL(w.washer_name,'') LIKE ? OR IFNULL(x.washer_name,'') LIKE ?)))`

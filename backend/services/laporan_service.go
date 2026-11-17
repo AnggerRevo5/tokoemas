@@ -17,15 +17,16 @@ func LabelArah(a string) string {
 	return "Keluar"
 }
 
-var OpMasuk = map[string]bool{"omzet": true, "jual_barang": true, "jual_qris": true, "jual_aset": true, "biaya_service": true}
+var OpMasuk = map[string]bool{"tukar_tambah_masuk": true, "omzet": true, "jual_barang": true, "jual_qris": true, "jual_aset": true, "biaya_service": true}
 
-var OpKeluar = map[string]bool{"pengeluaran_toko": true, "pembelian_customer": true, "operasional": true, "bulanan_investor": true, "biaya_qris": true, "gadai_biaya": true}
+var OpKeluar = map[string]bool{"tukar_tambah_keluar": true, "pengeluaran_toko": true, "pembelian_customer": true, "operasional": true, "bulanan_investor": true, "biaya_qris": true, "gadai_biaya": true}
 
 var DanaNonOp = map[string]bool{"investor": true, "pinjaman": true, "bayar_hutang": true, "gadai_dana": true, "gadai_pokok": true, "tarik_investor": true}
 
 var DaftarLaporan = []string{"kas", "labarugi", "hutang", "penjualan", "penjualan_toko", "penjualan_toko_ringkas", "investor", "investor_mutasi", "gadai", "talangan_bp", "cuci", "lebur", "stok"}
 
 var namaKategori = map[string]string{
+	"tukar_tambah_masuk": "Tukar tambah (pelanggan membayar selisih)", "tukar_tambah_keluar": "Tukar tambah (toko membayar selisih)", "tukar_tambah": "Tukar tambah",
 	"omzet": "Hasil jual (omzet)", "biaya_service": "Biaya service", "tambah_kas": "Tambahan kas", "pengeluaran_toko": "Pengeluaran toko",
 	"pembelian_customer": "Pembelian dari customer", "transfer_bo": "Transfer kas ke back office",
 	"dari_toko": "Pemasukan dari toko", "jual_barang": "Pemasukan dari jual barang", "jual_qris": "Penjualan QRIS/Debit", "biaya_qris": "Potongan QRIS/Debit",

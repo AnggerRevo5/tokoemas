@@ -8,6 +8,31 @@ type JualItem struct {
 	Harga  float64 `json:"harga" binding:"lte=1000000000000"`
 }
 
+// TukarLama adalah barang lama dari pelanggan pada tukar tambah, dengan nilai tukar yang disepakati.
+type TukarLama struct {
+	ItemName   string  `json:"item_name" binding:"max=100"`
+	Karat      string  `json:"karat" binding:"max=10"`
+	WeightGram float64 `json:"weight_gram" binding:"gt=0,lte=100000"`
+	Jenis      string  `json:"jenis" binding:"max=20"`
+	Brand      string  `json:"brand" binding:"max=50"`
+	Bahan      string  `json:"bahan" binding:"max=10"`
+	Nilai      float64 `json:"nilai" binding:"gt=0,lte=1000000000000"`
+	Kondisi    string  `json:"kondisi" binding:"max=10"` // kotor (bawaan) atau bersih
+	TrayID     int     `json:"tray_id" binding:"gte=0"`
+	Note       string  `json:"note" binding:"max=200"`
+}
+
+// TukarTambahReq: banyak barang lama dan banyak barang baru dalam satu transaksi.
+type TukarTambahReq struct {
+	LocationID int         `json:"location_id" binding:"gte=0"`
+	Date       string      `json:"date" binding:"max=10"`
+	Note       string      `json:"note" binding:"max=200"`
+	Metode     string      `json:"metode" binding:"max=10"`
+	Biaya      float64     `json:"biaya" binding:"gte=0,lte=1000000000000"`
+	Lama       []TukarLama `json:"lama" binding:"max=100,dive"`
+	Baru       []JualItem  `json:"baru" binding:"max=100,dive"`
+}
+
 type JualReq struct {
 	Items []JualItem `json:"items" binding:"max=1000,dive"`
 	Date  string     `json:"date" binding:"max=10"`
