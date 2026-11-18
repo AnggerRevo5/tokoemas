@@ -1,18 +1,38 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { api } from '../../services/api'
 import { hariIni, gram, rupiah } from '../../utils/format'
+import FilterProduksi, { FILTER_PRODUKSI_KOSONG } from '../common/FilterProduksi'
 import BarisKosong from '../common/BarisKosong'
 import Spinner from '../common/Spinner'
 
-export default function AntrianLebur({ rows, role, onSelesai, onError }) {
+export default function AntrianLebur({ rows, locations, role, onSelesai, onError }) {
   const [pilih, setPilih] = useState([])
   const [tanggal, setTanggal] = useState(hariIni())
   const [catatan, setCatatan] = useState('')
   const [loading, setLoading] = useState(false)
+  const [filter, setFilter] = useState(FILTER_PRODUKSI_KOSONG)
   const bisaBuatBatch = role === 'pj' || role === 'super_admin'
   const bisaTarik = role === 'owner' || role === 'super_admin'
   const terpilih = rows.filter((r) => pilih.includes(r.id))
-  const semuaDipilih = rows.length > 0 && rows.every((r) => pilih.includes(r.id))
+  const rowsTampil = useMemo(() => {
+    const q = filter.q.trim().toLowerCase()
+    const dari = filter.dari
+    const sampai = filter.sampai
+
+    return rows.filter((r) => {
+      const tanggalAntre = r.queued_date.slice(0, 10)
+      return (
+        (!q || `${r.item_no} ${r.item_name}`.toLowerCase().includes(q)) &&
+        (!filter.karat || r.karat === filter.karat) &&
+        (!filter.berat_min || r.weight_gram >= Number(filter.berat_min)) &&
+        (!filter.berat_max || r.weight_gram <= Number(filter.berat_max)) &&
+        (!filter.asal || String(r.origin_location_id) === filter.asal) &&
+        (!dari || tanggalAntre >= dari) &&
+        (!sampai || tanggalAntre <= sampai)
+      )
+    })
+  }, [rows, filter])
+  const semuaDipilih = rowsTampil.length > 0 && rowsTampil.every((r) => pilih.includes(r.id))
 
   function toggle(id) {
     if (pilih.includes(id)) {
@@ -27,8 +47,18 @@ export default function AntrianLebur({ rows, role, onSelesai, onError }) {
   }
 
   function toggleSemua() {
-    setPilih(semuaDipilih ? [] : rows.slice(0, 300).map((r) => r.id))
-    if (!semuaDipilih && rows.length > 300) onError('Dipilih 300 barang pertama; maksimal 300 barang per batch')
+    if (semuaDipilih) {
+      const terlihat = new Set(rowsTampil.map((r) => r.id))
+      setPilih((p) => p.filter((id) => !terlihat.has(id)))
+      return
+    }
+
+    const berikutnya = [...new Set([...pilih, ...rowsTampil.map((r) => r.id)])]
+    if (berikutnya.length > 300) {
+      onError('Maksimal 300 barang dalam satu pilihan')
+      return
+    }
+    setPilih(berikutnya)
   }
 
   async function proses(e, batalkan = !bisaBuatBatch) {
@@ -54,18 +84,38 @@ export default function AntrianLebur({ rows, role, onSelesai, onError }) {
   }
 
   return (
-    <div className="card" style={{ marginTop: 16 }}>
-      <h3>Antrian Barang untuk Lebur</h3>
+    <details className="card lebur-antrian" style={{ marginTop: 16 }} open>
+      <summary className="lebur-antrian-ringkasan">
+        <span>
+          <strong>Antrian Barang untuk Lebur</strong>
+          <small>{rowsTampil.length} dari {rows.length} barang</small>
+        </span>
+        {(bisaBuatBatch || bisaTarik) && terpilih.length > 0 && (
+          <span className="lebur-antrian-terpilih">{terpilih.length} dipilih</span>
+        )}
+      </summary>
       <p className="muted">
         Owner memasukkan barang ke antrean tanpa mengelompokkannya. PJ memilih barang yang akan menjadi satu batch.
         Barang tetap terkunci dari transaksi lain sampai dibentuk menjadi batch atau owner menariknya dari antrean.
       </p>
+      <details className="lebur-antrian-filter">
+        <summary>Cari dan filter barang</summary>
+        <FilterProduksi
+          f={filter}
+          onUbah={setFilter}
+          locations={locations}
+          labelNama="Nama atau nomor barang"
+        />
+      </details>
+      <div className="total-bar lebur-antrian-total">
+        <span>Berat antrean tampil: <b>{gram(rowsTampil.reduce((total, r) => total + r.weight_gram, 0))} g</b></span>
+      </div>
       <div className="table-wrap">
         <table>
           <thead>
             <tr>
               {(bisaBuatBatch || bisaTarik) && (
-                <th><input type="checkbox" checked={semuaDipilih} onChange={toggleSemua} aria-label="Pilih semua antrean" /></th>
+                <th><input type="checkbox" checked={semuaDipilih} onChange={toggleSemua} aria-label="Pilih semua antrean yang tampil" /></th>
               )}
               <th>No</th>
               <th>Barang</th>
@@ -77,8 +127,12 @@ export default function AntrianLebur({ rows, role, onSelesai, onError }) {
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 && <BarisKosong kolom={bisaBuatBatch || bisaTarik ? '8' : '7'}>Belum ada barang dalam antrean</BarisKosong>}
-            {rows.map((r) => (
+            {rowsTampil.length === 0 && (
+              <BarisKosong kolom={bisaBuatBatch || bisaTarik ? '8' : '7'}>
+                {rows.length === 0 ? 'Belum ada barang dalam antrean' : 'Tidak ada barang yang cocok dengan filter'}
+              </BarisKosong>
+            )}
+            {rowsTampil.map((r) => (
               <tr key={r.id}>
                 {(bisaBuatBatch || bisaTarik) && (
                   <td>
@@ -123,6 +177,6 @@ export default function AntrianLebur({ rows, role, onSelesai, onError }) {
           </div>
         </form>
       )}
-    </div>
+    </details>
   )
 }

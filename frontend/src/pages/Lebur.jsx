@@ -116,6 +116,7 @@ export default function Lebur({ me }) {
         {['pj', 'owner', 'super_admin'].includes(me.role) && (
           <AntrianLebur
             rows={antrian}
+            locations={locations}
             role={me.role}
             onSelesai={(pesan) => {
               setInfo(pesan)

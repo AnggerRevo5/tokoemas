@@ -32,6 +32,7 @@ type LeburAntrianRow struct {
 	Karat      string    `json:"karat"`
 	WeightGram float64   `json:"weight_gram"`
 	HargaBeli  float64   `json:"harga_beli"`
+	AsalID     int       `json:"origin_location_id"`
 	Asal       string    `json:"asal"`
 	QueuedDate time.Time `json:"queued_date"`
 	Note       string    `json:"note"`

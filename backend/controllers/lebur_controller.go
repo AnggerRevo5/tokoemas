@@ -166,7 +166,7 @@ func LeburAntrian(db *sql.DB) gin.HandlerFunc {
 		}
 		rows, err := db.Query(`
 			SELECT i.id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''), i.weight_gram,
-			       i.harga_beli, o.name, q.queued_date, q.note
+			       i.harga_beli, i.origin_location_id, o.name, q.queued_date, q.note
 			FROM melt_queue_items q
 			JOIN items i ON i.id = q.item_id
 			JOIN locations o ON o.id = i.origin_location_id
@@ -181,7 +181,7 @@ func LeburAntrian(db *sql.DB) gin.HandlerFunc {
 		for rows.Next() {
 			var r models.LeburAntrianRow
 			if err := rows.Scan(&r.ID, &r.ItemNo, &r.ItemName, &r.Karat, &r.WeightGram,
-				&r.HargaBeli, &r.Asal, &r.QueuedDate, &r.Note); err != nil {
+				&r.HargaBeli, &r.AsalID, &r.Asal, &r.QueuedDate, &r.Note); err != nil {
 				utils.Gagal(c, err)
 				return
 			}
