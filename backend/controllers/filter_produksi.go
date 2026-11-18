@@ -29,6 +29,29 @@ func syaratBarang(c *gin.Context, a, beratExpr, kolomAsal string, denganNama boo
 	return kond, args
 }
 
+// syaratCariStok: pencarian di Stok. Tiap kata yang diketik harus cocok di salah satu: nama, catatan, nomor barang,
+// atau nama pencuci. Kata berakhiran K (8K, 17k) juga dicocokkan ke kadar, karena kadar tersimpan di kolom terpisah
+// dari nama. shortcut: maksimal 8 kata, selebihnya diabaikan.
+func syaratCariStok(q string) (string, []interface{}) {
+	kond, args := "", []interface{}{}
+	kata := strings.Fields(q)
+	if len(kata) > 8 {
+		kata = kata[:8]
+	}
+	for _, k := range kata {
+		p := "%" + strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(utils.BatasTeks(k, 60)) + "%"
+		kond += ` AND (i.item_name LIKE ? OR IFNULL(i.note,'') LIKE ? OR IFNULL(i.item_no,'') LIKE ? OR
+			(i.status = 'cuci' AND (IFNULL(w.washer_name,'') LIKE ? OR IFNULL(x.washer_name,'') LIKE ?))`
+		args = append(args, p, p, p, p, p)
+		if kd, ok := utils.NormalKarat(k); ok && strings.HasSuffix(strings.ToUpper(k), "K") {
+			kond += " OR i.karat = ?"
+			args = append(args, kd)
+		}
+		kond += ")"
+	}
+	return kond, args
+}
+
 // syaratKadarBerat: filter kadar (query karat: 1K-24K, atau 999 untuk perak) dan rentang berat (berat_min, berat_max).
 // Dipakai Cuci, Lebur, Service lewat syaratBarang, dan Stok langsung.
 func syaratKadarBerat(c *gin.Context, a, beratExpr string) (string, []interface{}) {

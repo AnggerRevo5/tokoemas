@@ -478,7 +478,8 @@ func BarangVoid(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		// Cabang: hanya toko sendiri; barang beli customer (ada kas pembelian) hanya dalam 7 hari. Owner dan Super Admin bebas.
-		if cl.Role == "cabang" && (cl.LocationID != lokasi || (cashID.Valid && !baru)) {
+		// batal kirim (status dikirim) tidak kena batas 7 hari: barang hanya kembali ke stok, tidak dihapus
+		if cl.Role == "cabang" && (cl.LocationID != lokasi || (cashID.Valid && !baru && status != "dikirim")) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "cabang hanya bisa menghapus barang tokonya sendiri, dan barang beli customer paling lama 7 hari"})
 			return
 		}
@@ -488,6 +489,22 @@ func BarangVoid(db *sql.DB) gin.HandlerFunc {
 		}
 		if status != "tersedia" && status != "dikirim" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "barang sedang diproses, tidak bisa dibatalkan"})
+			return
+		}
+		// barang yang sedang dikirim (disiapkan atau sudah diserahkan ke kurir): batalkan = kembali tersedia di lokasi asal,
+		// bukan dihapus. Antar dan serah kurir tidak membuat catatan stok, jadi stok dan kas tidak berubah.
+		if status == "dikirim" {
+			if _, err := tx.Exec(`UPDATE items SET status = 'tersedia', kirim_ke_location_id = NULL, bp_nama = NULL, kirim_tgl = NULL,
+				diserahkan = TRUE, belum_sampai = FALSE, belum_sampai_note = NULL WHERE id = ?`, id); err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			services.CatatAudit(tx, middleware.Meta(c), "batal_kirim", "items", int64(id), gin.H{"reason": reason})
+			if err := tx.Commit(); err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"message": "pengiriman dibatalkan, barang kembali ke stok"})
 			return
 		}
 		var n int
@@ -612,11 +629,9 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 		kb, ak := syaratKadarBerat(c, "i", "i.weight_gram")
 		dari += kb
 		args = append(args, ak...)
-		if s := strings.TrimSpace(c.Query("q")); s != "" {
-			dari += ` AND (i.item_name LIKE ? OR IFNULL(i.note,'') LIKE ? OR
-				(i.status = 'cuci' AND (IFNULL(w.washer_name,'') LIKE ? OR IFNULL(x.washer_name,'') LIKE ?)))`
-			args = append(args, "%"+s+"%", "%"+s+"%", "%"+s+"%", "%"+s+"%")
-		}
+		sc, ac := syaratCariStok(c.Query("q"))
+		dari += sc
+		args = append(args, ac...)
 
 		// jumlah barang dan total berat/harga dihitung dari seluruh barang yang cocok, bukan hanya baris yang tampil
 		var jumlah int

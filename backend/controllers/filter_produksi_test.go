@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -22,6 +23,21 @@ func TestSyaratBarang(t *testing.T) {
 	c.Request = httptest.NewRequest("GET", "/?q=cincin", nil)
 	if sy, args := syaratBarang(c, "s", "s.weight_gram", "s.origin_location_id", false); sy != "" || len(args) != 0 {
 		t.Fatalf("q harus diabaikan bila denganNama=false: %s %v", sy, args)
+	}
+}
+
+func TestSyaratCariStok(t *testing.T) {
+	// "8k" ikut dicocokkan ke kadar (5 argumen per kata + 1 kadar), "mdl" dan "mp" hanya teks
+	sy, args := syaratCariStok("cincin mdl mp 8k")
+	if len(args) != 4*5+1 || args[len(args)-1] != "8K" || strings.Count(sy, "i.karat = ?") != 1 {
+		t.Fatalf("argumen salah: %v (%s)", args, sy)
+	}
+	// angka tanpa K bukan kadar (agar "8" tidak ikut menemukan 18K)
+	if _, args := syaratCariStok("cincin 8"); len(args) != 2*5 {
+		t.Fatalf("angka tanpa K tidak boleh jadi kadar: %v", args)
+	}
+	if sy, args := syaratCariStok("   "); sy != "" || len(args) != 0 {
+		t.Fatalf("teks kosong harus diabaikan: %s %v", sy, args)
 	}
 }
 

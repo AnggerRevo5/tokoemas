@@ -387,14 +387,18 @@ export default function Barang({ me, onUbah }) {
 
       {voidItem && (
         <Popup
-          judul={`Hapus barang ${voidItem.item_no}?`}
-          labelKonfirmasi="Ya, hapus barang"
+          judul={voidItem.status === 'dikirim' ? `Batalkan pengiriman ${voidItem.item_no}?` : `Hapus barang ${voidItem.item_no}?`}
+          labelKonfirmasi={voidItem.status === 'dikirim' ? 'Ya, batalkan pengiriman' : 'Ya, hapus barang'}
           danger
           loading={loadingBatal}
           onKonfirmasi={konfirmasiBatal}
           onTutup={() => setVoidItem(null)}
         >
-          <p className="muted">Barang dihapus dari stok (salah input). Periksa lagi spesifikasinya:</p>
+          <p className="muted">
+            {voidItem.status === 'dikirim'
+              ? 'Barang kembali ke stok lokasi asalnya, tidak dihapus. Periksa lagi spesifikasinya:'
+              : 'Barang dihapus dari stok (salah input). Periksa lagi spesifikasinya:'}
+          </p>
           <SpesifikasiBarang item={voidItem} />
           <label style={{ display: 'block', marginTop: 12 }}>Alasan menghapus</label>
           <input

@@ -113,11 +113,28 @@ func TabelKas(db *sql.DB, dari, sampai, loc string) (models.TabelLaporan, error)
 		}
 		t.Baris = append(t.Baris, []interface{}{fmtTgl(tgl), lok, labelK(kat), m, k, note, user})
 	}
+	// saldo awal = semua transaksi sebelum tanggal "dari" (lokasi yang sama), agar saldo akhir sama dengan saldo kas sebenarnya
+	qa := `SELECT IFNULL(SUM(IF(direction='in',amount,-amount)),0) FROM cash_transactions WHERE is_void = FALSE AND transaction_date < ?`
+	aa := []interface{}{dari}
+	if loc != "" {
+		qa += " AND location_id = ?"
+		aa = append(aa, loc)
+	}
+	var awal float64
+	if err := db.QueryRow(qa, aa...).Scan(&awal); err != nil {
+		return t, err
+	}
 	t.Baris = append(t.Baris,
 		[]interface{}{"TOTAL", "", "", masuk, keluar, "", ""},
+<<<<<<< HEAD
 		[]interface{}{"Sisa Saldo", "", "", masuk - keluar, nil, "", ""},
+=======
+		[]interface{}{"SELISIH (masuk dikurangi keluar)", "", "", masuk - keluar, nil, "", ""},
+		[]interface{}{"SALDO AWAL (sebelum tanggal mulai)", "", "", awal, nil, "", ""},
+		[]interface{}{"SALDO AKHIR (saldo awal + selisih)", "", "", awal + masuk - keluar, nil, "", ""},
+>>>>>>> f0686cd (penambahan tampilan saldo awal dan saldo akhir per periode)
 	)
-	t.Tebal = []int{len(t.Baris) - 2, len(t.Baris) - 1}
+	t.Tebal = []int{len(t.Baris) - 4, len(t.Baris) - 3, len(t.Baris) - 2, len(t.Baris) - 1}
 	return t, nil
 }
 
