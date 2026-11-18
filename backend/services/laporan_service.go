@@ -126,13 +126,9 @@ func TabelKas(db *sql.DB, dari, sampai, loc string) (models.TabelLaporan, error)
 	}
 	t.Baris = append(t.Baris,
 		[]interface{}{"TOTAL", "", "", masuk, keluar, "", ""},
-<<<<<<< HEAD
-		[]interface{}{"Sisa Saldo", "", "", masuk - keluar, nil, "", ""},
-=======
 		[]interface{}{"SELISIH (masuk dikurangi keluar)", "", "", masuk - keluar, nil, "", ""},
 		[]interface{}{"SALDO AWAL (sebelum tanggal mulai)", "", "", awal, nil, "", ""},
 		[]interface{}{"SALDO AKHIR (saldo awal + selisih)", "", "", awal + masuk - keluar, nil, "", ""},
->>>>>>> f0686cd (penambahan tampilan saldo awal dan saldo akhir per periode)
 	)
 	t.Tebal = []int{len(t.Baris) - 4, len(t.Baris) - 3, len(t.Baris) - 2, len(t.Baris) - 1}
 	return t, nil
