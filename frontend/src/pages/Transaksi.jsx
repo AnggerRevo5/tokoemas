@@ -6,6 +6,7 @@ import TabelTransaksi from '../components/transaksi/TabelTransaksi'
 import PenjualanDariKas from '../components/transaksi/PenjualanDariKas'
 import CardGadai from '../components/barang/CardGadai'
 import FilterKas, { FILTER_KAS_KOSONG } from '../components/transaksi/FilterKas'
+import Investor from './Investor'
 
 const FormTransaksi = lazy(() => import('../components/transaksi/FormTransaksi'))
 
@@ -28,6 +29,7 @@ export default function Transaksi({ jenis, me }) {
   const [gadaiItem, setGadaiItem] = useState(null)
 
   const lokasi = locations.find((l) => l.id === Number(locId))
+  const bisaKelolaInvestor = (me.role === 'super_admin' || me.role === 'owner') && lokasi?.type === 'back_office'
 
   useEffect(() => {
     api('/locations')
@@ -134,6 +136,16 @@ export default function Transaksi({ jenis, me }) {
           onError={setError}
         />
       </Suspense>
+
+      {isKas && bisaKelolaInvestor && (
+        <details className="card" style={{ marginTop: 16 }}>
+          <summary>Kelola Investor — riwayat lengkap dan bunga per siklus</summary>
+          <p className="muted">
+            Pilih investor untuk membuka ringkasan, pencatatan, riwayat, dan bunga per siklus.
+          </p>
+          <Investor mode="manage" tampilkanForm={false} locationId={Number(locId)} onUbah={muat} />
+        </details>
+      )}
 
       <div className="card" style={{ marginTop: 16 }}>
         <h3>Riwayat{lokasi ? ` - ${lokasi.name}` : ''}</h3>

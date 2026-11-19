@@ -5,7 +5,7 @@ import FormInvestor from '../components/investor/FormInvestor'
 import TabelInvestor from '../components/investor/TabelInvestor'
 import DetailInvestor from '../components/investor/DetailInvestor'
 
-export default function Investor({ mode = 'read', locationId, onUbah }) {
+export default function Investor({ mode = 'read', locationId, onUbah, tampilkanForm = true }) {
   const canManage = mode === 'manage'
   const [rows, setRows] = useState([])
   const [terpilih, setTerpilih] = useState(null)
@@ -61,7 +61,7 @@ export default function Investor({ mode = 'read', locationId, onUbah }) {
     <div>
       <Pesan error={error} info={info} />
 
-      {canManage && (
+      {canManage && tampilkanForm && (
         <FormInvestor
           locationId={locationId}
           onMulai={resetPesan}
