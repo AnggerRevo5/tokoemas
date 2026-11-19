@@ -84,22 +84,16 @@ export default function AntrianLebur({ rows, locations, role, onSelesai, onError
   }
 
   return (
-    <details className="card lebur-antrian" style={{ marginTop: 16 }} open>
-      <summary className="lebur-antrian-ringkasan">
-        <span>
-          <strong>Antrian Barang untuk Lebur</strong>
-          <small>{rowsTampil.length} dari {rows.length} barang</small>
-        </span>
-        {(bisaBuatBatch || bisaTarik) && terpilih.length > 0 && (
-          <span className="lebur-antrian-terpilih">{terpilih.length} dipilih</span>
-        )}
+    <details className="card" style={{ marginTop: 16 }} open>
+      <summary style={{ cursor: 'pointer', fontWeight: 700 }}>
+        Antrian Barang untuk Lebur ({rowsTampil.length} dari {rows.length} barang)
       </summary>
       <p className="muted">
         Owner memasukkan barang ke antrean tanpa mengelompokkannya. PJ memilih barang yang akan menjadi satu batch.
         Barang tetap terkunci dari transaksi lain sampai dibentuk menjadi batch atau owner menariknya dari antrean.
       </p>
-      <details className="lebur-antrian-filter">
-        <summary>Cari dan filter barang</summary>
+      <details style={{ marginBottom: 12 }}>
+        <summary style={{ cursor: 'pointer' }}>Cari dan filter barang</summary>
         <FilterProduksi
           f={filter}
           onUbah={setFilter}
@@ -108,7 +102,7 @@ export default function AntrianLebur({ rows, locations, role, onSelesai, onError
           multipleKarat
         />
       </details>
-      <div className="total-bar lebur-antrian-total">
+      <div className="total-bar">
         <span>Berat antrean tampil: <b>{gram(rowsTampil.reduce((total, r) => total + r.weight_gram, 0))} g</b></span>
       </div>
       <div className="table-wrap">
