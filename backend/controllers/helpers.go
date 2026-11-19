@@ -86,3 +86,21 @@ func resolveLocation(c *gin.Context, db *sql.DB, requested int) (int, string, bo
 	}
 	return id, tipe, true
 }
+
+func lokasiKasBackOffice(c *gin.Context, db *sql.DB) bool {
+	backOfficeID, err := services.IDBackOffice(db)
+	if err != nil {
+		utils.Gagal(c, err)
+		return false
+	}
+	if !idLokasiBackOfficeSesuai(c.Query("location_id"), backOfficeID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "pencatatan hanya bisa dilakukan dari Kas Back Office"})
+		return false
+	}
+	return true
+}
+
+func idLokasiBackOfficeSesuai(requested string, backOfficeID int) bool {
+	locationID, err := strconv.Atoi(requested)
+	return err == nil && locationID == backOfficeID
+}

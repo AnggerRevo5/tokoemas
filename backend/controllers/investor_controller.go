@@ -198,7 +198,7 @@ func catatKasGerak(tx *sql.Tx, meta services.MetaAudit, userID, boID int, jenis 
 func InvestorCreate(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		cl, ok := middleware.HanyaAdminOwner(c)
-		if !ok {
+		if !ok || !lokasiKasBackOffice(c, db) {
 			return
 		}
 		var req models.InvestorBaruReq
@@ -206,6 +206,7 @@ func InvestorCreate(db *sql.DB) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "data tidak valid"})
 			return
 		}
+		req.CatatKas = true
 		nama := strings.TrimSpace(req.Name)
 		if nama == "" || req.Amount <= 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "nama dan nominal setoran wajib diisi dengan benar"})
@@ -373,7 +374,7 @@ func simpanGerak(c *gin.Context, db *sql.DB, id int, tglStr, note string, baru [
 
 func InvestorGerak(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if _, ok := middleware.HanyaAdminOwner(c); !ok {
+		if _, ok := middleware.HanyaAdminOwner(c); !ok || !lokasiKasBackOffice(c, db) {
 			return
 		}
 		id, ok := utils.IDParam(c)
@@ -385,6 +386,7 @@ func InvestorGerak(db *sql.DB) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "data tidak valid"})
 			return
 		}
+		req.CatatKas = true
 		if _, ada := labelGerak[req.Jenis]; !ada {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "jenis harus setor, tarik pokok, atau bayar bunga"})
 			return
@@ -413,7 +415,7 @@ func InvestorGerak(db *sql.DB) gin.HandlerFunc {
 
 func InvestorAmbil(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if _, ok := middleware.HanyaAdminOwner(c); !ok {
+		if _, ok := middleware.HanyaAdminOwner(c); !ok || !lokasiKasBackOffice(c, db) {
 			return
 		}
 		id, ok := utils.IDParam(c)
@@ -425,6 +427,7 @@ func InvestorAmbil(db *sql.DB) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "data tidak valid"})
 			return
 		}
+		req.CatatKas = true
 		if req.Pokok < 0 || req.Bunga < 0 || req.Pokok+req.Bunga <= 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "isi nominal pokok dan/atau bunga yang diambil (rupiah bulat)"})
 			return
@@ -456,7 +459,7 @@ func InvestorAmbil(db *sql.DB) gin.HandlerFunc {
 
 func InvestorGerakVoid(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if _, ok := middleware.HanyaAdminOwner(c); !ok {
+		if _, ok := middleware.HanyaAdminOwner(c); !ok || !lokasiKasBackOffice(c, db) {
 			return
 		}
 		mid, ok := utils.IDParam(c)

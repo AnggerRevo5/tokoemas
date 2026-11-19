@@ -5,7 +5,8 @@ import FormInvestor from '../components/investor/FormInvestor'
 import TabelInvestor from '../components/investor/TabelInvestor'
 import DetailInvestor from '../components/investor/DetailInvestor'
 
-export default function Investor() {
+export default function Investor({ mode = 'read', locationId, onUbah }) {
+  const canManage = mode === 'manage'
   const [rows, setRows] = useState([])
   const [terpilih, setTerpilih] = useState(null)
   const [detail, setDetail] = useState(null)
@@ -51,6 +52,7 @@ export default function Investor() {
   function muatUlang() {
     muatDaftar()
     muatDetail(terpilih)
+    if (canManage) onUbah?.()
   }
 
   const investor = rows.find((r) => r.id === terpilih)
@@ -59,18 +61,22 @@ export default function Investor() {
     <div>
       <Pesan error={error} info={info} />
 
-      <FormInvestor
-        onMulai={resetPesan}
-        onSukses={(res) => {
-          setInfo(res.message)
-          muatDaftar()
-        }}
-        onError={setError}
-      />
+      {canManage && (
+        <FormInvestor
+          locationId={locationId}
+          onMulai={resetPesan}
+          onSukses={(res) => {
+            setInfo(res.message)
+            muatDaftar()
+            onUbah?.()
+          }}
+          onError={setError}
+        />
+      )}
 
       <div className="card" style={{ marginTop: 16 }}>
-        <h3>Daftar Investor</h3>
-        <TabelInvestor rows={rows} terpilih={terpilih} onPilih={buka} />
+        <h3>{canManage ? 'Kelola Investor' : 'Catatan Investor'}</h3>
+        <TabelInvestor rows={rows} terpilih={terpilih} onPilih={buka} readOnly={!canManage} />
       </div>
 
       {terpilih && (
@@ -78,6 +84,8 @@ export default function Investor() {
           key={terpilih}
           nama={investor ? investor.name : ''}
           data={detail}
+          readOnly={!canManage}
+          locationId={locationId}
           onTutup={tutup}
           onSimpan={muatUlang}
           onPesan={setInfo}

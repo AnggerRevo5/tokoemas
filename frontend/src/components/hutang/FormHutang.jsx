@@ -6,7 +6,7 @@ import Spinner from '../common/Spinner'
 
 // Form terima dana baru atau catat hutang tanpa uang masuk.
 // onMulai: bersihkan pesan; onSukses(res): setelah tersimpan; onError(msg).
-export default function FormHutang({ onMulai, onSukses, onError }) {
+export default function FormHutang({ locationId, onMulai, onSukses, onError }) {
   const [loading, setLoading] = useState(false)
   const [mode, setMode] = useState('dana')
   const [jenis, setJenis] = useState('perorangan')
@@ -29,7 +29,8 @@ export default function FormHutang({ onMulai, onSukses, onError }) {
       note,
     }
     try {
-      const res = await api(mode === 'dana' ? '/dana/terima' : '/hutang', {
+      const path = mode === 'dana' ? '/dana/terima' : '/hutang'
+      const res = await api(`${path}?location_id=${locationId}`, {
         method: 'POST',
         body: JSON.stringify(body),
       })
@@ -55,7 +56,7 @@ export default function FormHutang({ onMulai, onSukses, onError }) {
       <h3>{mode === 'dana' ? 'Terima Dana Baru' : 'Catat Hutang Tanpa Uang Masuk'}</h3>
       <p className="muted">
         {mode === 'dana'
-          ? 'Sekali simpan: kas back office bertambah dan hutang tercatat atas nama pemberi dana. Dana dari investor dicatat lewat menu Investor, bukan di sini.'
+          ? 'Sekali simpan: kas Back Office bertambah dan hutang tercatat atas nama pemberi dana.'
           : 'Untuk hutang yang tidak membawa uang tunai, misalnya barang dari pabrik yang belum dibayar. Kas tidak berubah.'}
       </p>
 

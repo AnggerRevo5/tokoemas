@@ -7,6 +7,8 @@ import TabelTransaksi from '../components/transaksi/TabelTransaksi'
 import PenjualanDariKas from '../components/transaksi/PenjualanDariKas'
 import CardGadai from '../components/barang/CardGadai'
 import FilterKas, { FILTER_KAS_KOSONG } from '../components/transaksi/FilterKas'
+import Investor from './Investor'
+import Hutang from './Hutang'
 
 export default function Transaksi({ jenis, me }) {
   const isKas = jenis === 'kas'
@@ -27,6 +29,7 @@ export default function Transaksi({ jenis, me }) {
   const [gadaiItem, setGadaiItem] = useState(null)
 
   const lokasi = locations.find((l) => l.id === Number(locId))
+  const bisaKelolaKeuangan = (me.role === 'super_admin' || me.role === 'owner') && lokasi?.type === 'back_office'
 
   useEffect(() => {
     api('/locations')
@@ -131,6 +134,18 @@ export default function Transaksi({ jenis, me }) {
         }}
         onError={setError}
       />
+
+      {isKas && bisaKelolaKeuangan && (
+        <section style={{ marginTop: 24 }}>
+          <h3>Pengelolaan Investor &amp; Hutang</h3>
+          <p className="muted">
+            Input, pembayaran, dan pembatalan transaksi investor maupun hutang dilakukan di sini. Kas dan catatan
+            kewajiban akan diperbarui otomatis.
+          </p>
+          <Investor mode="manage" locationId={Number(locId)} onUbah={muat} />
+          <Hutang me={me} mode="manage" locationId={Number(locId)} onUbah={muat} />
+        </section>
+      )}
 
       <div className="card" style={{ marginTop: 16 }}>
         <h3>Riwayat{lokasi ? ` - ${lokasi.name}` : ''}</h3>

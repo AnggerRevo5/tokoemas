@@ -2,7 +2,7 @@ import { rupiah } from '../../utils/format'
 import { labelJenis } from '../../constants/hutang'
 import BarisKosong from '../common/BarisKosong'
 
-export default function TabelHutang({ rows, bisaVoid, onBayar, onBatal }) {
+export default function TabelHutang({ rows, bisaVoid, onBayar, onBatal, readOnly = false }) {
   return (
     <div className="table-wrap">
       <table>
@@ -14,11 +14,11 @@ export default function TabelHutang({ rows, bisaVoid, onBayar, onBatal }) {
             <th className="num">Sisa</th>
             <th>Jatuh tempo</th>
             <th>Status</th>
-            <th></th>
+            {!readOnly && <th></th>}
           </tr>
         </thead>
         <tbody>
-          {rows.length === 0 && <BarisKosong kolom="7">Belum ada hutang</BarisKosong>}
+          {rows.length === 0 && <BarisKosong kolom={readOnly ? '6' : '7'}>Belum ada hutang</BarisKosong>}
           {rows.map((r) => (
             <tr key={r.id}>
               <td>
@@ -39,7 +39,7 @@ export default function TabelHutang({ rows, bisaVoid, onBayar, onBatal }) {
                   {r.status === 'lunas' ? 'Lunas' : 'Aktif'}
                 </span>
               </td>
-              <td>
+              {!readOnly && <td>
                 {r.status === 'aktif' && (
                   <button type="button" className="mini primary" onClick={() => onBayar(r)}>
                     Bayar
@@ -50,7 +50,7 @@ export default function TabelHutang({ rows, bisaVoid, onBayar, onBatal }) {
                     Batalkan
                   </button>
                 )}
-              </td>
+              </td>}
             </tr>
           ))}
         </tbody>

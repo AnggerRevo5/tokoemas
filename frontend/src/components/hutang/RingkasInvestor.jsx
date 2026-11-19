@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../../services/api'
 import { rupiah } from '../../utils/format'
 
-// Ringkasan baca-saja dana investor di halaman Hutang. Datanya dikelola di menu Investor (setor, tarik pokok,
-// dan bunga otomatis tercatat di kas), jadi tidak diinput lagi di sini. Akun tanpa akses Investor tidak melihatnya.
+// Ringkasan baca-saja dana investor di halaman Hutang.
 export default function RingkasInvestor() {
   const [rows, setRows] = useState([])
 
@@ -25,8 +24,7 @@ export default function RingkasInvestor() {
         {aktif.length} investor, pokok yang ditanggung <b>{rupiah(pokok)}</b>, bunga belum dibayar <b>{rupiah(bunga)}</b>.
       </p>
       <p className="muted" style={{ marginBottom: 0 }}>
-        Termasuk kewajiban toko dan ikut di laporan Hutang. Setor, tarik pokok, dan bunga dicatat di menu Investor dan
-        kasnya ikut otomatis, jadi tidak perlu dimasukkan lagi di sini.
+        Termasuk kewajiban toko dan ikut di laporan Hutang. Pengelolaan transaksi dilakukan melalui Kas Back Office.
       </p>
     </div>
   )

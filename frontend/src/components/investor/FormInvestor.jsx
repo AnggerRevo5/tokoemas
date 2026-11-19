@@ -5,21 +5,20 @@ import Spinner from '../common/Spinner'
 
 // Form investor baru beserta setoran pertamanya. Tanggal setor pertama menjadi tanggal jatuh tempo bunga tiap bulan.
 // onMulai: bersihkan pesan; onSukses(res): setelah tersimpan; onError(msg).
-export default function FormInvestor({ onMulai, onSukses, onError }) {
+export default function FormInvestor({ locationId, onMulai, onSukses, onError }) {
   const [loading, setLoading] = useState(false)
   const [nama, setNama] = useState('')
   const [jumlah, setJumlah] = useState('')
   const [tanggal, setTanggal] = useState(hariIni())
   const [persen, setPersen] = useState('1')
   const [note, setNote] = useState('')
-  const [catatKas, setCatatKas] = useState(true)
 
   async function simpan(e) {
     e.preventDefault()
     onMulai()
     setLoading(true)
     try {
-      const res = await api('/investor', {
+      const res = await api(`/investor?location_id=${locationId}`, {
         method: 'POST',
         body: JSON.stringify({
           name: nama,
@@ -27,7 +26,7 @@ export default function FormInvestor({ onMulai, onSukses, onError }) {
           start_date: tanggal,
           rate_percent: Number(persen),
           note,
-          catat_kas: catatKas,
+          catat_kas: true,
         }),
       })
       setNama('')
@@ -75,12 +74,8 @@ export default function FormInvestor({ onMulai, onSukses, onError }) {
         </div>
       </div>
 
-      <label className="cek-item" style={{ margin: '10px 0' }}>
-        <input type="checkbox" checked={catatKas} onChange={(e) => setCatatKas(e.target.checked)} />
-        Catat setoran ini juga sebagai kas masuk back office (cukup diisi di sini, tidak perlu lagi di menu Hutang)
-      </label>
-
-      <button disabled={loading}>{loading ? <><Spinner />Menyimpan...</> : 'Simpan investor'}</button>
+      <p className="muted">Setoran awal otomatis tercatat sebagai kas masuk Back Office.</p>
+      <button disabled={loading}>{loading ? <><Spinner />Menyimpan...</> : 'Simpan investor dan kas masuk'}</button>
     </form>
   )
 }

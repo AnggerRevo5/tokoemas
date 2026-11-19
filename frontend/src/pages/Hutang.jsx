@@ -7,8 +7,9 @@ import FormHutang from '../components/hutang/FormHutang'
 import TabelHutang from '../components/hutang/TabelHutang'
 import RingkasInvestor from '../components/hutang/RingkasInvestor'
 
-export default function Hutang({ me }) {
-  const bisaVoid = me && me.role === 'super_admin'
+export default function Hutang({ me, mode = 'read', locationId, onUbah }) {
+  const canManage = mode === 'manage'
+  const bisaVoid = canManage && me && me.role === 'super_admin'
 
   const [rows, setRows] = useState([])
   const [error, setError] = useState('')
@@ -49,7 +50,7 @@ export default function Hutang({ me }) {
   async function konfirmasiBayar() {
     resetPesan()
     try {
-      const res = await api(`/hutang/${payId}/bayar`, {
+      const res = await api(`/hutang/${payId}/bayar?location_id=${locationId}`, {
         method: 'POST',
         body: JSON.stringify({ amount: Number(payAmount), note: payNote, paid_date: hariIni() }),
       })
@@ -57,6 +58,7 @@ export default function Hutang({ me }) {
       if (res.peringatan) setWarn(res.peringatan)
       setPayId(null)
       muat()
+      onUbah?.()
     } catch (err) {
       setError(err.message)
     }
@@ -76,13 +78,14 @@ export default function Hutang({ me }) {
     }
     resetPesan()
     try {
-      const res = await api(`/dana/void/${voidId}`, {
+      const res = await api(`/dana/void/${voidId}?location_id=${locationId}`, {
         method: 'POST',
         body: JSON.stringify({ reason: alasan }),
       })
       setInfo(res.message)
       setVoidId(null)
       muat()
+      onUbah?.()
     } catch (err) {
       setError(err.message)
     }
@@ -97,19 +100,23 @@ export default function Hutang({ me }) {
 
       <RingkasInvestor />
 
-      <FormHutang
-        onMulai={resetPesan}
-        onSukses={(res) => {
-          setInfo(res.message)
-          muat()
-        }}
-        onError={setError}
-      />
+      {canManage && (
+        <FormHutang
+          locationId={locationId}
+          onMulai={resetPesan}
+          onSukses={(res) => {
+            setInfo(res.message)
+            muat()
+            onUbah?.()
+          }}
+          onError={setError}
+        />
+      )}
 
       <div className="card" style={{ marginTop: 16 }}>
-        <h3>Daftar Hutang</h3>
+        <h3>{canManage ? 'Kelola Hutang' : 'Catatan Hutang'}</h3>
 
-        {payRow && (
+        {canManage && payRow && (
           <KotakBatal
             danger={false}
             labelKonfirmasi="Bayar"
@@ -137,7 +144,7 @@ export default function Hutang({ me }) {
           </KotakBatal>
         )}
 
-        {voidRow && (
+        {canManage && voidRow && (
           <KotakBatal onKonfirmasi={konfirmasiBatal} onTutup={() => setVoidId(null)}>
             <div>
               Batalkan hutang <b>{voidRow.creditor_name}</b> ({rupiah(voidRow.principal)}).
@@ -147,7 +154,7 @@ export default function Hutang({ me }) {
           </KotakBatal>
         )}
 
-        <TabelHutang rows={rows} bisaVoid={bisaVoid} onBayar={mulaiBayar} onBatal={mulaiBatal} />
+        <TabelHutang rows={rows} bisaVoid={bisaVoid} onBayar={mulaiBayar} onBatal={mulaiBatal} readOnly={!canManage} />
       </div>
     </div>
   )

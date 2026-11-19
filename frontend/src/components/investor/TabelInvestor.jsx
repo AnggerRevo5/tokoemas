@@ -1,7 +1,7 @@
 import { rupiah, tgl10 } from '../../utils/format'
 import BarisKosong from '../common/BarisKosong'
 
-export default function TabelInvestor({ rows, terpilih, onPilih }) {
+export default function TabelInvestor({ rows, terpilih, onPilih, readOnly = false }) {
   return (
     <div className="table-wrap">
       <table>
@@ -34,7 +34,7 @@ export default function TabelInvestor({ rows, terpilih, onPilih }) {
               <td className="num">{r.jatuh_tempo_berikut ? rupiah(r.perkiraan_bunga_berikut) : '-'}</td>
               <td>
                 <button type="button" className="mini primary" onClick={() => onPilih(r.id)}>
-                  Kelola
+                  {readOnly ? 'Lihat' : 'Kelola'}
                 </button>
               </td>
             </tr>

@@ -21,7 +21,7 @@ var jenisHutang = map[string]bool{"perorangan": true, "pabrik": true, "bank_pega
 func HutangCreate(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		cl, ok := middleware.HanyaAdminOwner(c)
-		if !ok {
+		if !ok || !lokasiKasBackOffice(c, db) {
 			return
 		}
 		var req models.HutangCreateRequest
@@ -76,7 +76,7 @@ func HutangCreate(db *sql.DB) gin.HandlerFunc {
 func HutangTerimaDana(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		cl, ok := middleware.HanyaAdminOwner(c)
-		if !ok {
+		if !ok || !lokasiKasBackOffice(c, db) {
 			return
 		}
 		var req models.HutangTerimaDanaRequest
@@ -195,7 +195,7 @@ func HutangList(db *sql.DB) gin.HandlerFunc {
 func HutangBayar(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		cl, ok := middleware.HanyaAdminOwner(c)
-		if !ok {
+		if !ok || !lokasiKasBackOffice(c, db) {
 			return
 		}
 		id, ok := utils.IDParam(c)
@@ -301,7 +301,7 @@ func HutangBayar(db *sql.DB) gin.HandlerFunc {
 func HutangVoid(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		_, ok := middleware.HanyaSuperAdmin(c)
-		if !ok {
+		if !ok || !lokasiKasBackOffice(c, db) {
 			return
 		}
 		id, ok := utils.IDParam(c)
