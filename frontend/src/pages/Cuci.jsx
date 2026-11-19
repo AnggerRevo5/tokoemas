@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { api } from '../services/api'
 import { gram } from '../utils/format'
 import Pesan from '../components/common/Pesan'
+import AntrianCuci from '../components/cuci/AntrianCuci'
 import FormAksiCuci from '../components/cuci/FormAksiCuci'
 import TabelDaftarCuci from '../components/cuci/TabelDaftarCuci'
 import BarangDiPencuci from '../components/cuci/BarangDiPencuci'
@@ -18,6 +19,7 @@ export default function Cuci({ me }) {
   const [locations, setLocations] = useState([])
   const [rows, setRows] = useState([])
   const [items, setItems] = useState([])
+  const [antrian, setAntrian] = useState([])
   const [pilihKirim, setPilihKirim] = useState({})
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
@@ -30,6 +32,7 @@ export default function Cuci({ me }) {
     api(`/cuci?${p}`).then(setRows).catch((e) => setError(e.message))
     if (!isCabang) {
       api('/cucian/barang').then(setItems).catch(() => {})
+      api('/cuci/antrian').then(setAntrian).catch((e) => setError(e.message))
     }
   }, [filter, fp, tampilkanSeluruhBatch, isCabang])
 
@@ -113,8 +116,10 @@ export default function Cuci({ me }) {
       <div className="card">
         <h3>Daftar Cuci</h3>
         <p className="muted">
-          Owner memilih barang di menu Stok lalu klik Cuci. PJ memilih barang yang akan dikirim, menimbang tiap
-          barang (berat awal), lalu mengirimnya ke pencuci. Saat barang kembali, PJ menimbang lagi (berat sesudah) dan mencatat susutnya. Barang yang
+          Owner memilih barang di menu Stok lalu klik Cuci untuk memasukkannya ke antrean tanpa mengelompokkan.
+          PJ memilih barang dari lokasi asal yang sama untuk membentuk pekerjaan, lalu memilih barang yang akan
+          dikirim dan menimbang tiap barang (berat awal). Saat barang kembali, PJ menimbang lagi (berat sesudah)
+          dan mencatat susutnya. Barang yang
           selesai dikembalikan ke back office dengan berat terbaru, lalu owner mengonfirmasi sudah diterima.
           Kalau tidak jadi dicuci, PJ bisa membatalkan dan mengembalikan barang yang belum selesai.
         </p>
@@ -173,6 +178,20 @@ export default function Cuci({ me }) {
               </button>
             </div>
           </div>
+        )}
+
+        {!isCabang && ['pj', 'owner', 'super_admin'].includes(me.role) && (
+          <AntrianCuci
+            rows={antrian}
+            locations={locations}
+            role={me.role}
+            onSelesai={(pesan) => {
+              setInfo(pesan)
+              setError('')
+              muat()
+            }}
+            onError={setError}
+          />
         )}
 
         {aksi && (

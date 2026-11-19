@@ -26,6 +26,10 @@ func CuciMulai(db *sql.DB) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "data tidak valid"})
 			return
 		}
+		ids, _, ok := cuciIDsUnik(c, req.ItemIDs)
+		if !ok {
+			return
+		}
 		tgl, ok := utils.ParseTanggal(c, req.StartDate)
 		if !ok {
 			return
@@ -43,47 +47,36 @@ func CuciMulai(db *sql.DB) gin.HandlerFunc {
 		}
 		defer tx.Rollback()
 
-		items, ok := barangDiBO(c, tx, req.ItemIDs, boID)
+		items, ok := barangDiBO(c, tx, ids, boID)
 		if !ok {
 			return
 		}
-		asal, err := services.AmbilAsal(tx, services.Kunci(items))
-		if err != nil {
-			utils.Gagal(c, err)
-			return
-		}
-		groups := map[int][]models.ItemRow{}
-		for id, it := range items {
-			groups[asal[id]] = append(groups[asal[id]], it)
-		}
-
 		note := strings.TrimSpace(req.Note)
-		jobs := 0
-		for origin, g := range groups {
-			nama, berat, qty, karat := services.Ringkas(g)
-			res, err := tx.Exec(
-				`INSERT INTO washing_jobs (origin_location_id, item_name, weight_gram, karat, qty, washer_name, status, start_date, note, created_by)
-				 VALUES (?,?,?,?,?,'','menunggu',?,?,?)`,
-				origin, nama, berat, karat, qty, tgl, note, cl.UserID,
+		for _, id := range ids {
+			it := items[id]
+			result, err := tx.Exec(
+				"UPDATE items SET status = 'cuci', washing_job_id = NULL WHERE id = ? AND status = 'tersedia' AND location_id = ?",
+				it.ID, boID,
 			)
 			if err != nil {
 				utils.Gagal(c, err)
 				return
 			}
-			jobID, _ := res.LastInsertId()
-			for _, it := range g {
-				if _, err := tx.Exec(services.SQLStokItem, boID, "out", "cuci", it.Name, it.Weight, it.Karat,
-					"Masuk antrean cuci", tgl, cl.UserID, it.ID); err != nil {
-					utils.Gagal(c, err)
-					return
-				}
-				if _, err := tx.Exec("UPDATE items SET status = 'cuci', washing_job_id = ? WHERE id = ?", jobID, it.ID); err != nil {
-					utils.Gagal(c, err)
-					return
-				}
+			n, err := result.RowsAffected()
+			if err != nil || n != 1 {
+				utils.Gagal(c, fmt.Errorf("barang %s tidak berhasil dimasukkan ke antrean cuci", it.Name))
+				return
 			}
-			services.CatatAudit(tx, middleware.Meta(c), "cuci_mulai", "washing_jobs", jobID, gin.H{"jumlah": len(g)})
-			jobs++
+			if _, err := tx.Exec(
+				"INSERT INTO washing_queue_items (item_id, queued_date, note, queued_by) VALUES (?,?,?,?)",
+				it.ID, tgl, note, cl.UserID,
+			); err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			services.CatatAudit(tx, middleware.Meta(c), "cuci_antre", "washing_queue_items", int64(it.ID), gin.H{
+				"queued_date": tgl, "note": note,
+			})
 		}
 
 		if err := tx.Commit(); err != nil {
@@ -91,9 +84,325 @@ func CuciMulai(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		c.JSON(http.StatusCreated, gin.H{
-			"message": fmt.Sprintf("%d barang masuk antrean cuci (%d pekerjaan), menunggu PJ mengirim ke pencuci", len(items), jobs),
+			"message": fmt.Sprintf("%d barang masuk antrean cuci untuk dikelompokkan PJ", len(items)),
 		})
 	}
+}
+
+func CuciAntrian(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if _, ok := middleware.HanyaPeran(c, "pj", "owner", "super_admin"); !ok {
+			return
+		}
+		rows, err := db.Query(`
+			SELECT i.id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''), i.weight_gram,
+			       i.origin_location_id, o.name, q.queued_date, q.note
+			FROM washing_queue_items q
+			JOIN items i ON i.id = q.item_id
+			JOIN locations o ON o.id = i.origin_location_id
+			WHERE i.is_void = FALSE AND i.status = 'cuci' AND i.washing_job_id IS NULL
+			ORDER BY q.queued_date, q.created_at, i.id`)
+		if err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		defer rows.Close()
+		out := []models.CuciAntrianRow{}
+		for rows.Next() {
+			var r models.CuciAntrianRow
+			if err := rows.Scan(&r.ID, &r.ItemNo, &r.ItemName, &r.Karat, &r.WeightGram,
+				&r.OriginLocation, &r.Asal, &r.QueuedDate, &r.Note); err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			out = append(out, r)
+		}
+		if err := rows.Err(); err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		c.JSON(http.StatusOK, out)
+	}
+}
+
+func CuciAntrianBatal(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		_, ok := middleware.HanyaAdminOwner(c)
+		if !ok {
+			return
+		}
+		var req models.CuciAntrianBatalRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "data tidak valid"})
+			return
+		}
+		ids, args, ok := cuciIDsUnik(c, req.ItemIDs)
+		if !ok {
+			return
+		}
+		tx, err := db.Begin()
+		if err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		defer tx.Rollback()
+
+		items, err := services.AmbilBarang(tx, ids)
+		if err != nil {
+			balasKesalahan(c, err)
+			return
+		}
+		rows, err := tx.Query(
+			`SELECT q.item_id FROM washing_queue_items q
+			 JOIN items i ON i.id = q.item_id
+			 WHERE q.item_id IN (`+utils.Placeholders(len(args))+`)
+			   AND i.status = 'cuci' AND i.washing_job_id IS NULL AND i.is_void = FALSE
+			 ORDER BY q.item_id FOR UPDATE`, args...)
+		if err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		queued := map[int]bool{}
+		for rows.Next() {
+			var id int
+			if err := rows.Scan(&id); err != nil {
+				rows.Close()
+				utils.Gagal(c, err)
+				return
+			}
+			queued[id] = true
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			utils.Gagal(c, err)
+			return
+		}
+		rows.Close()
+		if len(queued) != len(ids) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ada barang yang bukan lagi dalam antrean cuci"})
+			return
+		}
+		for _, id := range ids {
+			it := items[id]
+			if it.Status != "cuci" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s tidak lagi menunggu proses cuci", it.Name)})
+				return
+			}
+			result, err := tx.Exec(
+				"UPDATE items SET status = 'tersedia' WHERE id = ? AND status = 'cuci' AND washing_job_id IS NULL", id)
+			if err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			n, err := result.RowsAffected()
+			if err != nil || n != 1 {
+				utils.Gagal(c, fmt.Errorf("barang %s tidak berhasil ditarik dari antrean cuci", it.Name))
+				return
+			}
+			result, err = tx.Exec("DELETE FROM washing_queue_items WHERE item_id = ?", id)
+			if err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			n, err = result.RowsAffected()
+			if err != nil || n != 1 {
+				utils.Gagal(c, fmt.Errorf("barang %s tidak berhasil dihapus dari antrean cuci", it.Name))
+				return
+			}
+			services.CatatAudit(tx, middleware.Meta(c), "cuci_antre_batal", "items", int64(id), gin.H{"status": "tersedia"})
+		}
+		if err := tx.Commit(); err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("%d barang ditarik dari antrean cuci dan kembali tersedia", len(ids))})
+	}
+}
+
+func CuciBuatBatch(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		cl, ok := middleware.HanyaPJ(c)
+		if !ok {
+			return
+		}
+		var req models.CuciBuatBatchRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "data tidak valid"})
+			return
+		}
+		ids, args, ok := cuciIDsUnik(c, req.ItemIDs)
+		if !ok {
+			return
+		}
+		tgl, ok := utils.ParseTanggal(c, req.StartDate)
+		if !ok {
+			return
+		}
+		boID, err := services.IDBackOffice(db)
+		if err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		tx, err := db.Begin()
+		if err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		defer tx.Rollback()
+
+		items, err := services.AmbilBarang(tx, ids)
+		if err != nil {
+			balasKesalahan(c, err)
+			return
+		}
+		rows, err := tx.Query(
+			`SELECT q.item_id, q.note, i.origin_location_id
+			 FROM washing_queue_items q
+			 JOIN items i ON i.id = q.item_id
+			 WHERE q.item_id IN (`+utils.Placeholders(len(args))+`)
+			   AND i.status = 'cuci' AND i.washing_job_id IS NULL AND i.is_void = FALSE
+			 ORDER BY q.item_id FOR UPDATE`, args...)
+		if err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		type queuedItem struct {
+			Note   string
+			Origin int
+		}
+		queued := map[int]queuedItem{}
+		for rows.Next() {
+			var id int
+			var q queuedItem
+			if err := rows.Scan(&id, &q.Note, &q.Origin); err != nil {
+				rows.Close()
+				utils.Gagal(c, err)
+				return
+			}
+			queued[id] = q
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			utils.Gagal(c, err)
+			return
+		}
+		rows.Close()
+		if len(queued) != len(ids) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ada barang yang tidak lagi dalam antrean cuci"})
+			return
+		}
+
+		origin := 0
+		group := make([]models.ItemRow, 0, len(ids))
+		catatan := map[string]bool{}
+		for _, id := range ids {
+			it := items[id]
+			q := queued[id]
+			if it.Status != "cuci" || it.Location != boID {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s tidak memenuhi syarat untuk dibentuk menjadi pekerjaan cuci", it.Name)})
+				return
+			}
+			if origin != 0 && origin != q.Origin {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "barang dari lokasi asal berbeda tidak bisa digabung dalam satu pekerjaan cuci"})
+				return
+			}
+			origin = q.Origin
+			group = append(group, it)
+			if note := strings.TrimSpace(q.Note); note != "" {
+				catatan[note] = true
+			}
+		}
+		if note := strings.TrimSpace(req.Note); note != "" {
+			catatan[note] = true
+		}
+		notes := make([]string, 0, len(catatan))
+		for note := range catatan {
+			notes = append(notes, note)
+		}
+		sort.Strings(notes)
+		note := utils.BatasTeks(strings.Join(notes, "; "), 200)
+		nama, berat, qty, karat := services.Ringkas(group)
+		res, err := tx.Exec(
+			`INSERT INTO washing_jobs (origin_location_id, item_name, weight_gram, karat, qty, washer_name, status, start_date, note, created_by)
+			 VALUES (?,?,?,?,?,'','menunggu',?,?,?)`,
+			origin, nama, berat, karat, qty, tgl, note, cl.UserID,
+		)
+		if err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		jobID, err := res.LastInsertId()
+		if err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		for _, id := range ids {
+			it := items[id]
+			if _, err := tx.Exec(services.SQLStokItem, boID, "out", "cuci", it.Name, it.Weight, it.Karat,
+				"Masuk antrean cuci", tgl, cl.UserID, it.ID); err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			result, err := tx.Exec(
+				"UPDATE items SET washing_job_id = ? WHERE id = ? AND status = 'cuci' AND washing_job_id IS NULL", jobID, id)
+			if err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			n, err := result.RowsAffected()
+			if err != nil || n != 1 {
+				utils.Gagal(c, fmt.Errorf("barang %s tidak berhasil dimasukkan ke pekerjaan cuci", it.Name))
+				return
+			}
+			result, err = tx.Exec("DELETE FROM washing_queue_items WHERE item_id = ?", id)
+			if err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			n, err = result.RowsAffected()
+			if err != nil || n != 1 {
+				utils.Gagal(c, fmt.Errorf("barang %s tidak berhasil dikeluarkan dari antrean cuci", it.Name))
+				return
+			}
+		}
+		services.CatatAudit(tx, middleware.Meta(c), "cuci_mulai", "washing_jobs", jobID, gin.H{
+			"jumlah": len(ids), "berat": berat, "items": ids,
+		})
+		if err := tx.Commit(); err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		c.JSON(http.StatusCreated, gin.H{
+			"id": jobID, "message": fmt.Sprintf("%d barang dibentuk menjadi pekerjaan cuci #%d", len(ids), jobID),
+		})
+	}
+}
+
+func cuciIDsUnik(c *gin.Context, itemIDs []int) ([]int, []interface{}, bool) {
+	if len(itemIDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "pilih minimal satu barang"})
+		return nil, nil, false
+	}
+	if len(itemIDs) > 300 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "maksimal 300 barang sekali proses"})
+		return nil, nil, false
+	}
+	ids := make([]int, 0, len(itemIDs))
+	seen := map[int]bool{}
+	for _, id := range itemIDs {
+		if id <= 0 || seen[id] {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "barang tidak valid atau dipilih lebih dari sekali"})
+			return nil, nil, false
+		}
+		seen[id] = true
+		ids = append(ids, id)
+	}
+	sort.Ints(ids)
+	args := make([]interface{}, 0, len(ids))
+	for _, id := range ids {
+		args = append(args, id)
+	}
+	return ids, args, true
 }
 
 // ---------- PJ: KIRIM KE PENCUCI ----------
@@ -174,14 +483,17 @@ func CucianNotif(db *sql.DB) gin.HandlerFunc {
 		n := 0
 		if cl.Role == "pj" || cl.Role == "super_admin" {
 			db.QueryRow(`
-				SELECT COUNT(DISTINCT w.id)
-				FROM washing_jobs w
-				JOIN items i ON i.washing_job_id = w.id AND i.status = 'cuci' AND i.is_void = FALSE
-				LEFT JOIN washing_job_items x ON x.job_id = w.id AND x.item_id = i.id
-				WHERE w.is_void = FALSE
-				  AND w.status IN ('menunggu','proses')
-				  AND NOT (x.weight_before IS NOT NULL OR (w.status = 'proses' AND
-				       NOT EXISTS (SELECT 1 FROM washing_job_items x0 WHERE x0.job_id = w.id)))
+				SELECT
+					(SELECT COUNT(DISTINCT w.id)
+					 FROM washing_jobs w
+					 JOIN items i ON i.washing_job_id = w.id AND i.status = 'cuci' AND i.is_void = FALSE
+					 LEFT JOIN washing_job_items x ON x.job_id = w.id AND x.item_id = i.id
+					 WHERE w.is_void = FALSE AND w.status IN ('menunggu','proses')
+					   AND NOT (x.weight_before IS NOT NULL OR (w.status = 'proses' AND
+					        NOT EXISTS (SELECT 1 FROM washing_job_items x0 WHERE x0.job_id = w.id))))
+					+ (SELECT COUNT(*) FROM washing_queue_items q
+					   JOIN items i ON i.id = q.item_id
+					   WHERE i.status = 'cuci' AND i.washing_job_id IS NULL AND i.is_void = FALSE)
 			`).Scan(&n)
 		}
 		c.JSON(http.StatusOK, gin.H{"badge": n})

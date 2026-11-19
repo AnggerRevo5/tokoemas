@@ -10,6 +10,7 @@ export const STATUS_LABEL = {
   tersedia: 'Tersedia',
   dikirim: 'Dalam perjalanan',
   cuci: 'Proses cuci',
+  cuci_antrean: 'Antrean cuci (menunggu PJ)',
   lebur: 'Dilebur',
   lebur_antrean: 'Antrean lebur (menunggu PJ)',
   hasil: 'Hasil lebur',
@@ -27,6 +28,7 @@ export const STATUS_CLASS = {
   tersedia: 'tag in',
   dikirim: 'tag warn',
   cuci: 'tag info',
+  cuci_antrean: 'tag warn',
   lebur: 'tag info',
   lebur_antrean: 'tag warn',
   hasil: 'tag gray',
@@ -55,7 +57,7 @@ export const KETERANGAN_AKSI = {
   lebur:
     'Barang masuk antrean PJ untuk dilebur dan tidak bisa dipakai untuk transaksi lain. PJ memilih barang mana yang digabung menjadi satu batch. Stok berkurang saat PJ membentuk batch.',
   cuci:
-    'Stok back office berkurang dan barang masuk antrean cuci. PJ yang mengirimnya ke pencuci dan mencatat saat selesai di menu Cuci. Barang yang selesai berstatus Bersih.',
+    'Barang masuk antrean PJ untuk dicuci dan tidak bisa dipakai untuk transaksi lain. PJ memilih barang mana yang digabung menjadi satu pekerjaan cuci. Stok berkurang saat PJ membentuk pekerjaan, lalu PJ mengirimnya ke pencuci dan mencatat saat selesai. Barang yang selesai berstatus Bersih.',
   gadai:
     'Dana yang diterima masuk ke kas toko ini dan barang berstatus Digadai sampai lunas. Cicilan tiap bulan dikonfirmasi dari card barang (klik nama barangnya).',
   jual: 'Isi harga jual tiap barang. Total harga jual otomatis masuk ke kas toko ini (menu Kas), tidak perlu diinput lagi.',

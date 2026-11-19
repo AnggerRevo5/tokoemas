@@ -58,6 +58,9 @@ func main() {
 	if err := services.SiapkanSkemaAntrianLebur(db); err != nil {
 		log.Fatal(err)
 	}
+	if err := services.SiapkanSkemaAntrianCuci(db); err != nil {
+		log.Fatal(err)
+	}
 	if err := services.SiapkanSkemaKirim(db); err != nil {
 		log.Fatal(err)
 	}

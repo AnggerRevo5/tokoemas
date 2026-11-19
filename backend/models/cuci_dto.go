@@ -14,6 +14,16 @@ type CuciMulaiRequest struct {
 	Note      string `json:"note" binding:"max=200"`
 }
 
+type CuciBuatBatchRequest struct {
+	ItemIDs   []int  `json:"item_ids" binding:"max=300,dive,gt=0"`
+	StartDate string `json:"start_date" binding:"max=10"`
+	Note      string `json:"note" binding:"max=200"`
+}
+
+type CuciAntrianBatalRequest struct {
+	ItemIDs []int `json:"item_ids" binding:"max=300,dive,gt=0"`
+}
+
 // CuciSelesaiBarangLangsungRequest adalah payload JSON untuk CuciSelesaiBarangLangsung.
 type CuciSelesaiBarangLangsungRequest struct {
 	ItemIDs    []int  `json:"item_ids" binding:"max=1000,dive,gt=0"`
@@ -79,6 +89,18 @@ type CuciListRow struct {
 	BeratAwalSelesai float64       `json:"berat_awal_selesai"`
 	BeratSesudah     float64       `json:"berat_sesudah"`
 	Items            []CuciItemRow `json:"items"`
+}
+
+type CuciAntrianRow struct {
+	ID             int       `json:"id"`
+	ItemNo         string    `json:"item_no"`
+	ItemName       string    `json:"item_name"`
+	Karat          string    `json:"karat"`
+	WeightGram     float64   `json:"weight_gram"`
+	OriginLocation int       `json:"origin_location_id"`
+	Asal           string    `json:"asal"`
+	QueuedDate     time.Time `json:"queued_date"`
+	Note           string    `json:"note"`
 }
 
 // CuciItemRow: satu barang di dalam pekerjaan cuci (untuk mencocokkan barang fisik).
