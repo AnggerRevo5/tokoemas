@@ -83,7 +83,7 @@ export default function Lebur({ me }) {
           Angka berat di tabel: awal → setelah dipotong → leburan kotor → cukim.
         </p>
 
-        <FilterProduksi f={fp} onUbah={setFp} locations={locations}
+        <FilterProduksi f={fp} onUbah={setFp} locations={locations} multipleKarat
           labelNama="Nama atau nomor barang" labelOrang="Dicatat oleh (leburan atau cukim)"
           aksiTambahan={
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>

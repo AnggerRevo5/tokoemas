@@ -124,7 +124,7 @@ export default function Cuci({ me }) {
           Kalau tidak jadi dicuci, PJ bisa membatalkan dan mengembalikan barang yang belum selesai.
         </p>
 
-        <FilterProduksi f={fp} onUbah={setFp} locations={locations} tampilAsal={!isCabang}
+        <FilterProduksi f={fp} onUbah={setFp} locations={locations} tampilAsal={!isCabang} multipleKarat
           labelNama="Nama atau nomor barang" labelOrang="Pencuci"
           aksiTambahan={
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>

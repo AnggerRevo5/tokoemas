@@ -27,7 +27,7 @@ export default function BarangDiPencuci({ items, fp, statusF, locations, bisaCat
     const mulai = r.start_date.slice(0, 10)
     return (
       (!s || r.item_name.toLowerCase().includes(s) || (r.item_no || '').toLowerCase().includes(s)) &&
-      (!fp.karat || r.karat === fp.karat) &&
+      (!fp.karats?.length || fp.karats.includes(r.karat)) &&
       (!fp.berat_min || r.berat_awal >= Number(fp.berat_min)) &&
       (!fp.berat_max || r.berat_awal <= Number(fp.berat_max)) &&
       (!asal || r.asal === asal.name) &&

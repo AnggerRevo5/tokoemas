@@ -54,4 +54,9 @@ func TestSyaratKadarBerat(t *testing.T) {
 	if sy, args := syaratKadarBerat(c, "i", "i.weight_gram"); sy != "" || len(args) != 0 {
 		t.Fatalf("kadar tidak dikenal harus diabaikan: %s %v", sy, args)
 	}
+	c, _ = gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest("GET", "/?karat=17K&karat=18&karat=17", nil)
+	if sy, args := syaratKadarBerat(c, "i", "i.weight_gram"); sy != " AND i.karat IN (?,?)" || len(args) != 2 || args[0] != "17K" || args[1] != "18K" {
+		t.Fatalf("filter beberapa kadar salah: %v (%s)", args, sy)
+	}
 }

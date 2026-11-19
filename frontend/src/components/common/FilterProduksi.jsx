@@ -1,12 +1,13 @@
 import { KARAT } from '../../constants/barang'
 
-export const FILTER_PRODUKSI_KOSONG = { q: '', karat: '', berat_min: '', berat_max: '', asal: '', dari: '', sampai: '', orang: '' }
+export const FILTER_PRODUKSI_KOSONG = { q: '', karat: '', karats: [], berat_min: '', berat_max: '', asal: '', dari: '', sampai: '', orang: '' }
 
 // susun parameter query untuk server (nama field sama dengan yang dibaca backend)
 export function paramProduksi(f) {
   const p = new URLSearchParams()
+  if (f.karats?.length) f.karats.forEach((k) => p.append('karat', k))
   const peta = {
-    q: f.q.trim(), karat: f.karat, berat_min: f.berat_min, berat_max: f.berat_max,
+    q: f.q.trim(), karat: f.karats?.length ? '' : f.karat, berat_min: f.berat_min, berat_max: f.berat_max,
     asal: f.asal, from: f.dari, to: f.sampai, orang: f.orang.trim(),
   }
   Object.entries(peta).forEach(([k, v]) => v && p.set(k, v))
@@ -15,9 +16,16 @@ export function paramProduksi(f) {
 
 // Filter bersama untuk menu Cuci, Lebur, dan Service. children = filter status milik halaman.
 // labelOrang: nama kolom orangnya (Pencuci, Penyervice, Dicatat oleh); tampilAsal=false untuk akun cabang.
-export default function FilterProduksi({ f, onUbah, locations, tampilAsal = true, labelNama, labelOrang, children, aksiTambahan }) {
+export default function FilterProduksi({ f, onUbah, locations, tampilAsal = true, labelNama, labelOrang, children, aksiTambahan, multipleKarat = false }) {
   const set = (bagian) => onUbah({ ...f, ...bagian })
   const aktif = JSON.stringify(f) !== JSON.stringify(FILTER_PRODUKSI_KOSONG)
+  const karats = f.karats || []
+  const toggleKarat = (karat) => {
+    const next = karats.includes(karat)
+      ? karats.filter((k) => k !== karat)
+      : [...karats, karat]
+    set({ karat: '', karats: next })
+  }
   return (
     <div style={{ marginBottom: 12 }}>
       <div className="form-grid">
@@ -28,10 +36,39 @@ export default function FilterProduksi({ f, onUbah, locations, tampilAsal = true
         </div>
         <div>
           <label>Kadar</label>
-          <select value={f.karat} onChange={(e) => set({ karat: e.target.value })}>
-            <option value="">Semua</option>
-            {KARAT.map((n) => <option key={n} value={`${n}K`}>{n}K</option>)}
-          </select>
+          {multipleKarat ? (
+            <details className="filter-kadar-dropdown">
+              <summary>{karats.length ? `${karats.length} kadar dipilih` : 'Semua kadar'}</summary>
+              <div className="filter-kadar-pilihan">
+                <div className="filter-kadar-aksi">
+                  <button type="button" className="mini" onClick={() => set({ karat: '', karats: KARAT.map((n) => `${n}K`) })}>
+                    Pilih semua
+                  </button>
+                  {karats.length > 0 && (
+                    <button type="button" className="mini" onClick={() => set({ karat: '', karats: [] })}>
+                      Hapus pilihan
+                    </button>
+                  )}
+                </div>
+                <div className="filter-kadar-grid">
+                  {KARAT.map((n) => {
+                    const value = `${n}K`
+                    return (
+                      <label key={n}>
+                        <input type="checkbox" checked={karats.includes(value)} onChange={() => toggleKarat(value)} />
+                        {value}
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            </details>
+          ) : (
+            <select value={f.karat} onChange={(e) => set({ karat: e.target.value, karats: [] })}>
+              <option value="">Semua</option>
+              {KARAT.map((n) => <option key={n} value={`${n}K`}>{n}K</option>)}
+            </select>
+          )}
         </div>
         <div>
           <label>Berat dari (g)</label>

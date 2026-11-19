@@ -306,11 +306,66 @@ input[type="checkbox"]:disabled { opacity: 0.4; cursor: not-allowed; }
 .total-bar b { color: var(--text); font-weight: 650; font-variant-numeric: tabular-nums; }
 .total-bar .utama { color: var(--gold-text); }
 
+.filter-kadar-dropdown { position: relative; }
+.filter-kadar-dropdown > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 42px;
+  padding: 9px 34px 9px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  background: var(--surface);
+  cursor: pointer;
+  list-style: none;
+}
+.filter-kadar-dropdown > summary::-webkit-details-marker { display: none; }
+.filter-kadar-dropdown > summary::after {
+  content: "";
+  position: absolute;
+  right: 14px;
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+}
+.filter-kadar-dropdown[open] > summary::after { transform: translateY(2px) rotate(225deg); }
+.filter-kadar-pilihan {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 5px);
+  left: 0;
+  width: min(320px, 85vw);
+  padding: 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.filter-kadar-aksi { display: flex; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.filter-kadar-aksi button { width: auto; min-height: 32px; margin: 0; padding: 5px 9px; font-size: 12px; }
+.filter-kadar-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px 8px; max-height: 240px; overflow-y: auto; padding-top: 8px; }
+.filter-kadar-grid > label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  margin: 0;
+  padding: 4px 6px;
+  border-radius: 5px;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+.filter-kadar-grid > label:hover { background: var(--surface-2); }
+
 .lebur-antrian > summary,
 .lebur-antrian-filter > summary {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
   cursor: pointer;
   list-style: none;
@@ -322,19 +377,21 @@ input[type="checkbox"]:disabled { opacity: 0.4; cursor: not-allowed; }
 .lebur-antrian-ringkasan > span:first-child { display: flex; flex-direction: column; gap: 3px; }
 .lebur-antrian-ringkasan strong { font-size: 15.5px; }
 .lebur-antrian-ringkasan small { color: var(--muted); font-size: 12.5px; }
-.lebur-antrian-ringkasan::after,
+.lebur-antrian-ringkasan::before,
 .lebur-antrian-filter > summary::after {
   content: "";
+  flex: 0 0 9px;
   width: 9px;
   height: 9px;
   border-right: 1.5px solid currentColor;
   border-bottom: 1.5px solid currentColor;
-  transform: rotate(45deg);
+  transform: rotate(-45deg);
   transition: transform 0.15s var(--ease);
 }
-.lebur-antrian[open] > .lebur-antrian-ringkasan::after,
+.lebur-antrian[open] > .lebur-antrian-ringkasan::before { transform: rotate(45deg); }
 .lebur-antrian-filter[open] > summary::after { transform: rotate(225deg); }
 .lebur-antrian-terpilih {
+  margin-left: auto;
   padding: 5px 9px;
   border-radius: 999px;
   background: var(--surface-2);

@@ -23,7 +23,7 @@ export default function AntrianLebur({ rows, locations, role, onSelesai, onError
       const tanggalAntre = r.queued_date.slice(0, 10)
       return (
         (!q || `${r.item_no} ${r.item_name}`.toLowerCase().includes(q)) &&
-        (!filter.karat || r.karat === filter.karat) &&
+        (!filter.karats?.length || filter.karats.includes(r.karat)) &&
         (!filter.berat_min || r.weight_gram >= Number(filter.berat_min)) &&
         (!filter.berat_max || r.weight_gram <= Number(filter.berat_max)) &&
         (!filter.asal || String(r.origin_location_id) === filter.asal) &&
@@ -105,6 +105,7 @@ export default function AntrianLebur({ rows, locations, role, onSelesai, onError
           onUbah={setFilter}
           locations={locations}
           labelNama="Nama atau nomor barang"
+          multipleKarat
         />
       </details>
       <div className="total-bar lebur-antrian-total">

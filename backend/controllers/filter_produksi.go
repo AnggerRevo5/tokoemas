@@ -56,13 +56,28 @@ func syaratCariStok(q string) (string, []interface{}) {
 // Dipakai Cuci, Lebur, Service lewat syaratBarang, dan Stok langsung.
 func syaratKadarBerat(c *gin.Context, a, beratExpr string) (string, []interface{}) {
 	kond, args := "", []interface{}{}
-	k, ok := utils.NormalKarat(c.Query("karat"))
-	if !ok && strings.TrimSpace(c.Query("karat")) == "999" {
-		k, ok = "999", true
+	karats := c.QueryArray("karat")
+	valid := make([]string, 0, len(karats))
+	seen := map[string]bool{}
+	for _, value := range karats {
+		k, ok := utils.NormalKarat(value)
+		if !ok && strings.TrimSpace(value) == "999" {
+			k, ok = "999", true
+		}
+		if ok && !seen[k] {
+			valid = append(valid, k)
+			seen[k] = true
+		}
 	}
-	if ok {
+	if len(valid) == 1 {
 		kond += " AND " + a + ".karat = ?"
-		args = append(args, k)
+		args = append(args, valid[0])
+	} else if len(valid) > 1 {
+		placeholders := strings.TrimRight(strings.Repeat("?,", len(valid)), ",")
+		kond += " AND " + a + ".karat IN (" + placeholders + ")"
+		for _, k := range valid {
+			args = append(args, k)
+		}
 	}
 	if v, err := strconv.ParseFloat(c.Query("berat_min"), 64); err == nil && v > 0 {
 		kond += " AND " + beratExpr + " >= ?"
