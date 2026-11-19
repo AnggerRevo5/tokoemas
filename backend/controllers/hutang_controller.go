@@ -108,6 +108,10 @@ func HutangTerimaDana(db *sql.DB) gin.HandlerFunc {
 		}
 		kategori := "pinjaman"
 		note := strings.TrimSpace(req.Note)
+		catatanKas := "Dana dari " + nama
+		if note != "" {
+			catatanKas += ": " + note
+		}
 
 		tx, err := db.Begin()
 		if err != nil {
@@ -119,7 +123,7 @@ func HutangTerimaDana(db *sql.DB) gin.HandlerFunc {
 		res, err := tx.Exec(
 			`INSERT INTO cash_transactions (location_id, direction, category, amount, note, transaction_date, created_by)
 			 VALUES (?,?,?,?,?,?,?)`,
-			boID, "in", kategori, req.Principal, "Dana dari "+nama, start, cl.UserID,
+			boID, "in", kategori, req.Principal, catatanKas, start, cl.UserID,
 		)
 		if err != nil {
 			utils.Gagal(c, err)
@@ -207,6 +211,7 @@ func HutangBayar(db *sql.DB) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "nominal harus lebih dari 0"})
 			return
 		}
+		req.Note = strings.TrimSpace(req.Note)
 		tgl, ok := utils.ParseTanggal(c, req.PaidDate)
 		if !ok {
 			return
@@ -266,10 +271,14 @@ func HutangBayar(db *sql.DB) gin.HandlerFunc {
 		payID, _ := res.LastInsertId()
 		services.CatatAudit(tx, middleware.Meta(c), "create", "debt_payments", payID, req)
 
+		catatanKas := fmt.Sprintf("Bayar hutang #%d - %s", id, nama)
+		if req.Note != "" {
+			catatanKas += ": " + req.Note
+		}
 		res2, err := tx.Exec(
 			`INSERT INTO cash_transactions (location_id, direction, category, amount, note, transaction_date, created_by)
 			 VALUES (?,?,?,?,?,?,?)`,
-			boID, "out", "bayar_hutang", req.Amount, fmt.Sprintf("Bayar hutang #%d - %s", id, nama), tgl, cl.UserID,
+			boID, "out", "bayar_hutang", req.Amount, catatanKas, tgl, cl.UserID,
 		)
 		if err != nil {
 			utils.Gagal(c, err)

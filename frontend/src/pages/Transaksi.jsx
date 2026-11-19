@@ -1,14 +1,13 @@
-import { useState, useEffect, useCallback } from 'react'
+import { lazy, Suspense, useState, useEffect, useCallback } from 'react'
 import { api } from '../services/api'
 import Pesan from '../components/common/Pesan'
 import Popup from '../components/common/Popup'
-import FormTransaksi from '../components/transaksi/FormTransaksi'
 import TabelTransaksi from '../components/transaksi/TabelTransaksi'
 import PenjualanDariKas from '../components/transaksi/PenjualanDariKas'
 import CardGadai from '../components/barang/CardGadai'
 import FilterKas, { FILTER_KAS_KOSONG } from '../components/transaksi/FilterKas'
-import Investor from './Investor'
-import Hutang from './Hutang'
+
+const FormTransaksi = lazy(() => import('../components/transaksi/FormTransaksi'))
 
 export default function Transaksi({ jenis, me }) {
   const isKas = jenis === 'kas'
@@ -27,10 +26,8 @@ export default function Transaksi({ jenis, me }) {
   const [voidReason, setVoidReason] = useState('')
   const [kasJual, setKasJual] = useState(null)
   const [gadaiItem, setGadaiItem] = useState(null)
-  const [kelolaKeuangan, setKelolaKeuangan] = useState('')
 
   const lokasi = locations.find((l) => l.id === Number(locId))
-  const bisaKelolaKeuangan = (me.role === 'super_admin' || me.role === 'owner') && lokasi?.type === 'back_office'
 
   useEffect(() => {
     api('/locations')
@@ -119,46 +116,24 @@ export default function Transaksi({ jenis, me }) {
     <div>
       <Pesan error={error} info={info} />
 
-      <FormTransaksi
-        jenis={jenis}
-        me={me}
-        locations={locations}
-        locId={locId}
-        onLocId={setLocId}
-        onMulai={() => {
-          setError('')
-          setInfo('')
-        }}
-        onSukses={(res) => {
-          setInfo(res.message)
-          muat()
-        }}
-        onError={setError}
-      />
-
-      {isKas && bisaKelolaKeuangan && (
-        <section style={{ marginTop: 24 }}>
-          <h3>Pengelolaan Investor &amp; Hutang</h3>
-          <p className="muted">
-            Input, pembayaran, dan pembatalan transaksi investor maupun hutang dilakukan di sini. Kas dan catatan
-            kewajiban akan diperbarui otomatis.
-          </p>
-          <div style={{ maxWidth: 360, marginBottom: 16 }}>
-            <label htmlFor="kelola-keuangan">Pilih pengelolaan</label>
-            <select id="kelola-keuangan" value={kelolaKeuangan} onChange={(e) => setKelolaKeuangan(e.target.value)}>
-              <option value="">Pilih Investor atau Hutang</option>
-              <option value="investor">Investor</option>
-              <option value="hutang">Hutang</option>
-            </select>
-          </div>
-          {kelolaKeuangan === 'investor' && (
-            <Investor mode="manage" locationId={Number(locId)} onUbah={muat} />
-          )}
-          {kelolaKeuangan === 'hutang' && (
-            <Hutang me={me} mode="manage" locationId={Number(locId)} onUbah={muat} />
-          )}
-        </section>
-      )}
+      <Suspense fallback={<div className="card">Memuat form transaksi...</div>}>
+        <FormTransaksi
+          jenis={jenis}
+          me={me}
+          locations={locations}
+          locId={locId}
+          onLocId={setLocId}
+          onMulai={() => {
+            setError('')
+            setInfo('')
+          }}
+          onSukses={(res) => {
+            setInfo(res.message)
+            muat()
+          }}
+          onError={setError}
+        />
+      </Suspense>
 
       <div className="card" style={{ marginTop: 16 }}>
         <h3>Riwayat{lokasi ? ` - ${lokasi.name}` : ''}</h3>

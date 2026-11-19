@@ -1,4 +1,4 @@
-// dana investor dicatat lewat menu Investor, jadi tidak ada di pilihan hutang baru
+// Setoran investor punya kategori terpisah di form Kas.
 export const JENIS_KREDITUR = [
   ['bank_pegadaian', 'Bank / Pegadaian'],
   ['perorangan', 'Perorangan'],
