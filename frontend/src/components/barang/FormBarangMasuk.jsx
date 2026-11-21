@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { api } from '../../services/api'
 import { gram, hariIni, rupiah } from '../../utils/format'
 import { KATEGORI } from '../../constants/kategori'
-import { NAMA_UMUM, MEREK_LM, KARAT_UMUM, KARAT_LAIN } from '../../constants/barang'
+import { NAMA_UMUM, MEREK_LM, KARAT_UMUM, KARAT_LAIN, BP_LIST } from '../../constants/barang'
 import { barisBaru, tanpaGram, bolehBaki, JENIS_LABEL } from '../../utils/barang'
 import PilihanLokasi from '../common/PilihanLokasi'
 import { m } from 'motion/react'
@@ -21,6 +21,7 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
   const [loading, setLoading] = useState(false)
   const [fLoc, setFLoc] = useState(isCabang ? String(me.location_id) : '')
   const [fKat, setFKat] = useState('')
+  const [fBP, setFBP] = useState('')
   const [fTgl, setFTgl] = useState(hariIni())
   const [fNote, setFNote] = useState('')
   const [fPosisi, setFPosisi] = useState('toko')
@@ -35,6 +36,7 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
   const fTipe = tipeLok(fLoc) || 'cabang'
   const fOpsi = KATEGORI.stok[fTipe].in
   const wajibHarga = fKat === 'beli_customer'
+  const barangBP = fKat === 'barang_bp'
 
   // akun owner/admin: lokasi awal = back office
   useEffect(() => {
@@ -127,6 +129,7 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
         body: JSON.stringify({
           location_id: Number(fLoc),
           category: fKat,
+          bp_nama: barangBP ? fBP : '',
           entry_date: fTgl,
           note: fNote,
           posisi: wajibHarga ? fPosisi : '',
@@ -203,6 +206,15 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
                 ))}
               </select>
             </div>
+            {barangBP && (
+              <div>
+                <label>Asal BP</label>
+                <select value={fBP} onChange={(e) => setFBP(e.target.value)} required>
+                  <option value="">Pilih BP</option>
+                  {BP_LIST.map((b) => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </div>
+            )}
             {wajibHarga && (
               <div>
                 <label>Posisi barang</label>
@@ -211,6 +223,11 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
                   <option value="bo">Antar ke back office</option>
                 </select>
               </div>
+            )}
+            {barangBP && (
+              <p className="muted" style={{ marginTop: 10 }}>
+                Harga beli wajib diisi sebagai nilai Talangan. Barang dicatat di stok dan Talangan, tanpa transaksi kas pembelian.
+              </p>
             )}
             <div>
               <label>Masukkan barang ke baki</label>
@@ -360,8 +377,8 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
                   value={b.harga_beli}
                   onChange={(e) => ubahBaris(i, 'harga_beli', e.target.value)}
                   onKeyDown={(e) => enterBaris(e, true)}
-                  placeholder={wajibHarga ? 'Harga beli (Rp)' : 'Harga beli (opsional)'}
-                  required={wajibHarga}
+                  placeholder={wajibHarga || barangBP ? 'Harga beli / nilai Talangan (Rp)' : 'Harga beli (opsional)'}
+                  required={wajibHarga || barangBP}
                 />
                 <input
                   value={b.note}
@@ -427,10 +444,11 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
             <tbody>
               <tr><th>Lokasi</th><td>{(locations.find((l) => l.id === Number(fLoc)) || {}).name || '-'}</td></tr>
               <tr><th>Asal barang</th><td>{(fOpsi.find(([k]) => k === fKat) || [])[1] || fKat}</td></tr>
+              {barangBP && <tr><th>BP</th><td>{fBP || '-'}</td></tr>}
               <tr><th>Baki</th><td>{teksBaki}</td></tr>
               <tr><th>Tanggal</th><td>{fTgl}</td></tr>
               <tr><th>Total</th><td>{totalBarang} barang, {gram(totalGram)} g emas</td></tr>
-              {totalBeli > 0 && <tr><th>Total harga beli</th><td>{rupiah(totalBeli)}{wajibHarga && ' (kas toko keluar)'}</td></tr>}
+              {totalBeli > 0 && <tr><th>{barangBP ? 'Total nilai Talangan' : 'Total harga beli'}</th><td>{rupiah(totalBeli)}{wajibHarga && ' (kas toko keluar)'}</td></tr>}
             </tbody>
           </table>
         </Popup>

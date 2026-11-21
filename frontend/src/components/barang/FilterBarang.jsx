@@ -27,6 +27,7 @@ export default function FilterBarang({
             <option value="hasil">Hasil lebur</option>
             <option value="terjual">Terjual</option>
             <option value="di_bp">Di BP</option>
+            <option value="tukar_bp">Sudah ditukar ke BP</option>
             <option value="digadai">Digadai</option>
             <option value="tidak_ditebus">Tidak ditebus</option>
             <option value="semua">Semua</option>

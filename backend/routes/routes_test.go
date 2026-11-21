@@ -147,3 +147,10 @@ func TestPembatasanRole(t *testing.T) {
 		t.Errorf("pj: /locations harus tetap 200, dapat %d", w.Code)
 	}
 }
+
+func TestTalanganTidakBisaDiinputManual(t *testing.T) {
+	r := mesinUji(t, "owner")
+	if w := kirim(t, r, http.MethodPost, "/talangan"); w.Code != http.StatusNotFound {
+		t.Errorf("POST /talangan harus tidak tersedia, dapat %d", w.Code)
+	}
+}

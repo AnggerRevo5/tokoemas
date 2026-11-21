@@ -24,6 +24,7 @@ export default function BarAksiBarang({
   const [loading, setLoading] = useState(false)
   const [tgl, setTgl] = useState(hariIni())
   const [target, setTarget] = useState('')
+  const [nilaiBP, setNilaiBP] = useState({})
   const [catatan, setCatatan] = useState('')
   const [harga, setHarga] = useState({}) // harga jual per barang { id: 'nominal' }
   const [metode, setMetode] = useState('tunai')
@@ -40,6 +41,8 @@ export default function BarAksiBarang({
   }
   const judulAksi = (aksiTersedia.find(([k]) => k === aksi) || [])[1] || ''
   const totalJual = terpilih.reduce((s, r) => s + (Number(harga[r.id]) || 0), 0)
+  const nilaiBPKosong = terpilih.some((r) => !(Number(nilaiBP[r.id]) > 0))
+  const totalNilaiBP = terpilih.reduce((s, r) => s + (Number(nilaiBP[r.id]) || 0), 0)
   // harga jual wajib > 0, kecuali tempat/kotak perhiasan yang dicentang Gratis (harga '0')
   const hargaKosong = terpilih.some((r) => !(Number(harga[r.id]) > 0) && !(bolehGratis(r.jenis) && harga[r.id] === '0'))
   const beratTeks = (r) => (tanpaGram(r.jenis) && !(r.weight_gram > 0) ? '-' : `${gram(r.weight_gram)} g`)
@@ -67,6 +70,9 @@ export default function BarAksiBarang({
       if (aksi === 'jual' && hargaKosong) {
         throw new Error('Harga jual setiap barang wajib diisi')
       }
+      if (aksi === 'kirim' && targetAktif.startsWith('bp:') && nilaiBPKosong) {
+        throw new Error('Harga jual BP untuk setiap barang wajib diisi')
+      }
       if (aksi === 'jual' && metode === 'qris' && nominalBiaya(totalJual, biaya) > totalJual) {
         throw new Error('Potongan tidak boleh melebihi total penjualan')
       }
@@ -79,6 +85,7 @@ export default function BarAksiBarang({
             item_ids: ids,
             date: tgl,
             ...(keBP ? { bp_nama: targetAktif.slice(3) } : { target_location_id: Number(targetAktif) }),
+            ...(keBP ? { bp_nilai: Object.fromEntries(terpilih.map((r) => [r.id, Number(nilaiBP[r.id])])) } : {}),
           }),
         })
       } else if (aksi === 'terima_toko' || aksi === 'belum_toko') {
@@ -146,6 +153,7 @@ export default function BarAksiBarang({
       }
       setCatatan('')
       setHarga({})
+      setNilaiBP({})
       setMetode('tunai')
       setBiaya(BIAYA_KOSONG)
       onSelesai(res.message)
@@ -244,6 +252,39 @@ export default function BarAksiBarang({
                     ))}
                   </optgroup>
                 </select>
+              </div>
+            )}
+            {aksi === 'kirim' && targetAktif.startsWith('bp:') && (
+              <div className="span2">
+                <label>Harga jual / nilai Talangan per barang</label>
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr><th>Barang</th><th className="num">Berat</th><th>Nilai Talangan (Rp)</th></tr>
+                    </thead>
+                    <tbody>
+                      {terpilih.map((r) => (
+                        <tr key={r.id}>
+                          <td>{r.item_no} {r.item_name} {r.karat}</td>
+                          <td className="num">{beratTeks(r)}</td>
+                          <td>
+                            <input
+                              type="number"
+                              min="1"
+                              value={nilaiBP[r.id] ?? ''}
+                              onChange={(e) => setNilaiBP((p) => ({ ...p, [r.id]: e.target.value }))}
+                              required
+                              aria-label={`Nilai Talangan ${r.item_no}`}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="total-bar">
+                    <span>Total nilai Talangan: <b className="utama"><AngkaBerjalan nilai={totalNilaiBP} format={formatRupiah} /></b></span>
+                  </div>
+                </div>
               </div>
             )}
 

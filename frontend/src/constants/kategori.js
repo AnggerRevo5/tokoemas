@@ -39,6 +39,7 @@ export const KATEGORI = {
     cabang: {
       in: [
         ['beli_customer', 'Beli dari customer (barang kotor)'],
+        ['barang_bp', 'Barang dari BP'],
         ['stok_awal', 'Stok awal toko'],
       ],
       out: [
@@ -54,6 +55,7 @@ export const KATEGORI = {
       in: [
         ['pabrik', 'Pabrik'],
         ['konsinyasi', 'Konsinyasi'],
+        ['barang_bp', 'Barang dari BP'],
         ['stok_awal', 'Stok awal back office'],
       ],
       out: [

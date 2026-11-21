@@ -274,12 +274,27 @@ func BarangOper(db *sql.DB) gin.HandlerFunc {
 				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s tidak berada di back office", it.Name)})
 				return
 			}
+			if bp != "" {
+				var asalBP string
+				if err := tx.QueryRow("SELECT source_category FROM items WHERE id = ?", it.ID).Scan(&asalBP); err != nil {
+					utils.Gagal(c, err)
+					return
+				}
+				if asalBP == "barang_bp" {
+					c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s milik BP; selesaikan melalui pengajuan tukar Talangan", it.Name)})
+					return
+				}
+				if nilai, ada := req.BPNilai[it.ID]; !ada || nilai <= 0 {
+					c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("harga jual untuk %s wajib diisi", it.Name)})
+					return
+				}
+			}
 		}
 		for _, it := range items {
 			if _, err := tx.Exec(
-				`UPDATE items SET status = 'dikirim', kirim_ke_location_id = ?, bp_nama = ?, kirim_tgl = ?, diserahkan = FALSE,
+				`UPDATE items SET status = 'dikirim', kirim_ke_location_id = ?, bp_nama = ?, bp_nilai = ?, kirim_tgl = ?, diserahkan = FALSE,
 				        belum_sampai = FALSE, belum_sampai_note = NULL WHERE id = ?`,
-				tujuanID, bpArg, tgl, it.ID,
+				tujuanID, bpArg, sql.NullFloat64{Float64: req.BPNilai[it.ID], Valid: bp != ""}, tgl, it.ID,
 			); err != nil {
 				utils.Gagal(c, err)
 				return

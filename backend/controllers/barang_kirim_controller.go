@@ -54,7 +54,7 @@ func ubahTahapKirim(db *sql.DB, batal bool) gin.HandlerFunc {
 		defer tx.Rollback()
 
 		rows, err := tx.Query(
-			`SELECT id, item_name, location_id, status, diserahkan, IFNULL(kirim_ke_location_id,0), IFNULL(bp_nama,''), weight_gram, IFNULL(karat,'')
+			`SELECT id, item_name, location_id, status, diserahkan, IFNULL(kirim_ke_location_id,0), IFNULL(bp_nama,''), weight_gram, IFNULL(karat,''), IFNULL(bp_nilai,0)
 			 FROM items WHERE is_void = FALSE AND id IN (`+utils.Placeholders(len(args))+`) FOR UPDATE`, args...)
 		if err != nil {
 			utils.Gagal(c, err)
@@ -67,14 +67,15 @@ func ubahTahapKirim(db *sql.DB, batal bool) gin.HandlerFunc {
 			Status     string
 			Diserahkan bool
 			Tujuan     int
-		BP         string
-		Berat      float64
-		Karat      string
+			BP         string
+			Berat      float64
+			Karat      string
+			Nilai      float64
 		}
 		list := []brg{}
 		for rows.Next() {
 			var b brg
-			if err := rows.Scan(&b.ID, &b.Name, &b.Loc, &b.Status, &b.Diserahkan, &b.Tujuan, &b.BP, &b.Berat, &b.Karat); err != nil {
+			if err := rows.Scan(&b.ID, &b.Name, &b.Loc, &b.Status, &b.Diserahkan, &b.Tujuan, &b.BP, &b.Berat, &b.Karat, &b.Nilai); err != nil {
 				rows.Close()
 				utils.Gagal(c, err)
 				return
@@ -107,7 +108,7 @@ func ubahTahapKirim(db *sql.DB, batal bool) gin.HandlerFunc {
 
 		sqlUbah, aksi, pesan := "UPDATE items SET diserahkan = TRUE WHERE id = ?", "serah_kurir", "%d barang diserahkan ke kurir, menunggu konfirmasi penerima"
 		if batal {
-			sqlUbah = `UPDATE items SET status = 'tersedia', kirim_ke_location_id = NULL, bp_nama = NULL, kirim_tgl = NULL, diserahkan = TRUE,
+			sqlUbah = `UPDATE items SET status = 'tersedia', kirim_ke_location_id = NULL, bp_nama = NULL, bp_nilai = NULL, kirim_tgl = NULL, diserahkan = TRUE,
 			           belum_sampai = FALSE, belum_sampai_note = NULL WHERE id = ?`
 			aksi, pesan = "batal_kirim", "%d barang batal dikirim, kembali ke stok"
 		}
@@ -117,16 +118,33 @@ func ubahTahapKirim(db *sql.DB, batal bool) gin.HandlerFunc {
 		}
 		for _, b := range list {
 			if !batal && b.BP != "" {
+				if b.Nilai <= 0 {
+					c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s belum memiliki harga jual BP", b.Name)})
+					return
+				}
 				// BP tanpa akun: begitu diserahkan ke kurir, stok back office berkurang dan barang tercatat di BP
 				if _, err := tx.Exec(services.SQLStokItem, b.Loc, "out", "ke_bp", b.Name, b.Berat, b.Karat,
 					"Dikirim ke "+b.BP, tgl, cl.UserID, b.ID); err != nil {
 					utils.Gagal(c, err)
 					return
 				}
-				if _, err := tx.Exec("UPDATE items SET status = 'di_bp', diserahkan = TRUE, tray_id = NULL, kirim_tgl = ? WHERE id = ?", tgl, b.ID); err != nil {
+				res, err := tx.Exec(
+					`INSERT INTO talangan
+					 (location_id, bp_nama, arah, item_name, weight_gram, karat, nilai, entry_date, item_id, created_by)
+					 VALUES (?,?,?,?,?,?,?,?,?,?)`,
+					b.Loc, b.BP, "kita_di_bp", b.Name, b.Berat, utils.StrNull(b.Karat), b.Nilai, tgl, b.ID, cl.UserID)
+				if err != nil {
 					utils.Gagal(c, err)
 					return
 				}
+				talanganID, _ := res.LastInsertId()
+				if _, err := tx.Exec("UPDATE items SET status = 'di_bp', diserahkan = TRUE, tray_id = NULL, bp_nilai = NULL, kirim_tgl = ? WHERE id = ?", tgl, b.ID); err != nil {
+					utils.Gagal(c, err)
+					return
+				}
+				services.CatatAudit(tx, middleware.Meta(c), "talangan_baru", "talangan", talanganID, gin.H{
+					"bp_nama": b.BP, "arah": "kita_di_bp", "item_name": b.Name, "weight_gram": b.Berat, "karat": b.Karat, "nilai": b.Nilai,
+				})
 				continue
 			}
 			if _, err := tx.Exec(sqlUbah, b.ID); err != nil {
@@ -186,14 +204,31 @@ func BarangTarikBP(db *sql.DB) gin.HandlerFunc {
 				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s tidak sedang berada di BP", it.Name)})
 				return
 			}
+			var menungguTukar int
+			if err := tx.QueryRow(
+				`SELECT COUNT(*) FROM talangan WHERE item_id = ? AND status = 'tukar'
+				 AND tukar_id IN (SELECT id FROM tukar_bp WHERE status = 'diajukan')`, it.ID).Scan(&menungguTukar); err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			if menungguTukar > 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s sedang menunggu persetujuan tukar", it.Name)})
+				return
+			}
 		}
 		for _, it := range items {
+			if _, err := tx.Exec(
+				`UPDATE talangan SET status = 'batal', batal_alasan = 'Barang ditarik kembali dari BP'
+				 WHERE item_id = ? AND arah = 'kita_di_bp' AND status = 'aktif'`, it.ID); err != nil {
+				utils.Gagal(c, err)
+				return
+			}
 			if _, err := tx.Exec(services.SQLStokItem, boID, "in", "kembali_bp", it.Name, it.Weight, it.Karat,
 				"Ditarik kembali dari BP", tgl, cl.UserID, it.ID); err != nil {
 				utils.Gagal(c, err)
 				return
 			}
-			if _, err := tx.Exec("UPDATE items SET status = 'tersedia', location_id = ?, bp_nama = NULL, kirim_tgl = NULL WHERE id = ?", boID, it.ID); err != nil {
+			if _, err := tx.Exec("UPDATE items SET status = 'tersedia', location_id = ?, bp_nama = NULL, bp_nilai = NULL, kirim_tgl = NULL WHERE id = ?", boID, it.ID); err != nil {
 				utils.Gagal(c, err)
 				return
 			}

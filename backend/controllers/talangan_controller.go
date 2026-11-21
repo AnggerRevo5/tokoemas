@@ -15,8 +15,7 @@ import (
 	"toko-emas/utils"
 )
 
-// Catatan talangan dan tukar barang dengan BP (pihak luar tanpa akun).
-// Pegawai toko (cabang) menginput dan mengajukan tukar; owner memantau dan menyetujui, baru kas back office tercatat.
+// Catatan talangan berasal dari alur Stok; cabang/owner mengajukan tukar dan owner menyetujui.
 
 type TalanganReq struct {
 	BPNama     string  `json:"bp_nama" binding:"max=30"`
@@ -319,7 +318,7 @@ func TalanganEdit(db *sql.DB) gin.HandlerFunc {
 
 func TalanganKonfirmasi(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl, ok := middleware.HanyaPeran(c, "cabang", "super_admin")
+		cl, ok := middleware.HanyaPeran(c, "cabang", "owner", "super_admin")
 		if !ok {
 			return
 		}
@@ -455,7 +454,7 @@ func TukarList(db *sql.DB) gin.HandlerFunc {
 
 func TukarAjukan(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl, ok := middleware.HanyaPeran(c, "cabang", "super_admin")
+		cl, ok := middleware.HanyaPeran(c, "cabang", "owner", "super_admin")
 		if !ok {
 			return
 		}
@@ -472,9 +471,14 @@ func TukarAjukan(db *sql.DB) gin.HandlerFunc {
 		if !ok {
 			return
 		}
-		loc, ok := lokasiTulis(c, cl, req.LocationID)
-		if !ok {
-			return
+		loc := cl.LocationID
+		if cl.Role != "cabang" {
+			boID, err := services.IDBackOffice(db)
+			if err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			loc = boID
 		}
 		uniq := map[int]bool{}
 		args := []interface{}{}
@@ -519,7 +523,7 @@ func TukarAjukan(db *sql.DB) gin.HandlerFunc {
 				rows.Close()
 				c.JSON(http.StatusBadRequest, gin.H{"error": "semua catatan harus untuk BP yang sama"})
 				return
-			case l != loc:
+			case cl.Role == "cabang" && l != loc:
 				rows.Close()
 				c.JSON(http.StatusForbidden, gin.H{"error": "ada catatan yang bukan milik toko ini"})
 				return
@@ -598,6 +602,87 @@ func TukarSetujui(db *sql.DB) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "pengajuan ini sudah diproses"})
 			return
 		}
+		rows, err := tx.Query(
+			`SELECT id, item_id, arah FROM talangan WHERE tukar_id = ? ORDER BY id FOR UPDATE`, id)
+		if err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		type catatanTukar struct {
+			ID     int
+			ItemID sql.NullInt64
+			Arah   string
+		}
+		catatan := []catatanTukar{}
+		for rows.Next() {
+			var r catatanTukar
+			if err := rows.Scan(&r.ID, &r.ItemID, &r.Arah); err != nil {
+				rows.Close()
+				utils.Gagal(c, err)
+				return
+			}
+			catatan = append(catatan, r)
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			utils.Gagal(c, err)
+			return
+		}
+		rows.Close()
+
+		for _, r := range catatan {
+			if !r.ItemID.Valid {
+				continue
+			}
+			var nama, karat, itemStatus, itemBP, bpAsal, asal string
+			var berat float64
+			var loc int
+			err := tx.QueryRow(
+				`SELECT item_name, IFNULL(karat,''), weight_gram, status, location_id, IFNULL(bp_nama,''), IFNULL(bp_asal,''), source_category
+				 FROM items WHERE id = ? AND is_void = FALSE FOR UPDATE`, r.ItemID.Int64,
+			).Scan(&nama, &karat, &berat, &itemStatus, &loc, &itemBP, &bpAsal, &asal)
+			if err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			switch r.Arah {
+			case "kita_di_bp":
+				if itemStatus != "di_bp" || itemBP != bp {
+					c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s tidak lagi tercatat berada di %s", nama, bp)})
+					return
+				}
+				if _, err := tx.Exec(services.SQLStokItem, boID, "in", "kembali_bp", nama, berat, karat,
+					"Tukar dengan "+bp+": barang kita kembali ke back office", tgl, cl.UserID, r.ItemID.Int64); err != nil {
+					utils.Gagal(c, err)
+					return
+				}
+				if _, err := tx.Exec(
+					`UPDATE items SET status = 'tersedia', location_id = ?, bp_nama = NULL, bp_nilai = NULL, kirim_tgl = NULL WHERE id = ?`,
+					boID, r.ItemID.Int64); err != nil {
+					utils.Gagal(c, err)
+					return
+				}
+			case "bp_di_kita":
+				if itemStatus != "tersedia" || loc < 1 || asal != "barang_bp" || bpAsal != bp {
+					c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s tidak lagi tersedia sebagai barang milik %s", nama, bp)})
+					return
+				}
+				if _, err := tx.Exec(services.SQLStokItem, loc, "out", "ke_bp", nama, berat, karat,
+					"Tukar dengan "+bp+": barang BP dikembalikan", tgl, cl.UserID, r.ItemID.Int64); err != nil {
+					utils.Gagal(c, err)
+					return
+				}
+				if _, err := tx.Exec("UPDATE items SET status = 'tukar_bp', bp_nama = NULL, bp_nilai = NULL, tray_id = NULL WHERE id = ?", r.ItemID.Int64); err != nil {
+					utils.Gagal(c, err)
+					return
+				}
+			}
+			statusBaru := "tersedia"
+			if r.Arah == "bp_di_kita" {
+				statusBaru = "tukar_bp"
+			}
+			services.CatatAudit(tx, middleware.Meta(c), "tukar_setujui", "items", r.ItemID.Int64, gin.H{"tukar_id": id, "arah": r.Arah, "status": statusBaru})
+		}
 		var cashID sql.NullInt64
 		if selisih != 0 {
 			arah, jumlah, catat := "out", selisih, fmt.Sprintf("Tukar barang dengan %s: kita bayar selisih", bp)
@@ -627,7 +712,7 @@ func TukarSetujui(db *sql.DB) gin.HandlerFunc {
 			utils.Gagal(c, err)
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"message": "tukar disetujui dan tercatat di kas back office"})
+		c.JSON(http.StatusOK, gin.H{"message": "tukar disetujui, stok barang diperbarui, dan selisih tercatat di kas back office"})
 	}
 }
 
@@ -653,10 +738,10 @@ func TukarBatal(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		defer tx.Rollback()
-		var status string
+		var status, bp string
 		var loc int
 		var cashID sql.NullInt64
-		if err := tx.QueryRow("SELECT status, location_id, cash_id FROM tukar_bp WHERE id = ? FOR UPDATE", id).Scan(&status, &loc, &cashID); err != nil {
+		if err := tx.QueryRow("SELECT status, location_id, cash_id, bp_nama FROM tukar_bp WHERE id = ? FOR UPDATE", id).Scan(&status, &loc, &cashID, &bp); err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "pengajuan tidak ditemukan"})
 			return
 		}
@@ -671,6 +756,81 @@ func TukarBatal(db *sql.DB) gin.HandlerFunc {
 		if cashID.Valid {
 			tx.Exec("UPDATE cash_transactions SET is_void = TRUE, void_reason = ? WHERE id = ?", alasan, cashID.Int64)
 			services.CatatAudit(tx, middleware.Meta(c), "void", "cash_transactions", cashID.Int64, gin.H{"reason": alasan})
+		}
+		if status == "disetujui" {
+			tgl, ok := utils.ParseTanggal(c, "")
+			if !ok {
+				return
+			}
+			rows, err := tx.Query(
+				`SELECT item_id, arah FROM talangan WHERE tukar_id = ? AND item_id IS NOT NULL ORDER BY id FOR UPDATE`, id)
+			if err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			type itemTukar struct {
+				ID   int64
+				Arah string
+			}
+			items := []itemTukar{}
+			for rows.Next() {
+				var r itemTukar
+				if err := rows.Scan(&r.ID, &r.Arah); err != nil {
+					rows.Close()
+					utils.Gagal(c, err)
+					return
+				}
+				items = append(items, r)
+			}
+			if err := rows.Err(); err != nil {
+				rows.Close()
+				utils.Gagal(c, err)
+				return
+			}
+			rows.Close()
+			for _, r := range items {
+				var nama, karat, itemStatus string
+				var berat float64
+				var itemLoc int
+				if err := tx.QueryRow(
+					`SELECT item_name, IFNULL(karat,''), weight_gram, status, location_id
+					 FROM items WHERE id = ? AND is_void = FALSE FOR UPDATE`, r.ID,
+				).Scan(&nama, &karat, &berat, &itemStatus, &itemLoc); err != nil {
+					utils.Gagal(c, err)
+					return
+				}
+				switch r.Arah {
+				case "kita_di_bp":
+					if itemStatus != "tersedia" {
+						c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s tidak bisa dikembalikan ke BP saat pengajuan dibatalkan", nama)})
+						return
+					}
+					if _, err := tx.Exec(services.SQLStokItem, itemLoc, "out", "ke_bp", nama, berat, karat,
+						"Tukar dibatalkan: barang kita dikirim kembali ke "+bp, tgl, cl.UserID, r.ID); err != nil {
+						utils.Gagal(c, err)
+						return
+					}
+					if _, err := tx.Exec("UPDATE items SET status = 'di_bp', bp_nama = ?, kirim_tgl = ? WHERE id = ?", bp, tgl, r.ID); err != nil {
+						utils.Gagal(c, err)
+						return
+					}
+				case "bp_di_kita":
+					if itemStatus != "tukar_bp" {
+						c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s tidak bisa dikembalikan ke stok saat pengajuan dibatalkan", nama)})
+						return
+					}
+					if _, err := tx.Exec(services.SQLStokItem, itemLoc, "in", "barang_bp", nama, berat, karat,
+						"Tukar dibatalkan: barang "+bp+" kembali ke stok", tgl, cl.UserID, r.ID); err != nil {
+						utils.Gagal(c, err)
+						return
+					}
+					if _, err := tx.Exec("UPDATE items SET status = 'tersedia', bp_nama = NULL, bp_nilai = NULL WHERE id = ?", r.ID); err != nil {
+						utils.Gagal(c, err)
+						return
+					}
+				}
+				services.CatatAudit(tx, middleware.Meta(c), "tukar_batal", "items", r.ID, gin.H{"tukar_id": id, "arah": r.Arah, "status": itemStatus})
+			}
 		}
 		for _, tid := range idCatatanTukar(tx, id) {
 			services.CatatAudit(tx, middleware.Meta(c), "tukar_batal", "talangan", int64(tid), gin.H{"tukar_id": id, "reason": alasan})

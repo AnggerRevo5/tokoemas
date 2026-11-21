@@ -19,6 +19,7 @@ export const STATUS_LABEL = {
   digadai: 'Digadai',
   tidak_ditebus: 'Tidak ditebus',
   di_bp: 'Di BP',
+  tukar_bp: 'Sudah ditukar ke BP',
 }
 
 // pihak luar tanpa akun, tujuan oper barang dan mitra tukar (sama dengan services.DaftarBP di backend)
@@ -37,6 +38,7 @@ export const STATUS_CLASS = {
   digadai: 'tag warn',
   tidak_ditebus: 'tag gray',
   di_bp: 'tag info',
+  tukar_bp: 'tag gray',
 }
 
 // penjelasan singkat di bawah form aksi barang

@@ -214,8 +214,8 @@ func BarangJual(db *sql.DB) gin.HandlerFunc {
 // ---------- BATALKAN BARANG MASUK ----------
 
 var kategoriMasuk = map[string]map[string]bool{
-	"cabang":      {"beli_customer": true, "stok_awal": true},
-	"back_office": {"pabrik": true, "konsinyasi": true, "stok_awal": true},
+	"cabang":      {"beli_customer": true, "stok_awal": true, "barang_bp": true},
+	"back_office": {"pabrik": true, "konsinyasi": true, "stok_awal": true, "barang_bp": true},
 }
 
 // ---------- INPUT BARANG MASUK ----------
@@ -234,6 +234,16 @@ func BarangCreate(db *sql.DB) gin.HandlerFunc {
 		}
 		if !kategoriMasuk[tipe][req.Category] {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "asal barang tidak valid untuk lokasi ini"})
+			return
+		}
+		bpNama := strings.TrimSpace(req.BPNama)
+		if req.Category == "barang_bp" {
+			if !services.BPValid(bpNama) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "pilih asal BP"})
+				return
+			}
+		} else if bpNama != "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "asal BP hanya boleh diisi untuk barang dari BP"})
 			return
 		}
 		if len(req.Items) == 0 {
@@ -345,7 +355,7 @@ func BarangCreate(db *sql.DB) gin.HandlerFunc {
 			if it.Jenis != "logam_mulia" && it.Jenis != "perhiasan" {
 				it.Bahan = "emas"
 			}
-			if it.HargaBeli < 0 || (beliCustomer && it.HargaBeli <= 0) {
+			if it.HargaBeli < 0 || ((beliCustomer || req.Category == "barang_bp") && it.HargaBeli <= 0) {
 				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("baris %d: harga beli wajib diisi", baris)})
 				return
 			}
@@ -403,11 +413,11 @@ func BarangCreate(db *sql.DB) gin.HandlerFunc {
 				res, err := tx.Exec(
 					`INSERT INTO items
 					 (item_name, karat, weight_gram, origin_location_id, location_id, source_category, entry_date, note, created_by,
-					  jenis, brand, kondisi, harga_beli, purchase_cash_id, tray_id, bahan)
-					 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+					  jenis, brand, kondisi, harga_beli, purchase_cash_id, tray_id, bahan, bp_asal)
+					 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 					it.ItemName, it.Karat, it.WeightGram, locID, locID, req.Category, tgl, it.Note, cl.UserID,
 					it.Jenis, sql.NullString{String: it.Brand, Valid: it.Brand != ""}, kondisi, it.HargaBeli, cashID,
-					sql.NullInt64{Int64: int64(it.TrayID), Valid: it.TrayID > 0}, it.Bahan,
+					sql.NullInt64{Int64: int64(it.TrayID), Valid: it.TrayID > 0}, it.Bahan, utils.StrNull(bpNama),
 				)
 				if err != nil {
 					utils.Gagal(c, err)
@@ -423,6 +433,23 @@ func BarangCreate(db *sql.DB) gin.HandlerFunc {
 					it.Note, tgl, cl.UserID, id); err != nil {
 					utils.Gagal(c, err)
 					return
+				}
+				if req.Category == "barang_bp" {
+					res, err := tx.Exec(
+						`INSERT INTO talangan
+						 (location_id, bp_nama, arah, item_name, weight_gram, karat, nilai, entry_date, note, item_id, created_by)
+						 VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+						locID, bpNama, "bp_di_kita", it.ItemName, it.WeightGram, utils.StrNull(it.Karat), it.HargaBeli,
+						tgl, utils.StrNull(it.Note), id, cl.UserID)
+					if err != nil {
+						utils.Gagal(c, err)
+						return
+					}
+					talanganID, _ := res.LastInsertId()
+					services.CatatAudit(tx, middleware.Meta(c), "talangan_baru", "talangan", talanganID, gin.H{
+						"bp_nama": bpNama, "arah": "bp_di_kita", "item_name": it.ItemName,
+						"weight_gram": it.WeightGram, "karat": it.Karat, "nilai": it.HargaBeli,
+					})
 				}
 			}
 		}
@@ -494,7 +521,7 @@ func BarangVoid(db *sql.DB) gin.HandlerFunc {
 		// barang yang sedang dikirim (disiapkan atau sudah diserahkan ke kurir): batalkan = kembali tersedia di lokasi asal,
 		// bukan dihapus. Antar dan serah kurir tidak membuat catatan stok, jadi stok dan kas tidak berubah.
 		if status == "dikirim" {
-			if _, err := tx.Exec(`UPDATE items SET status = 'tersedia', kirim_ke_location_id = NULL, bp_nama = NULL, kirim_tgl = NULL,
+			if _, err := tx.Exec(`UPDATE items SET status = 'tersedia', kirim_ke_location_id = NULL, bp_nama = NULL, bp_nilai = NULL, kirim_tgl = NULL,
 				diserahkan = TRUE, belum_sampai = FALSE, belum_sampai_note = NULL WHERE id = ?`, id); err != nil {
 				utils.Gagal(c, err)
 				return
@@ -546,7 +573,7 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 
 		kolom := `SELECT i.id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''), i.weight_gram,
 		             i.jenis, IFNULL(i.brand,''), i.kondisi, i.harga_beli,
-		             i.location_id, l.name, i.origin_location_id, o.name,
+		             i.location_id, l.name, i.origin_location_id, IFNULL(NULLIF(i.bp_asal,''), o.name),
 		             IF(i.status = 'cuci' AND i.washing_job_id IS NULL AND
 		                EXISTS (SELECT 1 FROM washing_queue_items q WHERE q.item_id = i.id),
 		                'cuci_antrean',

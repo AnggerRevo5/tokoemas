@@ -108,12 +108,9 @@ func Setup(r *gin.Engine, db *sql.DB) {
 	auth.POST("/penjualan/:id/konfirmasi", controllers.PenjualanKonfirmasi(db))
 	auth.PUT("/penjualan/:id", controllers.PenjualanEdit(db))
 
-	// Talangan dan tukar barang dengan BP (toko menginput, owner memantau dan menyetujui)
+	// Talangan dari pergerakan stok dengan BP; cabang/owner mengajukan, owner menyetujui
 	auth.GET("/talangan", controllers.TalanganList(db))
-	auth.POST("/talangan", controllers.TalanganCreate(db))
-	auth.PUT("/talangan/:id", controllers.TalanganEdit(db))
 	auth.POST("/talangan/:id/konfirmasi", controllers.TalanganKonfirmasi(db))
-	auth.POST("/talangan/:id/batal", controllers.TalanganBatal(db))
 	auth.GET("/talangan/:id/riwayat", controllers.TalanganRiwayat(db))
 	auth.GET("/tukar/:id/riwayat", controllers.TukarRiwayat(db))
 	auth.GET("/tukar", controllers.TukarList(db))

@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// DaftarBP: pihak luar (tanpa akun, tanpa stok di aplikasi) tujuan oper barang dan mitra tukar.
+// DaftarBP: pihak luar (tanpa akun) tujuan oper barang dan mitra tukar.
 // shortcut: daftar tetap di kode, ubah jadi tabel bila nama BP perlu diatur dari aplikasi.
 var DaftarBP = []string{"BP Induk", "BP Pecinan", "BP Iss", "BP Lawang"}
 
@@ -62,9 +62,12 @@ var tabelBP = []struct{ nama, sql string }{
 
 var kolomBP = []struct{ tabel, kolom, ddl string }{
 	{"items", "bp_nama", "bp_nama VARCHAR(30) NULL"},
+	{"items", "bp_asal", "bp_asal VARCHAR(30) NULL"},
+	{"items", "bp_nilai", "bp_nilai DECIMAL(15,2) NULL"},
 	// asal dan tanggal terima kiriman terakhir (label "baru datang" dan filter asal di daftar stok)
 	{"items", "diterima_dari_id", "diterima_dari_id INT NULL"},
 	{"items", "diterima_tgl", "diterima_tgl DATE NULL"},
+	{"talangan", "item_id", "item_id INT NULL"},
 	// penjualan penadah dicatat PJ dulu (konfirmasi = FALSE, belum masuk kas); data lama dianggap sudah dikonfirmasi
 	{"penadah_sales", "konfirmasi", "konfirmasi BOOLEAN NOT NULL DEFAULT TRUE"},
 	{"penadah_sales", "biaya", "biaya DECIMAL(15,2) NOT NULL DEFAULT 0"},
@@ -89,13 +92,18 @@ func SiapkanSkemaBP(db *sql.DB) error {
 			return gagal("kolom "+k.tabel+"."+k.kolom, err)
 		}
 	}
+	if !indeksAda(db, "talangan", "idx_talangan_item") {
+		if _, err := db.Exec("CREATE INDEX idx_talangan_item ON talangan (item_id)"); err != nil {
+			return gagal("indeks talangan.item_id", err)
+		}
+	}
 	var tipe string
 	db.QueryRow(
 		"SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'items' AND COLUMN_NAME = 'status'",
 	).Scan(&tipe)
-	if !strings.Contains(tipe, "di_bp") {
+	if !strings.Contains(tipe, "tukar_bp") {
 		if _, err := db.Exec("ALTER TABLE items MODIFY COLUMN status " + enumStatusBarang); err != nil {
-			return gagal("status barang di_bp", err)
+			return gagal("status barang tukar_bp", err)
 		}
 	}
 	return nil

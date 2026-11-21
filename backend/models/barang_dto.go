@@ -89,6 +89,7 @@ type PindahBakiReq struct {
 type BarangMasukReq struct {
 	LocationID int          `json:"location_id" binding:"gte=0"`
 	Category   string       `json:"category" binding:"max=30"`
+	BPNama     string       `json:"bp_nama" binding:"max=30"`
 	EntryDate  string       `json:"entry_date" binding:"max=10"`
 	Note       string       `json:"note" binding:"max=200"`
 	Posisi     string       `json:"posisi" binding:"max=10"`
@@ -149,10 +150,11 @@ type TerimaReq struct {
 
 // BarangOperRequest adalah payload JSON untuk BarangOper.
 type BarangOperRequest struct {
-	ItemIDs          []int  `json:"item_ids" binding:"max=1000,dive,gt=0"`
-	TargetLocationID int    `json:"target_location_id" binding:"gte=0"`
-	BPNama           string `json:"bp_nama" binding:"max=30"` // tujuan BP (pihak luar), menggantikan target_location_id
-	Date             string `json:"date" binding:"max=10"`
+	ItemIDs          []int           `json:"item_ids" binding:"max=1000,dive,gt=0"`
+	TargetLocationID int             `json:"target_location_id" binding:"gte=0"`
+	BPNama           string          `json:"bp_nama" binding:"max=30"` // tujuan BP (pihak luar), menggantikan target_location_id
+	BPNilai          map[int]float64 `json:"bp_nilai" binding:"max=300,dive,gte=0,lte=1000000000000"`
+	Date             string          `json:"date" binding:"max=10"`
 }
 
 // BarangTerimaTokoRequest adalah payload JSON untuk BarangTerimaToko.

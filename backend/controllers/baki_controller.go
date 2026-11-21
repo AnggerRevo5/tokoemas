@@ -386,17 +386,17 @@ func BarangEdit(db *sql.DB) gin.HandlerFunc {
 		defer tx.Rollback()
 
 		var lama struct {
-			Name, Karat, Brand, Note, Jenis, Status, Bahan string
-			Weight, Harga                                  float64
-			Loc, Tray                                      int
-			Cash                                           sql.NullInt64
+			Name, Karat, Brand, Note, Jenis, Status, Bahan, Source string
+			Weight, Harga                                          float64
+			Loc, Tray                                              int
+			Cash                                                   sql.NullInt64
 		}
 		err = tx.QueryRow(
 			`SELECT item_name, IFNULL(karat,''), IFNULL(brand,''), IFNULL(note,''), jenis, status, bahan,
-			        weight_gram, harga_beli, location_id, IFNULL(tray_id,0), purchase_cash_id
+			        weight_gram, harga_beli, location_id, IFNULL(tray_id,0), purchase_cash_id, source_category
 			 FROM items WHERE id = ? AND is_void = FALSE FOR UPDATE`, id).
 			Scan(&lama.Name, &lama.Karat, &lama.Brand, &lama.Note, &lama.Jenis, &lama.Status, &lama.Bahan,
-				&lama.Weight, &lama.Harga, &lama.Loc, &lama.Tray, &lama.Cash)
+				&lama.Weight, &lama.Harga, &lama.Loc, &lama.Tray, &lama.Cash, &lama.Source)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "barang tidak ditemukan"})
 			return
@@ -407,6 +407,10 @@ func BarangEdit(db *sql.DB) gin.HandlerFunc {
 		}
 		if lama.Status != "tersedia" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "hanya barang yang tersedia di stok yang bisa diedit"})
+			return
+		}
+		if lama.Source == "barang_bp" && req.HargaBeli <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "nilai Talangan barang BP harus lebih dari 0"})
 			return
 		}
 
@@ -489,6 +493,24 @@ func BarangEdit(db *sql.DB) gin.HandlerFunc {
 			nama, karat, req.WeightGram, id); err != nil {
 			utils.Gagal(c, err)
 			return
+		}
+		if lama.Source == "barang_bp" {
+			var diajukan int
+			if err := tx.QueryRow("SELECT COUNT(*) FROM talangan WHERE item_id = ? AND status = 'tukar'", id).Scan(&diajukan); err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			if diajukan > 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "barang BP yang sudah diajukan tukar tidak bisa diedit"})
+				return
+			}
+			if _, err := tx.Exec(
+				`UPDATE talangan SET item_name = ?, karat = ?, weight_gram = ?, nilai = ?
+				 WHERE item_id = ? AND status = 'aktif'`,
+				nama, utils.StrNull(karat), req.WeightGram, req.HargaBeli, id); err != nil {
+				utils.Gagal(c, err)
+				return
+			}
 		}
 
 		services.CatatPerubahan(tx, middleware.Meta(c), "edit", "items", int64(id),
