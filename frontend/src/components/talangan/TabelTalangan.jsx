@@ -144,7 +144,10 @@ export default function TabelTalangan({ rows, me, onUbah, onError, onInfo }) {
               {riwayat.rows.map((x, i) => (
                 <tr key={i}>
                   <td>{wkt(x.waktu)}</td>
-                  <td>{x.dari ? `${LABEL_STATUS[x.dari] || x.dari} → ` : ''}<b>{LABEL_STATUS[x.ke] || x.ke}</b></td>
+                  <td>
+                    {x.jenis === 'cuci' ? <span className="tag info">Cuci</span> : x.dari ? `${LABEL_STATUS[x.dari] || x.dari} → ` : ''}{' '}
+                    <b>{LABEL_STATUS[x.ke] || x.ke}</b>
+                  </td>
                   <td>{x.oleh}</td>
                   <td className="muted">{x.catatan}</td>
                 </tr>

@@ -116,7 +116,6 @@ export default function FormTukar({ bpList, onSelesai, onError, onInfo, onMulai 
 
   return (
     <div className="card">
-      <h3>Buat penukaran dengan cabang BP</h3>
       <p className="muted">
         Pilih barang BP yang dibawa (di back office) dan barang kita yang diambil dari BP. Satu barang hanya bisa masuk satu penukaran.
       </p>

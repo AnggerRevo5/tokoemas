@@ -6,14 +6,15 @@ import TabelTalangan from '../components/talangan/TabelTalangan'
 import FormTukar from '../components/talangan/FormTukar'
 import DaftarTukar from '../components/talangan/DaftarTukar'
 import PiutangBP from '../components/talangan/PiutangBP'
+import Lipat from '../components/common/Lipat'
 
 // Menu Talangan: barang milik BP lain yang dibeli toko (MASUK), barang kita yang dibeli BP (KELUAR),
 // penukaran per cabang BP, dan piutang. Barang MASUK diinput petugas toko lewat Stok > Tambah barang masuk > Barang cabang.
 export default function Talangan({ me }) {
   const lengkap = me.role !== 'cabang'
   const bisaTukar = me.role === 'pj' || me.role === 'super_admin'
-  const tabAda = lengkap ? ['masuk', 'keluar', 'tukar', 'piutang'] : ['masuk']
-  const NAMA_TAB = { masuk: 'Masuk (barang BP)', keluar: 'Keluar (barang kita)', tukar: 'Penukaran', piutang: 'Piutang' }
+  const tabAda = lengkap ? ['masuk', 'keluar', 'tukar'] : ['masuk']
+  const NAMA_TAB = { masuk: 'Masuk (barang BP)', keluar: 'Keluar (barang kita)', tukar: 'Penukaran' }
 
   const [tab, setTab] = useState('masuk')
   const [bpList, setBpList] = useState([])
@@ -48,8 +49,10 @@ export default function Talangan({ me }) {
       if (status) q.set('status', status)
       api(`/talangan?${q}`).then(setRows).catch((e) => setError(e.message))
     }
-    if (tab === 'tukar') api(`/talangan/tukar${bp ? `?bp_id=${bp}` : ''}`).then(setTukar).catch((e) => setError(e.message))
-    if (tab === 'piutang') api('/talangan/piutang').then(setPiutang).catch((e) => setError(e.message))
+    if (tab === 'tukar') {
+      api(`/talangan/tukar${bp ? `?bp_id=${bp}` : ''}`).then(setTukar).catch((e) => setError(e.message))
+      api('/talangan/piutang').then(setPiutang).catch((e) => setError(e.message))
+    }
   }, [tab, bp, status])
 
   useEffect(() => {
@@ -111,22 +114,19 @@ export default function Talangan({ me }) {
       {tab === 'tukar' && (
         <>
           {bisaTukar && (
-            <FormTukar
-              bpList={bpList}
-              onMulai={reset}
-              onSelesai={muat}
-              onError={galat}
-              onInfo={kabar}
-            />
+            <Lipat judul="Buat penukaran dengan cabang BP">
+              <FormTukar bpList={bpList} onMulai={reset} onSelesai={muat} onError={galat} onInfo={kabar} />
+            </Lipat>
           )}
-          <div className="card" style={{ marginTop: 16 }}>
-            <h3>Daftar penukaran</h3>
-            <DaftarTukar rows={tukar} me={me} onUbah={muat} onError={galat} onInfo={kabar} />
-          </div>
+          <Lipat judul="Cabang BP dan daftar penukaran">
+            <div className="card">
+              <PiutangBP rows={piutang} me={me} onUbah={muat} onError={galat} onInfo={kabar} />
+              <h3 style={{ marginTop: 20 }}>Daftar penukaran</h3>
+              <DaftarTukar rows={tukar} me={me} onUbah={muat} onError={galat} onInfo={kabar} />
+            </div>
+          </Lipat>
         </>
       )}
-
-      {tab === 'piutang' && <PiutangBP rows={piutang} me={me} onUbah={muat} onError={galat} onInfo={kabar} />}
     </div>
   )
 }

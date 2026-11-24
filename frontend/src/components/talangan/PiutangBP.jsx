@@ -34,7 +34,7 @@ export default function PiutangBP({ rows, me, onUbah, onError, onInfo }) {
   }
 
   return (
-    <div className="card">
+    <div>
       <h3>Piutang per cabang BP</h3>
       <p className="muted">
         Piutang = BP masih harus membayar ke kita. Utang = kita masih harus membayar ke BP. Dihitung dari penukaran yang uangnya belum masuk kas BO.
