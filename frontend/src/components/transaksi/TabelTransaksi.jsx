@@ -34,16 +34,16 @@ export default function TabelTransaksi({ rows, isKas, bisaVoid, onBatal, onJual,
                     <>
                       {rupiah(r.amount)}
                       {r.metode && <div className="muted">Metode: {r.metode === 'qris' ? 'QRIS/Debit' : r.metode === 'transfer' ? 'Transfer' : 'Tunai'}</div>}
-                      {r.barang?.length > 0 && (
-                        <div className="muted" style={{ whiteSpace: 'normal', minWidth: 220, marginTop: 4 }}>
-                          {r.barang.map((b, i) => (
+                      <div className="muted" style={{ whiteSpace: 'normal', minWidth: 220, marginTop: 4 }}>
+                        {r.barang?.length > 0
+                          ? r.barang.map((b, i) => (
                             <div key={`${b.item_no || b.item_name}-${i}`}>
                               {b.item_no && <>{b.item_no} </>}{b.item_name}{b.karat && ` ${b.karat}`}
                               {b.weight_gram > 0 && ` - ${gram(b.weight_gram)} g`}{b.qty > 0 && ` (${b.qty} pcs)`}
                             </div>
-                          ))}
-                        </div>
-                      )}
+                          ))
+                          : <div>-</div>}
+                      </div>
                     </>
                   )
                   : `${r.item_name} - ${r.weight_gram} g ${r.karat} (${r.qty} pcs)`}
