@@ -108,18 +108,8 @@ func Setup(r *gin.Engine, db *sql.DB) {
 	auth.POST("/penjualan/:id/konfirmasi", controllers.PenjualanKonfirmasi(db))
 	auth.PUT("/penjualan/:id", controllers.PenjualanEdit(db))
 
-	// Talangan dan tukar barang dengan BP (toko menginput, owner memantau dan menyetujui)
-	auth.GET("/talangan", controllers.TalanganList(db))
-	auth.POST("/talangan", controllers.TalanganCreate(db))
-	auth.PUT("/talangan/:id", controllers.TalanganEdit(db))
-	auth.POST("/talangan/:id/konfirmasi", controllers.TalanganKonfirmasi(db))
-	auth.POST("/talangan/:id/batal", controllers.TalanganBatal(db))
-	auth.GET("/talangan/:id/riwayat", controllers.TalanganRiwayat(db))
-	auth.GET("/tukar/:id/riwayat", controllers.TukarRiwayat(db))
-	auth.GET("/tukar", controllers.TukarList(db))
-	auth.POST("/tukar", controllers.TukarAjukan(db))
-	auth.POST("/tukar/:id/setujui", controllers.TukarSetujui(db))
-	auth.POST("/tukar/:id/batal", controllers.TukarBatal(db))
+	// Talangan BO: barang BP lain, kirim BO, penukaran per cabang BP, kas BO
+	controllers.RuteTalangan(auth, db)
 
 	// Gadai logam mulia: dana masuk, cicilan bulanan, tebus lebih cepat, barang kembali atau tidak ditebus
 	auth.GET("/gadai", controllers.GadaiList(db))

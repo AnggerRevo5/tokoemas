@@ -1,0 +1,65 @@
+# dependensi dan hasil build
+node_modules/
+dist/
+build/
+vendor/
+bin/
+tmp/
+.vite/
+coverage/
+__pycache__/
+*.pyc
+*.exe
+
+# hasil graphify sendiri
+graphify-out/
+
+# rahasia dan konfigurasi lokal
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.p12
+
+# data besar dan dump (migrasi schema di backend/migrations dan db/migrations TETAP masuk)
+uploads/
+storage/
+public/uploads/
+/*.sql
+db/impor/
+*.dump
+*.db
+*.sqlite
+*.log
+backup/
+
+# file generate dan lock
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+go.sum
+*.min.js
+*.map
+
+# aset biner dan dokumen kerja
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.svg
+*.ico
+*.woff
+*.woff2
+*.pdf
+*.xlsx
+*.xls
+*.csv
+*.docx
+*.doc
+~$*
+
+# editor dan git
+.git/
+.idea/
+.vscode/

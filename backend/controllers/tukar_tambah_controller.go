@@ -130,6 +130,10 @@ func TukarTambahCreate(db *sql.DB) gin.HandlerFunc {
 			balasKesalahan(c, err)
 			return
 		}
+		if err := services.TolakTalangan(baru); err != nil {
+			balasKesalahan(c, err)
+			return
+		}
 		for _, it := range baru {
 			switch {
 			case it.Status != "tersedia":

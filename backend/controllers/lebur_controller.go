@@ -130,6 +130,10 @@ func LeburMulai(db *sql.DB) gin.HandlerFunc {
 		if !ok {
 			return
 		}
+		if err := services.TolakLebur(items); err != nil {
+			balasKesalahan(c, err)
+			return
+		}
 		note := strings.TrimSpace(req.Note)
 		ids := services.Kunci(items)
 		for _, it := range items {
@@ -330,6 +334,10 @@ func LeburBuatBatch(db *sql.DB) gin.HandlerFunc {
 
 		items, err := services.AmbilBarang(tx, ids)
 		if err != nil {
+			balasKesalahan(c, err)
+			return
+		}
+		if err := services.TolakLebur(items); err != nil {
 			balasKesalahan(c, err)
 			return
 		}

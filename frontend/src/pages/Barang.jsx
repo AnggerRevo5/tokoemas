@@ -29,6 +29,7 @@ export default function Barang({ me, onUbah }) {
   const [status, setStatus] = useState('tersedia')
   const [jenisF, setJenisF] = useState('semua')
   const [asal, setAsal] = useState('semua')
+  const [talanganF, setTalanganF] = useState('semua')
   const [cari, setCari] = useState('')
   const [kadar, setKadar] = useState('')
   const [beratMin, setBeratMin] = useState('')
@@ -71,6 +72,7 @@ export default function Barang({ me, onUbah }) {
     const p = new URLSearchParams({ location_id: locId, status, limit: String(batas) })
     if (jenisF !== 'semua') p.set('jenis', jenisF)
     if (asal !== 'semua') p.set('asal', asal)
+    if (talanganF !== 'semua') p.set('talangan', talanganF)
     if (bakiF) p.set('baki_id', bakiF)
     if (cari.trim()) p.set('q', cari.trim())
     if (kadar) p.set('karat', kadar)
@@ -96,7 +98,7 @@ export default function Barang({ me, onUbah }) {
       .then((d) => setGadaiMap(Object.fromEntries(d.flatMap((x) => x.barang.map((b) => [b.item_id, x])))))
       .catch(() => {})
     api('/barang/notif').then(setNotif).catch(() => {})
-  }, [locId, status, jenisF, asal, cari, kadar, beratMin, beratMax, bakiF, batas])
+  }, [locId, status, jenisF, asal, talanganF, cari, kadar, beratMin, beratMax, bakiF, batas])
 
   useEffect(() => {
     muat()
@@ -261,6 +263,11 @@ export default function Barang({ me, onUbah }) {
         asal={asal}
         onAsal={(v) => {
           setAsal(v)
+          setBatas(LANGKAH_MUAT)
+        }}
+        talangan={talanganF}
+        onTalangan={(v) => {
+          setTalanganF(v)
           setBatas(LANGKAH_MUAT)
         }}
         cari={cari}

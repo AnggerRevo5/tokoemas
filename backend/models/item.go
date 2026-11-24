@@ -11,6 +11,8 @@ type ItemRow struct {
 	Location int
 	Status   string
 	Jenis    string
+	// TalanganID > 0: barang milik BP lain yang menumpang di stok BO (bukan stok kita)
+	TalanganID int
 }
 
 // Item mencerminkan tabel items (barang per pcs).

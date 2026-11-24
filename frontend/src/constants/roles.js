@@ -16,7 +16,7 @@ export const DESKRIPSI_ROLE = {
     'Semua menu operasional dan laporan. Mengoper barang ke cabang dan mengonfirmasi barang yang masuk ke back office; edit atau pembatalan data kas/stok lama hanya oleh Super Admin.',
   cabang:
     'Operasional satu toko (cabangnya sendiri): input kas dan stok, cuci, dan service. Edit atau pembatalan data kas/stok yang sudah tercatat hanya oleh Super Admin.',
-  pj: 'Penanggung jawab: mencatat proses lebur, cuci, dan service di back office.',
+  pj: 'Penanggung jawab: mencatat proses lebur, cuci, dan service di back office, serta mengurus talangan (kirim ke BO, penukaran dengan BP, terima dan setor uang).',
 }
 
 // kelompok menu di sidebar (urutan tampil)
@@ -30,14 +30,14 @@ const GRUP_MENU = [
 
 // menu tab sesuai role: [kode, label]
 export function menuUntuk(role) {
-  if (role === 'pj') return [['lebur', 'Lebur'], ['cuci', 'Cuci'], ['service', 'Service']]
+  if (role === 'pj') return [['lebur', 'Lebur'], ['cuci', 'Cuci'], ['service', 'Service'], ['talangan', 'Talangan']]
 
   const menu = [
     ['dashboard', 'Dashboard'],
     ['kas', 'Kas'],
     ['stok', 'Stok'],
     ['riwayat_stok', 'Riwayat Stok'],
-    ['talangan', 'Talangan BP'],
+    ['talangan', 'Talangan'],
     ['cuci', 'Cuci'],
     ['service', 'Service'],
   ]

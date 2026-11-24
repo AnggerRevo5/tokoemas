@@ -187,6 +187,10 @@ func BarangTarikBP(db *sql.DB) gin.HandlerFunc {
 			balasKesalahan(c, err)
 			return
 		}
+		if err := services.TolakTalangan(items); err != nil {
+			balasKesalahan(c, err)
+			return
+		}
 		for _, it := range items {
 			if it.Status != "di_bp" {
 				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s tidak sedang berada di BP", it.Name)})

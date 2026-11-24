@@ -389,6 +389,12 @@ func BarangEdit(db *sql.DB) gin.HandlerFunc {
 			c.JSON(http.StatusNotFound, gin.H{"error": "barang tidak ditemukan"})
 			return
 		}
+		var talangan int
+		tx.QueryRow("SELECT COUNT(*) FROM talangan_barang WHERE stok_id = ?", id).Scan(&talangan)
+		if talangan > 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "barang ini tercatat di Talangan; harga dikunci dan hanya owner yang bisa mengoreksinya di menu Talangan"})
+			return
+		}
 		if lama.Status != "tersedia" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "hanya barang yang tersedia di stok yang bisa diedit"})
 			return

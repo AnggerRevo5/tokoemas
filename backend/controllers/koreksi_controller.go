@@ -104,10 +104,12 @@ func VoidTransaksi(db *sql.DB, tabel string) gin.HandlerFunc {
 			           + (SELECT COUNT(*) FROM service_jobs WHERE fee_cash_id = ? AND is_void = FALSE)
 			           + (SELECT COUNT(*) FROM investor_movements WHERE cash_id = ? AND is_void = FALSE)
 			           + (SELECT COUNT(*) FROM gadai WHERE cash_id = ? AND is_void = FALSE)
-			           + (SELECT COUNT(*) FROM gadai_pembayaran WHERE (cash_pokok_id = ? OR cash_biaya_id = ?) AND is_void = FALSE)`,
-				id, id, id, id, id, id, id, id, id, id).Scan(&terkait)
+			           + (SELECT COUNT(*) FROM gadai_pembayaran WHERE (cash_pokok_id = ? OR cash_biaya_id = ?) AND is_void = FALSE)
+			           + (SELECT COUNT(*) FROM talangan_barang WHERE kas_id = ?)
+			           + (SELECT COUNT(*) FROM talangan_tukar WHERE kas_id = ?)`,
+				id, id, id, id, id, id, id, id, id, id, id, id).Scan(&terkait)
 			if terkait > 0 {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "kas ini dibuat otomatis oleh hutang, penjualan, pembelian customer, bunga investor, atau gadai. Batalkan dari menu asalnya (penjualan: tombol Ubah penjualan di menu Kas atau klik barangnya di Stok)"})
+				c.JSON(http.StatusBadRequest, gin.H{"error": "kas ini dibuat otomatis oleh hutang, penjualan, pembelian customer, bunga investor, gadai, atau talangan. Batalkan dari menu asalnya (penjualan: tombol Ubah penjualan di menu Kas atau klik barangnya di Stok)"})
 				return
 			}
 		}
@@ -139,11 +141,12 @@ func Saldo(db *sql.DB) gin.HandlerFunc {
 		q := `SELECT l.id, l.name,
 		  IFNULL((SELECT SUM(IF(direction='in',amount,-amount)) FROM cash_transactions WHERE location_id=l.id AND is_void=FALSE),0),
 		  IFNULL((SELECT SUM(IF(m.direction='in',m.weight_gram,-m.weight_gram)) FROM stock_movements m LEFT JOIN items i ON i.id = m.item_id
-		          WHERE m.location_id=l.id AND m.is_void=FALSE AND IFNULL(i.bahan,'emas')='emas'
+		          WHERE m.location_id=l.id AND m.is_void=FALSE AND IFNULL(i.bahan,'emas')='emas' AND i.talangan_id IS NULL
 		            AND IFNULL(i.jenis,'perhiasan') NOT IN (` + services.SQLJenisTanpaGram + `)),0),
 		  IFNULL((SELECT SUM(IF(m.direction='in',m.weight_gram,-m.weight_gram)) FROM stock_movements m LEFT JOIN items i ON i.id = m.item_id
-		          WHERE m.location_id=l.id AND m.is_void=FALSE AND i.bahan='perak'),0),
-		  IFNULL((SELECT SUM(IF(direction='in',qty,-qty)) FROM stock_movements WHERE location_id=l.id AND is_void=FALSE),0)
+		          WHERE m.location_id=l.id AND m.is_void=FALSE AND i.bahan='perak' AND i.talangan_id IS NULL),0),
+		  IFNULL((SELECT SUM(IF(direction='in',qty,-qty)) FROM stock_movements WHERE location_id=l.id AND is_void=FALSE
+		            AND NOT EXISTS (SELECT 1 FROM items ti WHERE ti.id = stock_movements.item_id AND ti.talangan_id IS NOT NULL)),0)
 		  FROM locations l`
 		args := []interface{}{}
 		if cl.Role == "cabang" {

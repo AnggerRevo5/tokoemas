@@ -212,7 +212,7 @@ func KasCreate(db *sql.DB) gin.HandlerFunc {
 var kelompokKas = map[string][]string{
 	"penjualan":    {"omzet", "jual_qris", "biaya_qris", "jual_barang", "tukar_tambah_masuk", "tukar_tambah_keluar"},
 	"pembelian":    {"pembelian_customer"},
-	"tukar_bp":     {"kembali_cabang"},
+	"tukar_bp":     {"kembali_cabang", "talangan_tukar_masuk", "talangan_tukar_keluar"},
 	"gadai":        {"gadai_dana", "gadai_pokok", "gadai_biaya", "gadai_kembali"},
 	"hutang":       {"bayar_hutang", "pinjaman", "investor", "bulanan_investor", "tarik_investor"},
 	"service":      {"biaya_service"},

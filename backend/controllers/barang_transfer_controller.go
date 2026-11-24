@@ -53,6 +53,10 @@ func BarangKirimBO(db *sql.DB) gin.HandlerFunc {
 			balasKesalahan(c, err)
 			return
 		}
+		if err := services.TolakTalangan(items); err != nil {
+			balasKesalahan(c, err)
+			return
+		}
 		for _, it := range items {
 			if it.Status != "tersedia" {
 				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s tidak bisa diantar (%s)", it.Name, it.Status)})
@@ -127,6 +131,10 @@ func BarangTerimaBO(db *sql.DB) gin.HandlerFunc {
 
 		items, err := services.AmbilBarang(tx, req.ItemIDs)
 		if err != nil {
+			balasKesalahan(c, err)
+			return
+		}
+		if err := services.TolakTalangan(items); err != nil {
 			balasKesalahan(c, err)
 			return
 		}
@@ -235,7 +243,7 @@ func BarangOper(db *sql.DB) gin.HandlerFunc {
 		bp := strings.TrimSpace(req.BPNama)
 		var namaToko string
 		if bp != "" {
-			if !services.BPValid(bp) {
+			if !services.BPValid(db, bp) {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "BP tujuan tidak dikenal"})
 				return
 			}
@@ -262,6 +270,10 @@ func BarangOper(db *sql.DB) gin.HandlerFunc {
 
 		items, err := services.AmbilBarang(tx, req.ItemIDs)
 		if err != nil {
+			balasKesalahan(c, err)
+			return
+		}
+		if err := services.TolakTalangan(items); err != nil {
 			balasKesalahan(c, err)
 			return
 		}
@@ -477,14 +489,14 @@ func BarangNotif(db *sql.DB) gin.HandlerFunc {
 				 WHERE is_void = FALSE AND status = 'dikirim' AND (kirim_ke_location_id IS NOT NULL OR bp_nama IS NOT NULL)`,
 			).Scan(&keluar)
 		}
-		// pekerjaan menunggu owner: pengajuan tukar BP dan penjualan penadah yang belum dikonfirmasi
-		var tukarMenunggu, penadahMenunggu int
+		// pekerjaan menunggu owner: penjualan penadah yang belum dikonfirmasi dan barang talangan yang dibawa PJ ke BO
+		var penadahMenunggu, talanganMenunggu int
 		if cl.Role == "owner" || cl.Role == "super_admin" {
-			db.QueryRow("SELECT COUNT(*) FROM tukar_bp WHERE status = 'diajukan'").Scan(&tukarMenunggu)
+			db.QueryRow("SELECT COUNT(*) FROM talangan_barang WHERE status = 'KIRIM_BO'").Scan(&talanganMenunggu)
 			db.QueryRow("SELECT COUNT(*) FROM penadah_sales WHERE is_void = FALSE AND konfirmasi = FALSE").Scan(&penadahMenunggu)
 		}
 		c.JSON(http.StatusOK, gin.H{"menunggu": menunggu, "belum_sampai": belum, "keluar": keluar,
-			"tukar_menunggu": tukarMenunggu, "penadah_menunggu": penadahMenunggu})
+			"penadah_menunggu": penadahMenunggu, "talangan_menunggu": talanganMenunggu})
 	}
 }
 

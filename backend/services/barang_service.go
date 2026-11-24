@@ -18,7 +18,7 @@ func AmbilBarang(tx *sql.Tx, ids []int) (map[int]models.ItemRow, error) {
 		}
 	}
 	rows, err := tx.Query(
-		`SELECT id, item_name, IFNULL(karat,''), weight_gram, location_id, status, jenis
+		`SELECT id, item_name, IFNULL(karat,''), weight_gram, location_id, status, jenis, IFNULL(talangan_id,0)
 		 FROM items WHERE is_void = FALSE AND id IN (`+utils.Placeholders(len(args))+`) FOR UPDATE`, args...)
 	if err != nil {
 		return nil, err
@@ -27,7 +27,7 @@ func AmbilBarang(tx *sql.Tx, ids []int) (map[int]models.ItemRow, error) {
 	out := map[int]models.ItemRow{}
 	for rows.Next() {
 		var r models.ItemRow
-		if err := rows.Scan(&r.ID, &r.Name, &r.Karat, &r.Weight, &r.Location, &r.Status, &r.Jenis); err != nil {
+		if err := rows.Scan(&r.ID, &r.Name, &r.Karat, &r.Weight, &r.Location, &r.Status, &r.Jenis, &r.TalanganID); err != nil {
 			return nil, err
 		}
 		out[r.ID] = r
@@ -36,6 +36,28 @@ func AmbilBarang(tx *sql.Tx, ids []int) (map[int]models.ItemRow, error) {
 		return nil, salah("ada barang yang tidak ditemukan")
 	}
 	return out, nil
+}
+
+// TolakTalangan menolak aksi stok biasa (jual, oper, gadai, tukar tambah) untuk barang talangan.
+// Barang talangan hanya boleh diproses (cuci/lebur) dan ditukar lewat menu Talangan.
+func TolakTalangan(items map[int]models.ItemRow) error {
+	for _, it := range items {
+		if it.TalanganID > 0 {
+			return salah(it.Name + " adalah barang talangan milik BP lain, tidak bisa dipakai di menu ini (urus lewat menu Talangan)")
+		}
+	}
+	return nil
+}
+
+// TolakLebur: barang talangan milik BP lain hanya boleh dicuci, tidak boleh dilebur
+// (barang KELUAR, yaitu barang kita yang diambil dari BP, adalah stok biasa dan tidak terkena aturan ini).
+func TolakLebur(items map[int]models.ItemRow) error {
+	for _, it := range items {
+		if it.TalanganID > 0 {
+			return salah(it.Name + " adalah barang talangan milik BP lain: hanya boleh dicuci, tidak boleh dilebur")
+		}
+	}
+	return nil
 }
 
 func Ringkas(items []models.ItemRow) (string, float64, int, string) {

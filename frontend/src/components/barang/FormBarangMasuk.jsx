@@ -10,6 +10,7 @@ import { Plus, X } from 'lucide-react'
 import AngkaBerjalan from '../common/AngkaBerjalan'
 import Spinner from '../common/Spinner'
 import Popup from '../common/Popup'
+import FormTalanganMasuk from '../talangan/FormTalanganMasuk'
 
 const formatGram = (v) => String(gram(v))
 const formatRupiah = (v) => rupiah(Math.round(v))
@@ -33,7 +34,9 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
 
   const tipeLok = (id) => (locations.find((l) => l.id === Number(id)) || {}).type
   const fTipe = tipeLok(fLoc) || 'cabang'
-  const fOpsi = KATEGORI.stok[fTipe].in
+  // toko juga bisa mencatat barang milik BP lain (talangan): tidak masuk stok toko, diurus di menu Talangan
+  const fOpsi = fTipe === 'cabang' ? [...KATEGORI.stok.cabang.in, ['barang_cabang', 'Barang cabang BP (talangan)']] : KATEGORI.stok[fTipe].in
+  const modeTalangan = fKat === 'barang_cabang'
   const wajibHarga = fKat === 'beli_customer'
 
   // akun owner/admin: lokasi awal = back office
@@ -168,7 +171,27 @@ export default function FormBarangMasuk({ me, isCabang, locations, onMulai, onSu
         </button>
       </div>
 
-      {formBuka && (
+      {formBuka && modeTalangan && (
+        <FormTalanganMasuk
+          locationId={fLoc}
+          onMulai={onMulai}
+          onError={onError}
+          kategoriSelect={
+            <select value={fKat} onChange={(e) => setFKat(e.target.value)}>
+              {fOpsi.map(([k, l]) => (
+                <option key={k} value={k}>{l}</option>
+              ))}
+            </select>
+          }
+          onSukses={(message) => {
+            setFormBuka(false)
+            setFKat(fOpsi[0][0])
+            onSukses({ message, lokasiId: fLoc, status: 'tersedia' })
+          }}
+        />
+      )}
+
+      {formBuka && !modeTalangan && (
         <m.form
           className="card"
           style={{ marginBottom: 16 }}

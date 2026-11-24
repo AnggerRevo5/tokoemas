@@ -57,7 +57,7 @@ func HanyaPeran(c *gin.Context, peran ...string) (*models.Claims, bool) {
 	return nil, false
 }
 
-// BatasiPJ: akun PJ hanya boleh memakai menu Lebur, Cuci, dan Service (sesuai menu di frontend),
+// BatasiPJ: akun PJ hanya boleh memakai menu Lebur, Cuci, Service, dan Talangan (sesuai menu di frontend),
 // sehingga tidak bisa membaca kas, saldo, stok, hutang, atau laporan toko lewat API.
 func BatasiPJ() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -67,6 +67,7 @@ func BatasiPJ() gin.HandlerFunc {
 			boleh := p == "/me" || p == "/logout" || p == "/locations" || p == "/barang/notif" ||
 				strings.HasPrefix(p, "/lebur") ||
 				strings.HasPrefix(p, "/penjualan") ||
+				strings.HasPrefix(p, "/talangan") ||
 				strings.HasPrefix(p, "/cuci") || // termasuk /cucian
 				strings.HasPrefix(p, "/service")
 			if !boleh {

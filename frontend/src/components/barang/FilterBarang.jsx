@@ -4,7 +4,7 @@ import { KARAT } from '../../constants/barang'
 
 // Filter daftar barang (lokasi, status, jenis, asal, cari, kadar, berat) dan ringkasan jumlah/berat.
 export default function FilterBarang({
-  isCabang, locations, locId, onLocId, status, onStatus, jenisF, onJenis, asal, onAsal, cari, onCari, kadar, beratMin, beratMax, onKadarBerat, data,
+  isCabang, locations, locId, onLocId, status, onStatus, jenisF, onJenis, asal, onAsal, talangan, onTalangan, cari, onCari, kadar, beratMin, beratMax, onKadarBerat, data,
 }) {
   return (
     <div className="card">
@@ -55,6 +55,14 @@ export default function FilterBarang({
             {locations.filter((l) => String(l.id) !== String(locId)).map((l) => (
               <option key={l.id} value={l.id}>Kiriman dari {l.name}</option>
             ))}
+          </select>
+        </div>
+        <div>
+          <label>Barang talangan (milik BP lain)</label>
+          <select value={talangan} onChange={(e) => onTalangan(e.target.value)}>
+            <option value="semua">Tampilkan dengan label</option>
+            <option value="1">Hanya talangan</option>
+            <option value="0">Tanpa talangan</option>
           </select>
         </div>
         <div>

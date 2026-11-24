@@ -333,6 +333,10 @@ func GadaiCreate(db *sql.DB) gin.HandlerFunc {
 			balasKesalahan(c, err)
 			return
 		}
+		if err := services.TolakTalangan(items); err != nil {
+			balasKesalahan(c, err)
+			return
+		}
 		pertama := items[ids[0]]
 		var totalBerat float64
 		namaSemua := make([]string, 0, len(ids))

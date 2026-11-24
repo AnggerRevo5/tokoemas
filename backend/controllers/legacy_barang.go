@@ -240,6 +240,10 @@ func LegacyBarangPindah(db *sql.DB) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
+		if err := services.TolakTalangan(items); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 
 		// validasi semua barang dulu, baru proses
 		for _, it := range items {

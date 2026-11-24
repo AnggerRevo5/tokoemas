@@ -67,6 +67,11 @@ export default function TabelBarang({
                 ) : (
                   <>{r.item_name} {r.karat}</>
                 )}
+                {r.talangan && (
+                  <div>
+                    <span className="tag warn" title="Barang milik BP lain, bukan stok kita">Talangan {r.talangan_bp}</span>
+                  </div>
+                )}
                 {barangBaru(r) && (
                   <div>
                     <span className="tag info">Baru dari {r.diterima_dari}</span> <span className="muted">{r.diterima_tgl}</span>

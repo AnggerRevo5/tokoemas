@@ -146,6 +146,13 @@ func TestPembatasanRole(t *testing.T) {
 	if w := kirim(t, r, http.MethodGet, "/locations"); w.Code != http.StatusOK {
 		t.Errorf("pj: /locations harus tetap 200, dapat %d", w.Code)
 	}
+	// menu Talangan terbuka untuk PJ, tapi kas dan stok tetap tertutup
+	if w := kirim(t, r, http.MethodGet, "/talangan/bp"); w.Code != http.StatusOK {
+		t.Errorf("pj: /talangan/bp harus 200, dapat %d", w.Code)
+	}
+	if w := kirim(t, r, http.MethodGet, "/stok"); w.Code != http.StatusForbidden {
+		t.Errorf("pj: /stok harus tetap 403, dapat %d", w.Code)
+	}
 }
 
 func TestHanyaSuperAdminBisaMengubahAtauMembatalkanDataKasStokLama(t *testing.T) {
@@ -180,5 +187,47 @@ func TestHanyaSuperAdminBisaMengubahAtauMembatalkanDataKasStokLama(t *testing.T)
 				t.Errorf("%s: input baru %s %s tetap harus diizinkan, dapat %d %s", role, route[0], route[1], w.Code, w.Body.String())
 			}
 		}
+	}
+}
+
+// Rute talangan lewat router asli: wajib login + CSRF, dan tiap role hanya mencapai rute miliknya.
+func TestRuteTalanganAuthDanRole(t *testing.T) {
+	// tanpa cookie sesi: ditolak
+	r := mesinUji(t, "pj")
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/talangan", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusUnauthorized && w.Code != http.StatusForbidden {
+		t.Errorf("tanpa login: kode %d, seharusnya 401/403", w.Code)
+	}
+	// POST tanpa token CSRF: ditolak
+	tok, _ := middleware.BuatToken(9, "uji", "apa saja", 0, sesiID)
+	req = httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/talangan/tukar", strings.NewReader("{}"))
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: middleware.NamaCookieSesi, Value: tok})
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusForbidden {
+		t.Errorf("tanpa CSRF: kode %d, seharusnya 403", w.Code)
+	}
+	// PJ tidak boleh input talangan masuk, penukaran bukan milik cabang/owner
+	if w := kirim(t, r, http.MethodPost, "/talangan"); w.Code != http.StatusForbidden {
+		t.Errorf("pj POST /talangan: kode %d, seharusnya 403", w.Code)
+	}
+	for _, role := range []string{"cabang", "owner"} {
+		rr := mesinUji(t, role)
+		if w := kirim(t, rr, http.MethodPost, "/talangan/tukar"); w.Code != http.StatusForbidden {
+			t.Errorf("%s POST /talangan/tukar: kode %d, seharusnya 403", role, w.Code)
+		}
+	}
+	if w := kirim(t, mesinUji(t, "cabang"), http.MethodGet, "/talangan/piutang"); w.Code != http.StatusForbidden {
+		t.Errorf("cabang GET /talangan/piutang: kode %d, seharusnya 403", w.Code)
+	}
+	if w := kirim(t, mesinUji(t, "cabang"), http.MethodGet, "/talangan/tukar"); w.Code != http.StatusForbidden {
+		t.Errorf("cabang GET /talangan/tukar: kode %d, seharusnya 403", w.Code)
+	}
+	// owner tidak boleh membuat/mengubah cabang BP
+	if w := kirim(t, mesinUji(t, "owner"), http.MethodPost, "/talangan/bp"); w.Code != http.StatusForbidden {
+		t.Errorf("owner POST /talangan/bp: kode %d, seharusnya 403", w.Code)
 	}
 }

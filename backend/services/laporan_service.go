@@ -39,7 +39,7 @@ var namaKategori = map[string]string{
 	"lebur": "Masuk proses lebur", "leburan_kotor": "Leburan kotor", "murnikan": "Dimurnikan jadi cukim",
 	"cukim": "Cukim", "jual_penadah": "Jual ke penadah", "laku": "Laku", "pegadaian": "Pegadaian", "jual": "Jual",
 	"gadai_dana": "Dana gadai diterima", "gadai_pokok": "Pembayaran pokok gadai", "gadai_biaya": "Biaya gadai (bunga dan denda)",
-	"gadai_kembali": "Kembali dari gadai", "ke_bp": "Dikirim ke BP", "kembali_bp": "Ditarik kembali dari BP", "tarik_investor": "Penarikan pokok investor",
+	"gadai_kembali": "Kembali dari gadai", "talangan_tukar_masuk": "Tukar talangan (BP membayar ke kita)", "talangan_tukar_keluar": "Tukar talangan (kita membayar ke BP)", "talangan": "Barang talangan masuk BO", "talangan_keluar": "Barang kita dari BP", "talangan_tukar": "Barang talangan ditukar ke BP", "ke_bp": "Dikirim ke BP", "kembali_bp": "Ditarik kembali dari BP", "tarik_investor": "Penarikan pokok investor",
 }
 
 func labelK(k string) string {

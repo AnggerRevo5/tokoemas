@@ -81,6 +81,10 @@ func BarangJual(db *sql.DB) gin.HandlerFunc {
 			balasKesalahan(c, err)
 			return
 		}
+		if err := services.TolakTalangan(items); err != nil {
+			balasKesalahan(c, err)
+			return
+		}
 		for _, it := range items {
 			if harga[it.ID] == 0 && !services.BolehGratis(it.Jenis) {
 				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("harga jual %s wajib diisi (lebih dari 0)", it.Name)})
@@ -473,6 +477,12 @@ func BarangVoid(db *sql.DB) gin.HandlerFunc {
 			c.JSON(http.StatusNotFound, gin.H{"error": "barang tidak ditemukan"})
 			return
 		}
+		var talangan int
+		tx.QueryRow("SELECT COUNT(*) FROM talangan_barang WHERE stok_id = ?", id).Scan(&talangan)
+		if talangan > 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "barang ini tercatat di Talangan, tidak bisa dibatalkan dari sini"})
+			return
+		}
 		if isVoid {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "sudah dibatalkan"})
 			return
@@ -554,7 +564,8 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 		             IFNULL(i.kirim_ke_location_id,0), IFNULL(k.name,''),
 		             i.harga_jual, i.tanggal_jual, IFNULL(t.id,0), IFNULL(t.no,0), IFNULL(t.name,''), i.purchase_cash_id IS NOT NULL,
 		             IFNULL(jc.metode,''), i.bahan, i.diserahkan, IFNULL(i.bp_nama,''),
-		             IFNULL(i.diterima_dari_id,0), IFNULL(dd.name,''), IFNULL(DATE_FORMAT(i.diterima_tgl,'%Y-%m-%d'),'')`
+		             IFNULL(i.diterima_dari_id,0), IFNULL(dd.name,''), IFNULL(DATE_FORMAT(i.diterima_tgl,'%Y-%m-%d'),''),
+		             IFNULL(i.talangan_id,0), IFNULL(tb.nama,'')`
 		dari := `FROM items i
 		      JOIN locations l ON l.id = i.location_id
 		      JOIN locations o ON o.id = i.origin_location_id
@@ -564,6 +575,7 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 		      LEFT JOIN washing_job_items x ON x.job_id = i.washing_job_id AND x.item_id = i.id
 		      LEFT JOIN trays t ON t.id = i.tray_id AND t.location_id = i.location_id
 		      LEFT JOIN cash_transactions jc ON jc.id = i.jual_cash_id
+		      LEFT JOIN (SELECT t.id, bp.nama FROM talangan_barang t JOIN bp_cabang bp ON bp.id = t.cabang_pemilik_id) tb ON tb.id = i.talangan_id
 		      WHERE i.is_void = FALSE`
 		args := []interface{}{}
 
@@ -592,6 +604,13 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 			dari += " AND i.jenis = 'logam_mulia' AND i.bahan = 'emas'"
 		case "logam_mulia_perak":
 			dari += " AND i.jenis = 'logam_mulia' AND i.bahan = 'perak'"
+		}
+		// barang talangan (milik BP lain) tampil dengan label; talangan=1 hanya talangan, talangan=0 tanpa talangan
+		switch c.Query("talangan") {
+		case "1":
+			dari += " AND i.talangan_id IS NOT NULL"
+		case "0":
+			dari += " AND i.talangan_id IS NULL"
 		}
 		if v := c.Query("item_id"); v != "" {
 			dari += " AND i.id = ?"
@@ -626,13 +645,18 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 		dari += sc
 		args = append(args, ac...)
 
+		// total stok tidak menghitung barang talangan (bukan milik kita), kecuali yang diminta hanya talangan
+		dariTotal := dari
+		if c.Query("talangan") != "1" {
+			dariTotal += " AND i.talangan_id IS NULL"
+		}
 		// jumlah barang dan total berat/harga dihitung dari seluruh barang yang cocok, bukan hanya baris yang tampil
 		var jumlah int
 		var totalGram, totalPerak, totalBeli, totalJual float64
 		if err := db.QueryRow(
 			"SELECT COUNT(*), IFNULL(SUM(IF(i.bahan = 'perak' OR i.jenis IN ("+services.SQLJenisTanpaGram+"), 0, i.weight_gram)),0),"+
 				" IFNULL(SUM(IF(i.bahan = 'perak', i.weight_gram, 0)),0),"+
-				" IFNULL(SUM(i.harga_beli),0), IFNULL(SUM(i.harga_jual),0) "+dari, args...,
+				" IFNULL(SUM(i.harga_beli),0), IFNULL(SUM(i.harga_jual),0) "+dariTotal, args...,
 		).Scan(&jumlah, &totalGram, &totalPerak, &totalBeli, &totalJual); err != nil {
 			utils.Gagal(c, err)
 			return
@@ -658,15 +682,17 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 			var r models.BarangListRow
 			var kirim, cuciTgl, tglJual sql.NullTime
 			var hargaJual sql.NullFloat64
+			var talID int
 			if err := rows.Scan(&r.ID, &r.ItemNo, &r.ItemName, &r.Karat, &r.WeightGram,
 				&r.Jenis, &r.Brand, &r.Kondisi, &r.HargaBeli,
 				&r.LocationID, &r.Lokasi, &r.OriginID, &r.Asal, &r.Status, &r.EntryDate, &r.Note,
 				&kirim, &r.BelumSampai, &r.BelumNote, &r.Pencuci, &cuciTgl, &r.TujuanID, &r.Tujuan,
 				&hargaJual, &tglJual, &r.BakiID, &r.BakiNo, &r.BakiNama, &r.DariCustomer, &r.Metode, &r.Bahan, &r.Diserahkan, &r.BPNama,
-				&r.DiterimaDariID, &r.DiterimaDari, &r.DiterimaTgl); err != nil {
+				&r.DiterimaDariID, &r.DiterimaDari, &r.DiterimaTgl, &talID, &r.TalanganBP); err != nil {
 				utils.Gagal(c, err)
 				return
 			}
+			r.Talangan = talID > 0
 			if kirim.Valid {
 				t := kirim.Time
 				r.KirimTgl = &t

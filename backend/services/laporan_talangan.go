@@ -32,7 +32,7 @@ func TabelTalanganBP(db *sql.DB, dari, sampai, loc string) (models.TabelLaporan,
 		`SELECT x.entry_date, x.bp_nama, x.arah, x.item_name, IFNULL(x.karat,''), x.weight_gram, x.nilai, x.status, IFNULL(x.tukar_id,0),
 		        l.name, IFNULL(x.note,''), x.konfirmasi, IFNULL(DATE_FORMAT(x.konfirmasi_tgl,'%Y-%m-%d'),''), IFNULL(x.konfirmasi_note,''),
 		        IFNULL(x.batal_alasan,'')
-		 FROM talangan x JOIN locations l ON l.id = x.location_id
+		 FROM talangan_lama x JOIN locations l ON l.id = x.location_id
 		 WHERE x.entry_date BETWEEN ? AND ?`+filterLok+` ORDER BY x.bp_nama, x.id`, append([]interface{}{dari, sampai}, argLok...)...)
 	if err != nil {
 		return t, err
@@ -101,7 +101,7 @@ func TabelTalanganBP(db *sql.DB, dari, sampai, loc string) (models.TabelLaporan,
 	judulBagian("REKAP SELISIH PER BP (catatan aktif yang belum diajukan tukar, posisi saat ini)")
 	rrows, err := db.Query(
 		`SELECT x.bp_nama, IFNULL(SUM(IF(x.arah='kita_di_bp', x.nilai, 0)),0), IFNULL(SUM(IF(x.arah='bp_di_kita', x.nilai, 0)),0)
-		 FROM talangan x WHERE x.status = 'aktif'`+filterLok+` GROUP BY x.bp_nama ORDER BY x.bp_nama`, argLok...)
+		 FROM talangan_lama x WHERE x.status = 'aktif'`+filterLok+` GROUP BY x.bp_nama ORDER BY x.bp_nama`, argLok...)
 	if err != nil {
 		return t, err
 	}
@@ -129,8 +129,8 @@ func TabelTalanganBP(db *sql.DB, dari, sampai, loc string) (models.TabelLaporan,
 	judulBagian("PENGAJUAN TUKAR (menurut tanggal tukar; nilai = selisih, positif berarti kita bayar)")
 	prows, err := db.Query(
 		`SELECT x.tukar_date, x.bp_nama, x.id, x.total_kita, x.total_bp, x.selisih, x.status, l.name, IFNULL(x.note,''), IFNULL(x.batal_alasan,''),
-		        (SELECT COUNT(*) FROM talangan t WHERE t.tukar_id = x.id)
-		 FROM tukar_bp x JOIN locations l ON l.id = x.location_id
+		        (SELECT COUNT(*) FROM talangan_lama t WHERE t.tukar_id = x.id)
+		 FROM tukar_bp_lama x JOIN locations l ON l.id = x.location_id
 		 WHERE x.tukar_date BETWEEN ? AND ?`+filterLok+` ORDER BY x.id`, append([]interface{}{dari, sampai}, argLok...)...)
 	if err != nil {
 		return t, err

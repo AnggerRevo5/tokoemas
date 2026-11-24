@@ -132,6 +132,8 @@ type BarangListRow struct {
 	BakiNama       string     `json:"baki_nama"`
 	Bahan          string     `json:"bahan"` // emas | perak
 	DariCustomer   bool       `json:"dari_customer"`
+	Talangan       bool       `json:"talangan"`    // barang milik BP lain yang menumpang di stok BO
+	TalanganBP     string     `json:"talangan_bp"` // nama BP pemilik
 	Metode         string     `json:"metode"` // tunai | transfer | qris untuk barang terjual dari Stok, kosong bila belum/lewat penadah
 }
 
