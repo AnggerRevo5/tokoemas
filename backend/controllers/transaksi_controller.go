@@ -276,7 +276,8 @@ func isiRincianBarangKas(db *sql.DB, rows []models.KasListRow) error {
 	in := utils.Placeholders(len(ids))
 	args := make([]interface{}, 0, len(ids)*10)
 	kumpulan := []string{
-		`SELECT i.purchase_cash_id AS cash_id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''), IFNULL(i.weight_gram,0), 1
+		`SELECT i.purchase_cash_id AS cash_id, IFNULL(i.item_no,'') AS item_no, i.item_name AS item_name,
+		 IFNULL(i.karat,'') AS karat, IFNULL(i.weight_gram,0) AS weight_gram, 1 AS qty
 		 FROM items i WHERE i.purchase_cash_id IN (` + in + `)`,
 		`SELECT i.jual_cash_id AS cash_id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''), IFNULL(i.weight_gram,0), 1
 		 FROM items i WHERE i.jual_cash_id IN (` + in + `)`,
