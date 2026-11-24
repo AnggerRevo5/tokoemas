@@ -225,3 +225,42 @@ func TestTukarCreateBalapanHanyaSatuBerhasil(t *testing.T) {
 		t.Errorf("barang ada di %d penukaran", n)
 	}
 }
+
+// daftar dan rincian penukaran yang uangnya BELUM dibayar (metode_bayar masih NULL) harus bisa dibuka
+func TestDaftarDanRincianTukarBelumDibayar(t *testing.T) {
+	db := dbUji(t)
+	a := akunDariDB(t, db)
+	m, _ := masukDiBO(t, a, 500000)
+	h, kode := buatTukar(t, a, []int{m}, nil)
+	if h == nil {
+		t.Fatalf("kode %d", kode)
+	}
+	for _, role := range []string{"owner", "pj"} {
+		r := mesinTalangan(db, role, a.User, 0)
+		w := panggil(r, "GET", "/talangan/tukar", "")
+		if w.Code != http.StatusOK {
+			t.Fatalf("%s daftar: kode %d %s", role, w.Code, w.Body.String())
+		}
+		var rows []struct {
+			ID         int    `json:"id"`
+			StatusUang string `json:"status_uang"`
+			TanpaBukti bool   `json:"tanpa_bukti"`
+		}
+		jsonKe(t, w, &rows)
+		ketemu := false
+		for _, x := range rows {
+			if x.ID == h.ID {
+				ketemu = true
+				if x.StatusUang != "BELUM_BAYAR" || x.TanpaBukti {
+					t.Errorf("%s: baris salah %+v", role, x)
+				}
+			}
+		}
+		if !ketemu {
+			t.Errorf("%s: penukaran %d tidak ada di daftar", role, h.ID)
+		}
+		if w := panggil(r, "GET", fmt.Sprintf("/talangan/tukar/%d", h.ID), ""); w.Code != http.StatusOK {
+			t.Errorf("%s rincian: kode %d %s", role, w.Code, w.Body.String())
+		}
+	}
+}

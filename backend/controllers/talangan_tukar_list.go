@@ -13,7 +13,7 @@ import (
 
 const sqlTukar = `SELECT x.id, x.cabang_id, bp.nama, CAST(x.total_masuk AS SIGNED), CAST(x.total_keluar AS SIGNED), CAST(x.saldo AS SIGNED),
 	x.arah_uang, IFNULL(x.metode_bayar,''), IFNULL(CAST(x.nominal_bayar AS SIGNED),0), x.no_referensi, x.status_uang,
-	(x.metode_bayar = 'transfer' AND x.no_referensi = ''), IFNULL(x.koreksi_alasan,''), IFNULL(u.username,''),
+	IFNULL(x.metode_bayar = 'transfer' AND x.no_referensi = '', 0), IFNULL(x.koreksi_alasan,''), IFNULL(u.username,''),
 	DATE_FORMAT(x.tanggal,'%Y-%m-%d'), (SELECT COUNT(*) FROM talangan_tukar_item i WHERE i.tukar_id = x.id), IFNULL(x.catatan,'')
 	FROM talangan_tukar x JOIN bp_cabang bp ON bp.id = x.cabang_id LEFT JOIN users u ON u.id = x.pj_id`
 
