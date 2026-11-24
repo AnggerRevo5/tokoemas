@@ -261,6 +261,75 @@ func filterKas(c *gin.Context) (string, []interface{}) {
 	return q, args
 }
 
+func isiRincianBarangKas(db *sql.DB, rows []models.KasListRow) error {
+	if len(rows) == 0 {
+		return nil
+	}
+
+	index := make(map[int]int, len(rows))
+	ids := make([]interface{}, 0, len(rows))
+	for i := range rows {
+		index[rows[i].ID] = i
+		ids = append(ids, rows[i].ID)
+		rows[i].Barang = []models.KasBarangRow{}
+	}
+	in := utils.Placeholders(len(ids))
+	args := make([]interface{}, 0, len(ids)*11)
+	kumpulan := []string{
+		`SELECT i.purchase_cash_id AS cash_id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''), IFNULL(i.weight_gram,0), 1
+		 FROM items i WHERE i.purchase_cash_id IN (` + in + `)`,
+		`SELECT i.jual_cash_id AS cash_id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''), IFNULL(i.weight_gram,0), 1
+		 FROM items i WHERE i.jual_cash_id IN (` + in + `)`,
+		`SELECT i.jual_biaya_cash_id AS cash_id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''), IFNULL(i.weight_gram,0), 1
+		 FROM items i WHERE i.jual_biaya_cash_id IN (` + in + `)`,
+		`SELECT p.cash_id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''), IFNULL(i.weight_gram,0), 1
+		 FROM penadah_sales p JOIN items i ON i.sale_id = p.id WHERE p.cash_id IN (` + in + `)`,
+		`SELECT p.biaya_cash_id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''), IFNULL(i.weight_gram,0), 1
+		 FROM penadah_sales p JOIN items i ON i.sale_id = p.id WHERE p.biaya_cash_id IN (` + in + `)`,
+		`SELECT g.cash_id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''), IFNULL(i.weight_gram,0), 1
+		 FROM gadai g JOIN gadai_barang b ON b.gadai_id = g.id JOIN items i ON i.id = b.item_id
+		 WHERE g.cash_id IN (` + in + `)`,
+		`SELECT p.cash_pokok_id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''), IFNULL(i.weight_gram,0), 1
+		 FROM gadai_pembayaran p JOIN gadai_barang b ON b.gadai_id = p.gadai_id JOIN items i ON i.id = b.item_id
+		 WHERE p.cash_pokok_id IN (` + in + `)`,
+		`SELECT p.cash_biaya_id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''), IFNULL(i.weight_gram,0), 1
+		 FROM gadai_pembayaran p JOIN gadai_barang b ON b.gadai_id = p.gadai_id JOIN items i ON i.id = b.item_id
+		 WHERE p.cash_biaya_id IN (` + in + `)`,
+		`SELECT t.kas_id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''), IFNULL(i.weight_gram,0), 1
+		 FROM tukar_tambah t JOIN items i ON i.tukar_tambah_id = t.id WHERE t.kas_id IN (` + in + `)`,
+		`SELECT t.biaya_kas_id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''), IFNULL(i.weight_gram,0), 1
+		 FROM tukar_tambah t JOIN items i ON i.tukar_tambah_id = t.id WHERE t.biaya_kas_id IN (` + in + `)`,
+		`SELECT m.cash_id, CONCAT('Lebur #', m.id), m.item_name, IFNULL(m.karat,''), IFNULL(m.weight_gram,0), m.qty
+		 FROM melt_records m WHERE m.cash_id IN (` + in + `)`,
+	}
+	for range kumpulan {
+		args = append(args, ids...)
+	}
+
+	rinci, err := db.Query(
+		`SELECT DISTINCT detail.cash_id, detail.item_no, detail.item_name, detail.karat, detail.weight_gram, detail.qty
+		 FROM (`+strings.Join(kumpulan, " UNION ALL ")+`) detail
+		 ORDER BY detail.cash_id, detail.item_no`,
+		args...,
+	)
+	if err != nil {
+		return err
+	}
+	defer rinci.Close()
+
+	for rinci.Next() {
+		var cashID int
+		var barang models.KasBarangRow
+		if err := rinci.Scan(&cashID, &barang.ItemNo, &barang.ItemName, &barang.Karat, &barang.WeightGram, &barang.Qty); err != nil {
+			return err
+		}
+		if i, ok := index[cashID]; ok {
+			rows[i].Barang = append(rows[i].Barang, barang)
+		}
+	}
+	return rinci.Err()
+}
+
 func KasList(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		cl := c.MustGet("claims").(*models.Claims)
@@ -286,7 +355,7 @@ func KasList(db *sql.DB) gin.HandlerFunc {
 		}
 
 		q := `SELECT x.id, x.location_id, x.direction, x.category, x.amount, IFNULL(x.note,''), x.transaction_date, x.created_at,
-		             IFNULL(l.name,''),
+		             IFNULL(x.metode,''), IFNULL(l.name,''), IFNULL(u.username,''),
 		             EXISTS (SELECT 1 FROM items j WHERE (j.jual_cash_id = x.id OR j.jual_biaya_cash_id = x.id) AND j.is_void = FALSE),
 		             IFNULL((SELECT g.id FROM gadai g WHERE g.cash_id = x.id AND g.is_void = FALSE LIMIT 1),
 		                    IFNULL((SELECT p.gadai_id FROM gadai_pembayaran p
@@ -299,7 +368,7 @@ func KasList(db *sql.DB) gin.HandlerFunc {
 		} else {
 			q += ", FALSE"
 		}
-		q += " FROM cash_transactions x JOIN locations l ON l.id = x.location_id WHERE 1=1"
+		q += " FROM cash_transactions x JOIN locations l ON l.id = x.location_id LEFT JOIN users u ON u.id = x.created_by WHERE 1=1"
 		if !termasukBatal {
 			q += " AND x.is_void = FALSE"
 		}
@@ -324,15 +393,24 @@ func KasList(db *sql.DB) gin.HandlerFunc {
 		for rows.Next() {
 			var r models.KasListRow
 			if err := rows.Scan(&r.ID, &r.LocationID, &r.Direction, &r.Category, &r.Amount, &r.Note, &r.Date, &r.CreatedAt,
-				&r.NamaKas, &r.DariPenjualan, &r.GadaiID, &r.IsVoid, &r.VoidReason, &r.KasLain); err != nil {
+				&r.Metode, &r.NamaKas, &r.Oleh, &r.DariPenjualan, &r.GadaiID, &r.IsVoid, &r.VoidReason, &r.KasLain); err != nil {
 				utils.Gagal(c, err)
 				return
 			}
 			out = append(out, r)
 		}
+		if err := rows.Err(); err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		rows.Close()
 		adaLagi := len(out) > batas
 		if adaLagi {
 			out = out[:batas]
+		}
+		if err := isiRincianBarangKas(db, out); err != nil {
+			utils.Gagal(c, err)
+			return
 		}
 
 		// ringkasan seluruh hasil filter (bukan hanya yang tampil), tanpa transaksi dibatalkan dan tanpa baris kas lain

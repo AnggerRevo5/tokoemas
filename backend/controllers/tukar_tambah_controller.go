@@ -267,6 +267,9 @@ func TukarTambahCreate(db *sql.DB) gin.HandlerFunc {
 
 func TukarTambahBatal(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if _, ok := middleware.HanyaSuperAdmin(c); !ok {
+			return
+		}
 		cl := c.MustGet("claims").(*models.Claims)
 		id, ok := utils.IDParam(c)
 		if !ok {
@@ -302,7 +305,7 @@ func TukarTambahBatal(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		if !bolehUbahTransaksi(cl, lokasi, baru) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "bukan toko kamu atau lebih dari 7 hari lalu, minta Super Admin atau Owner yang membatalkan"})
+			c.JSON(http.StatusForbidden, gin.H{"error": "hanya Super Admin yang bisa membatalkan tukar tambah yang sudah tercatat"})
 			return
 		}
 

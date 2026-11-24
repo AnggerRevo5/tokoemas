@@ -41,14 +41,17 @@ type KasReq struct {
 
 // KasListRow adalah satu baris respons JSON dari KasList.
 type KasListRow struct {
-	ID         int       `json:"id"`
-	LocationID int       `json:"location_id"`
-	Direction  string    `json:"direction"`
-	Category   string    `json:"category"`
-	Amount     float64   `json:"amount"`
-	Note       string    `json:"note"`
-	Date       time.Time `json:"transaction_date"`
-	CreatedAt  time.Time `json:"created_at"`
+	ID         int            `json:"id"`
+	LocationID int            `json:"location_id"`
+	Direction  string         `json:"direction"`
+	Category   string         `json:"category"`
+	Amount     float64        `json:"amount"`
+	Note       string         `json:"note"`
+	Metode     string         `json:"metode"`
+	Oleh       string         `json:"oleh"`
+	Barang     []KasBarangRow `json:"barang"`
+	Date       time.Time      `json:"transaction_date"`
+	CreatedAt  time.Time      `json:"created_at"`
 	// KasLain: baris ini tercatat di kas lokasi lain (penjualan QRIS/Debit cabang masuk kas back office);
 	// ditampilkan hanya sebagai riwayat dan tidak mengubah kas lokasi yang dilihat. NamaKas = nama kas tempat uangnya.
 	KasLain bool   `json:"di_kas_lain"`
@@ -60,6 +63,15 @@ type KasListRow struct {
 	// IsVoid dan VoidReason terisi bila transaksi dibatalkan (hanya tampil dengan filter "termasuk yang dibatalkan").
 	IsVoid     bool   `json:"is_void"`
 	VoidReason string `json:"void_reason"`
+}
+
+// KasBarangRow adalah rincian barang yang terkait dengan satu catatan kas.
+type KasBarangRow struct {
+	ItemNo     string  `json:"item_no"`
+	ItemName   string  `json:"item_name"`
+	Karat      string  `json:"karat"`
+	WeightGram float64 `json:"weight_gram"`
+	Qty        int     `json:"qty"`
 }
 
 // StokListRow adalah satu baris respons JSON dari StokList.

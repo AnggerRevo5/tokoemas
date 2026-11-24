@@ -10,7 +10,7 @@ import FilterKas, { FILTER_KAS_KOSONG } from '../components/transaksi/FilterKas'
 
 export default function Transaksi({ jenis, me }) {
   const isKas = jenis === 'kas'
-  const bisaVoid = me.role === 'super_admin' || me.role === 'cabang'
+  const bisaVoid = me.role === 'super_admin'
 
   const [locations, setLocations] = useState([])
   const [locId, setLocId] = useState(me.role === 'cabang' ? me.location_id : 1)
@@ -114,6 +114,9 @@ export default function Transaksi({ jenis, me }) {
   return (
     <div>
       <Pesan error={error} info={info} />
+      {me.role !== 'super_admin' && (
+        <p className="muted">Transaksi baru tetap bisa diinput. Edit atau pembatalan data yang sudah tercatat hanya bisa dilakukan Super Admin.</p>
+      )}
 
       <FormTransaksi
         jenis={jenis}
@@ -193,7 +196,7 @@ export default function Transaksi({ jenis, me }) {
           isKas={isKas}
           bisaVoid={bisaVoid}
           onBatal={mulaiBatal}
-          onJual={isKas ? (r) => { setError(''); setInfo(''); setKasJual(r) } : undefined}
+          onJual={isKas && me.role === 'super_admin' ? (r) => { setError(''); setInfo(''); setKasJual(r) } : undefined}
           onGadai={isKas ? bukaGadai : undefined}
         />
         {isKas && adaLagi && (

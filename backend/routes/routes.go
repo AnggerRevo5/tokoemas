@@ -63,7 +63,7 @@ func Setup(r *gin.Engine, db *sql.DB) {
 	auth.POST("/barang/void/:id", controllers.BarangVoid(db))
 	auth.PUT("/barang/:id", controllers.BarangEdit(db))
 
-	// Pembatalan dan koreksi penjualan dari Stok (cabang paling lama 7 hari, selebihnya Super Admin atau Owner)
+	// Pembatalan dan koreksi penjualan yang sudah tercatat hanya oleh Super Admin.
 	auth.POST("/jual-toko/:id/batal", controllers.JualBatal(db))
 	auth.POST("/jual-toko/:id/koreksi", controllers.JualKoreksi(db))
 

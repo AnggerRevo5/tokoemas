@@ -13,9 +13,9 @@ export const DESKRIPSI_ROLE = {
   super_admin:
     'Akses penuh ke semua menu, bisa membatalkan transaksi, serta mengelola akun, password, dan cabang.',
   owner:
-    'Semua menu operasional dan laporan. Mengoper barang ke cabang dan mengonfirmasi barang yang masuk ke back office.',
+    'Semua menu operasional dan laporan. Mengoper barang ke cabang dan mengonfirmasi barang yang masuk ke back office; edit atau pembatalan data kas/stok lama hanya oleh Super Admin.',
   cabang:
-    'Operasional satu toko (cabangnya sendiri): kas, stok, cuci, dan service. Mengonfirmasi barang kiriman untuk cabangnya.',
+    'Operasional satu toko (cabangnya sendiri): input kas dan stok, cuci, dan service. Edit atau pembatalan data kas/stok yang sudah tercatat hanya oleh Super Admin.',
   pj: 'Penanggung jawab: mencatat proses lebur, cuci, dan service di back office.',
 }
 

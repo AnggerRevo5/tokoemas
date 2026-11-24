@@ -23,7 +23,13 @@ func BarangBatalKirim(db *sql.DB) gin.HandlerFunc { return ubahTahapKirim(db, tr
 
 func ubahTahapKirim(db *sql.DB, batal bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl, ok := middleware.HanyaPeran(c, "cabang", "owner", "super_admin")
+		var cl *models.Claims
+		var ok bool
+		if batal {
+			cl, ok = middleware.HanyaSuperAdmin(c)
+		} else {
+			cl, ok = middleware.HanyaPeran(c, "cabang", "owner", "super_admin")
+		}
 		if !ok {
 			return
 		}
@@ -67,9 +73,9 @@ func ubahTahapKirim(db *sql.DB, batal bool) gin.HandlerFunc {
 			Status     string
 			Diserahkan bool
 			Tujuan     int
-		BP         string
-		Berat      float64
-		Karat      string
+			BP         string
+			Berat      float64
+			Karat      string
 		}
 		list := []brg{}
 		for rows.Next() {

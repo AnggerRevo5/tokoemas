@@ -23,9 +23,7 @@ func VoidTransaksi(db *sql.DB, tabel string) gin.HandlerFunc {
 		panic("VoidTransaksi: tabel tidak diizinkan: " + tabel)
 	}
 	return func(c *gin.Context) {
-		cl := c.MustGet("claims").(*models.Claims)
-		if cl.Role != "super_admin" && cl.Role != "cabang" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "tidak punya akses membatalkan transaksi"})
+		if _, ok := middleware.HanyaSuperAdmin(c); !ok {
 			return
 		}
 
@@ -47,31 +45,16 @@ func VoidTransaksi(db *sql.DB, tabel string) gin.HandlerFunc {
 		}
 		defer tx.Rollback()
 
-		var locID int
-		var isVoid, recent bool
+		var isVoid bool
 		var relID sql.NullInt64
 		var kat string
 		err = tx.QueryRow(
-			"SELECT location_id, is_void, related_id, created_at >= NOW() - INTERVAL 1 DAY, category FROM "+tabel+" WHERE id = ? FOR UPDATE",
+			"SELECT is_void, related_id, category FROM "+tabel+" WHERE id = ? FOR UPDATE",
 			id,
-		).Scan(&locID, &isVoid, &relID, &recent, &kat)
+		).Scan(&isVoid, &relID, &kat)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "transaksi tidak ditemukan"})
 			return
-		}
-		if cl.Role == "cabang" {
-			if locID != cl.LocationID {
-				c.JSON(http.StatusForbidden, gin.H{"error": "bukan transaksi lokasi kamu"})
-				return
-			}
-			if !recent {
-				c.JSON(http.StatusForbidden, gin.H{"error": "lebih dari 24 jam, minta Super Admin yang membatalkan"})
-				return
-			}
-			if tabel == "stock_movements" && relID.Valid && kat == "barang_masuk" {
-				c.JSON(http.StatusForbidden, gin.H{"error": "barang kiriman dari Back Office hanya bisa dibatalkan Super Admin"})
-				return
-			}
 		}
 		if isVoid {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "transaksi sudah dibatalkan"})

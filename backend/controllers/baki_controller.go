@@ -144,7 +144,7 @@ func BakiCreate(db *sql.DB) gin.HandlerFunc {
 
 func BakiHapus(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl, ok := middleware.HanyaPeran(c, "cabang", "owner", "super_admin")
+		_, ok := middleware.HanyaSuperAdmin(c)
 		if !ok {
 			return
 		}
@@ -164,10 +164,6 @@ func BakiHapus(db *sql.DB) gin.HandlerFunc {
 		var nama string
 		if err := tx.QueryRow("SELECT location_id, no, name FROM trays WHERE id = ? FOR UPDATE", id).Scan(&loc, &no, &nama); err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "baki tidak ditemukan"})
-			return
-		}
-		if cl.Role == "cabang" && loc != cl.LocationID {
-			c.JSON(http.StatusForbidden, gin.H{"error": "bukan baki di lokasi kamu"})
 			return
 		}
 		isi, err := services.IsiBaki(tx, id, loc)
@@ -201,7 +197,7 @@ func BakiHapus(db *sql.DB) gin.HandlerFunc {
 
 func BakiRename(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl, ok := middleware.HanyaPeran(c, "cabang", "owner", "super_admin")
+		_, ok := middleware.HanyaSuperAdmin(c)
 		if !ok {
 			return
 		}
@@ -232,10 +228,6 @@ func BakiRename(db *sql.DB) gin.HandlerFunc {
 			c.JSON(http.StatusNotFound, gin.H{"error": "baki tidak ditemukan"})
 			return
 		}
-		if cl.Role == "cabang" && loc != cl.LocationID {
-			c.JSON(http.StatusForbidden, gin.H{"error": "bukan baki di lokasi kamu"})
-			return
-		}
 		if namaBakiDipakai(tx, loc, nama, id) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("nama baki %q sudah dipakai di lokasi ini", nama)})
 			return
@@ -257,7 +249,7 @@ func BakiRename(db *sql.DB) gin.HandlerFunc {
 
 func BakiPindah(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl, ok := middleware.HanyaPeran(c, "cabang", "owner", "super_admin")
+		_, ok := middleware.HanyaSuperAdmin(c)
 		if !ok {
 			return
 		}
@@ -294,10 +286,6 @@ func BakiPindah(db *sql.DB) gin.HandlerFunc {
 			}
 		} else {
 			loc = items[req.ItemIDs[0]].Location
-		}
-		if cl.Role == "cabang" && loc != cl.LocationID {
-			c.JSON(http.StatusForbidden, gin.H{"error": "bukan baki di lokasi kamu"})
-			return
 		}
 		args := make([]interface{}, 0, len(items))
 		for _, it := range items {
@@ -361,7 +349,7 @@ func BakiPindah(db *sql.DB) gin.HandlerFunc {
 
 func BarangEdit(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cl, ok := middleware.HanyaPeran(c, "cabang", "owner", "super_admin")
+		_, ok := middleware.HanyaSuperAdmin(c)
 		if !ok {
 			return
 		}
@@ -399,10 +387,6 @@ func BarangEdit(db *sql.DB) gin.HandlerFunc {
 				&lama.Weight, &lama.Harga, &lama.Loc, &lama.Tray, &lama.Cash)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "barang tidak ditemukan"})
-			return
-		}
-		if cl.Role == "cabang" && lama.Loc != cl.LocationID {
-			c.JSON(http.StatusForbidden, gin.H{"error": "bukan barang di lokasi kamu"})
 			return
 		}
 		if lama.Status != "tersedia" {

@@ -51,7 +51,7 @@ func periksaJual(c *gin.Context, cl *models.Claims, j jualLama) bool {
 	case !j.KasID.Valid:
 		c.JSON(http.StatusBadRequest, gin.H{"error": "penjualan ini dicatat tanpa catatan kas, jadi tidak bisa dibatalkan otomatis"})
 	case !bolehUbahTransaksi(cl, j.Lokasi, j.Baru):
-		c.JSON(http.StatusForbidden, gin.H{"error": fmt.Sprintf("bukan barang lokasi kamu atau penjualan lebih dari %d hari lalu, minta Super Admin atau Owner yang mengubahnya", services.BatasHariUbahGadai)})
+		c.JSON(http.StatusForbidden, gin.H{"error": "hanya Super Admin yang bisa mengubah atau membatalkan penjualan yang sudah tercatat"})
 	default:
 		return true
 	}
@@ -126,6 +126,9 @@ func batalkanJual(tx *sql.Tx, meta services.MetaAudit, id int, j jualLama, alasa
 
 func JualBatal(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if _, ok := middleware.HanyaSuperAdmin(c); !ok {
+			return
+		}
 		cl := c.MustGet("claims").(*models.Claims)
 		id, ok := utils.IDParam(c)
 		if !ok {
@@ -172,6 +175,9 @@ func JualBatal(db *sql.DB) gin.HandlerFunc {
 
 func JualKoreksi(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if _, ok := middleware.HanyaSuperAdmin(c); !ok {
+			return
+		}
 		cl := c.MustGet("claims").(*models.Claims)
 		id, ok := utils.IDParam(c)
 		if !ok {

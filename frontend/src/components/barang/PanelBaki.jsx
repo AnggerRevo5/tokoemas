@@ -7,7 +7,7 @@ import Popup from '../common/Popup'
 // Ringkasan baki (perhiasan dan logam mulia) di lokasi yang dipilih: dropdown pencari untuk memfilter baki (aman untuk ratusan baki),
 // tambah baki, dan hapus baki kosong.
 // bolehTambah: false bila lokasi belum dipilih (mode "Semua lokasi"). onUbah(pesan): setelah baki ditambah/dihapus.
-export default function PanelBaki({ baki, bakiF, onPilih, lokasiId, bolehTambah, onUbah, onError }) {
+export default function PanelBaki({ baki, bakiF, onPilih, lokasiId, bolehTambah, bolehUbah, onUbah, onError }) {
   const [loading, setLoading] = useState(false)
   const [hapus, setHapus] = useState(null)
   const [form, setForm] = useState(null) // { id?, nama }: kartu tambah baki atau ubah nama
@@ -164,20 +164,22 @@ export default function PanelBaki({ baki, bakiF, onPilih, lokasiId, bolehTambah,
                             {b.isi === 0 ? 'kosong' : `${b.isi} barang`}
                           </span>
                         </button>
-                        <button
-                          type="button"
-                          className="mini"
-                          title={`Ubah nama ${b.name}`}
-                          aria-label={`Ubah nama ${b.name}`}
-                          onClick={() => {
-                            setBuka(false)
-                            setGalat('')
-                            setForm({ id: b.id, nama: b.name })
-                          }}
-                        >
-                          <Pencil size={14} aria-hidden="true" />
-                        </button>
-                        {b.isi === 0 && (
+                        {bolehUbah && (
+                          <button
+                            type="button"
+                            className="mini"
+                            title={`Ubah nama ${b.name}`}
+                            aria-label={`Ubah nama ${b.name}`}
+                            onClick={() => {
+                              setBuka(false)
+                              setGalat('')
+                              setForm({ id: b.id, nama: b.name })
+                            }}
+                          >
+                            <Pencil size={14} aria-hidden="true" />
+                          </button>
+                        )}
+                        {bolehUbah && b.isi === 0 && (
                           <button
                             type="button"
                             className="mini"

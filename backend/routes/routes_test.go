@@ -147,3 +147,38 @@ func TestPembatasanRole(t *testing.T) {
 		t.Errorf("pj: /locations harus tetap 200, dapat %d", w.Code)
 	}
 }
+
+func TestHanyaSuperAdminBisaMengubahAtauMembatalkanDataKasStokLama(t *testing.T) {
+	ruteUbahLama := [][2]string{
+		{http.MethodPost, "/kas/1/void"},
+		{http.MethodPost, "/stok/1/void"},
+		{http.MethodPut, "/barang/1"},
+		{http.MethodPost, "/barang/void/1"},
+		{http.MethodPost, "/barang/batal-kirim"},
+		{http.MethodPost, "/jual-toko/1/batal"},
+		{http.MethodPost, "/jual-toko/1/koreksi"},
+		{http.MethodPost, "/gadai/1/batal"},
+		{http.MethodPost, "/gadai-bayar/1/void"},
+		{http.MethodPost, "/barang/tukar-tambah/1/batal"},
+		{http.MethodPost, "/baki/1/nama"},
+		{http.MethodPost, "/baki/1/hapus"},
+		{http.MethodPost, "/baki/pindah"},
+	}
+	for _, role := range []string{"cabang", "owner"} {
+		r := mesinUji(t, role)
+		for _, route := range ruteUbahLama {
+			if w := kirim(t, r, route[0], route[1]); w.Code != http.StatusForbidden {
+				t.Errorf("%s: %s %s harus 403, dapat %d %s", role, route[0], route[1], w.Code, w.Body.String())
+			}
+		}
+		for _, route := range [][2]string{
+			{http.MethodPost, "/kas"},
+			{http.MethodPost, "/stok"},
+			{http.MethodPost, "/barang"},
+		} {
+			if w := kirim(t, r, route[0], route[1]); w.Code == http.StatusForbidden {
+				t.Errorf("%s: input baru %s %s tetap harus diizinkan, dapat %d %s", role, route[0], route[1], w.Code, w.Body.String())
+			}
+		}
+	}
+}

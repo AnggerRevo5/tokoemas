@@ -35,16 +35,9 @@ const sqlGadai = `SELECT g.id, g.item_id, IFNULL(i.item_no,''), i.item_name, IFN
 
 type pemindai interface{ Scan(dest ...any) error }
 
-// bolehUbahTransaksi: akun cabang hanya di lokasinya sendiri dan dalam batas hari (gadai dan penjualan toko);
-// Super Admin dan Owner selalu boleh.
-func bolehUbahTransaksi(cl *models.Claims, lokasi int, barukah bool) bool {
-	switch cl.Role {
-	case "super_admin", "owner":
-		return true
-	case "cabang":
-		return cl.LocationID == lokasi && barukah
-	}
-	return false
+// bolehUbahTransaksi membatasi koreksi atau pembatalan data lama hanya untuk Super Admin.
+func bolehUbahTransaksi(cl *models.Claims, _ int, _ bool) bool {
+	return cl.Role == "super_admin"
 }
 
 // bolehKelolaGadai: mencatat gadai dan pembayarannya hanya untuk akun cabang (lokasinya sendiri) dan Super Admin.
@@ -769,6 +762,9 @@ func voidKas(tx *sql.Tx, meta services.MetaAudit, alasan string, ids ...sql.Null
 
 func GadaiBayarVoid(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if _, ok := middleware.HanyaSuperAdmin(c); !ok {
+			return
+		}
 		cl := c.MustGet("claims").(*models.Claims)
 		id, ok := utils.IDParam(c)
 		if !ok {
@@ -802,7 +798,7 @@ func GadaiBayarVoid(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		if !bolehUbahTransaksi(cl, lokasi, baru) {
-			c.JSON(http.StatusForbidden, gin.H{"error": fmt.Sprintf("lebih dari %d hari atau bukan lokasi kamu, minta Super Admin atau Owner yang membatalkan", services.BatasHariUbahGadai)})
+			c.JSON(http.StatusForbidden, gin.H{"error": "hanya Super Admin yang bisa membatalkan pembayaran gadai yang sudah tercatat"})
 			return
 		}
 		if isVoid {
@@ -835,6 +831,9 @@ func GadaiBayarVoid(db *sql.DB) gin.HandlerFunc {
 
 func GadaiBatal(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if _, ok := middleware.HanyaSuperAdmin(c); !ok {
+			return
+		}
 		cl := c.MustGet("claims").(*models.Claims)
 		id, ok := utils.IDParam(c)
 		if !ok {
@@ -868,7 +867,7 @@ func GadaiBatal(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		if !bolehUbahTransaksi(cl, lokasi, baru) {
-			c.JSON(http.StatusForbidden, gin.H{"error": fmt.Sprintf("lebih dari %d hari atau bukan lokasi kamu, minta Super Admin atau Owner yang membatalkan", services.BatasHariUbahGadai)})
+			c.JSON(http.StatusForbidden, gin.H{"error": "hanya Super Admin yang bisa membatalkan gadai yang sudah tercatat"})
 			return
 		}
 		if status != services.GadaiAktif {

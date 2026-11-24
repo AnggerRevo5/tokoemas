@@ -11,7 +11,7 @@ import BarisKosong from '../common/BarisKosong'
 const barangBaru = (r) => r.status === 'tersedia' && !!r.diterima_tgl && (new Date(hariIni()) - new Date(r.diterima_tgl)) / 86400000 <= 3
 
 export default function TabelBarang({
-  rows, pilih, onToggle, semuaDipilih, onToggleSemua, bisaVoid, onBatal, onEdit, onPindah, gadaiMap = {}, onGadai, onJual,
+  rows, pilih, onToggle, semuaDipilih, onToggleSemua, bisaVoid, bisaEdit, onBatal, onEdit, onPindah, gadaiMap = {}, onGadai, onJual,
 }) {
   const animasi = useAnimasiDaftar(rows.map((r) => r.id))
   return (
@@ -52,7 +52,7 @@ export default function TabelBarang({
               </td>
               <td>{r.item_no}</td>
               <td>
-                {r.status === 'tersedia' && r.jenis !== 'hasil_lebur' ? (
+                {bisaEdit && r.status === 'tersedia' && r.jenis !== 'hasil_lebur' ? (
                   <button type="button" className="link-barang" onClick={() => onEdit(r)} title="Klik untuk edit barang">
                     {r.item_name} {r.karat}
                   </button>
@@ -132,12 +132,12 @@ export default function TabelBarang({
               </td>
               <td>{r.entry_date.slice(0, 10)}</td>
               <td>
-                {r.status === 'tersedia' && r.jenis !== 'hasil_lebur' && (
+                {bisaEdit && r.status === 'tersedia' && r.jenis !== 'hasil_lebur' && (
                   <button type="button" className="mini" onClick={() => onEdit(r)}>
                     Edit
                   </button>
                 )}
-                {r.status === 'tersedia' && bolehBaki(r.jenis) && (
+                {bisaEdit && r.status === 'tersedia' && bolehBaki(r.jenis) && (
                   <button type="button" className="mini" style={{ marginLeft: 6 }} onClick={() => onPindah(r)}>
                     Pindah
                   </button>

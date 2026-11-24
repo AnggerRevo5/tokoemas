@@ -1,8 +1,9 @@
-import { rupiah } from '../../utils/format'
+import { gram, rupiah } from '../../utils/format'
 import { labelKategori } from '../../constants/kategori'
 import BarisKosong from '../common/BarisKosong'
 
 export default function TabelTransaksi({ rows, isKas, bisaVoid, onBatal, onJual, onGadai }) {
+  const adaAksi = bisaVoid || onJual || onGadai
   return (
     <div className="table-wrap">
       <table>
@@ -12,11 +13,12 @@ export default function TabelTransaksi({ rows, isKas, bisaVoid, onBatal, onJual,
             <th>Kategori</th>
             <th className={isKas ? 'num' : ''}>{isKas ? 'Nominal' : 'Barang'}</th>
             <th>Catatan</th>
-            {(bisaVoid || onJual || onGadai) && <th></th>}
+            {isKas && <th>Pencatat</th>}
+            {adaAksi && <th></th>}
           </tr>
         </thead>
         <tbody>
-          {rows.length === 0 && <BarisKosong kolom="5">Belum ada data</BarisKosong>}
+          {rows.length === 0 && <BarisKosong kolom={4 + (isKas ? 1 : 0) + (adaAksi ? 1 : 0)}>Belum ada data</BarisKosong>}
           {rows.map((r) => (
             <tr key={r.id} style={r.is_void ? { opacity: 0.55 } : undefined}>
               <td>{r.transaction_date.slice(0, 10)}</td>
@@ -28,7 +30,22 @@ export default function TabelTransaksi({ rows, isKas, bisaVoid, onBatal, onJual,
               </td>
               <td className={isKas ? 'num' : ''}>
                 {isKas
-                  ? rupiah(r.amount)
+                  ? (
+                    <>
+                      {rupiah(r.amount)}
+                      {r.metode && <div className="muted">Metode: {r.metode === 'qris' ? 'QRIS/Debit' : r.metode === 'transfer' ? 'Transfer' : 'Tunai'}</div>}
+                      {r.barang?.length > 0 && (
+                        <div className="muted" style={{ whiteSpace: 'normal', minWidth: 220, marginTop: 4 }}>
+                          {r.barang.map((b, i) => (
+                            <div key={`${b.item_no || b.item_name}-${i}`}>
+                              {b.item_no && <>{b.item_no} </>}{b.item_name}{b.karat && ` ${b.karat}`}
+                              {b.weight_gram > 0 && ` - ${gram(b.weight_gram)} g`}{b.qty > 0 && ` (${b.qty} pcs)`}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )
                   : `${r.item_name} - ${r.weight_gram} g ${r.karat} (${r.qty} pcs)`}
                 {r.di_kas_lain && (
                   <div className="muted">tercatat di kas {r.nama_kas}, tidak mengubah kas ini</div>
@@ -38,7 +55,8 @@ export default function TabelTransaksi({ rows, isKas, bisaVoid, onBatal, onJual,
                 {r.note}
                 {r.is_void && <div><span className="tag gray">Dibatalkan</span> {r.void_reason}</div>}
               </td>
-              {(bisaVoid || onJual || onGadai) && (
+              {isKas && <td>{r.oleh || '-'}</td>}
+              {adaAksi && (
                 <td>
                   {isKas && onJual && r.dari_penjualan && !r.is_void && (
                     <button type="button" className="mini primary" onClick={() => onJual(r)}>

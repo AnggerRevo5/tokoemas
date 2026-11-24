@@ -12,20 +12,11 @@ import Spinner from '../common/Spinner'
 import SpesifikasiBarang from './SpesifikasiBarang'
 import { bolehGratis } from '../../utils/barang'
 
-const BATAS_HARI = 7
 const LABEL_METODE = { qris: 'QRIS/Debit', transfer: 'Transfer' }
 const labelMetode = (m) => LABEL_METODE[m] || 'Tunai'
 
-// true bila tanggal (YYYY-MM-DD) masih dalam batas hari yang boleh diubah akun cabang
-function dalamBatas(tgl) {
-  if (!tgl) return false
-  const batas = new Date()
-  batas.setDate(batas.getDate() - BATAS_HARI)
-  return tgl >= batas.toLocaleDateString('en-CA')
-}
-
 // Card penjualan satu barang yang sudah terjual dari Stok: batalkan atau koreksi (harga, tanggal, metode, potongan).
-// Akun cabang hanya untuk lokasinya sendiri dan penjualan paling lama 7 hari; Super Admin dan Owner tanpa batas.
+// Hanya Super Admin yang bisa membatalkan atau mengoreksi penjualan yang sudah tercatat.
 // Setiap langkah menampilkan card konfirmasi sebelum disimpan. onUbah(pesan): data berubah; onTutup().
 export default function CardPenjualan({ item, me, onUbah, onTutup }) {
   const tglLama = item.tanggal_jual ? item.tanggal_jual.slice(0, 10) : ''
@@ -50,10 +41,8 @@ export default function CardPenjualan({ item, me, onUbah, onTutup }) {
   let terkunci = ''
   if (!item.metode) {
     terkunci = 'Penjualan ini dicatat tanpa catatan kas, jadi tidak bisa dibatalkan otomatis.'
-  } else if (me.role === 'cabang' && (item.location_id !== me.location_id || !dalamBatas(tglLama))) {
-    terkunci = `Penjualan lebih dari ${BATAS_HARI} hari lalu hanya bisa diubah Super Admin atau Owner.`
-  } else if (me.role !== 'cabang' && me.role !== 'super_admin' && me.role !== 'owner') {
-    terkunci = 'Akun ini tidak bisa mengubah penjualan.'
+  } else if (me.role !== 'super_admin') {
+    terkunci = 'Hanya Super Admin yang bisa mengubah atau membatalkan penjualan yang sudah tercatat.'
   }
 
   useEffect(() => {

@@ -21,7 +21,8 @@ const LANGKAH_MUAT = 200
 
 export default function Barang({ me, onUbah }) {
   const isCabang = me.role === 'cabang'
-  const bisaVoid = ['super_admin', 'owner', 'cabang'].includes(me.role)
+  const bisaEdit = me.role === 'super_admin'
+  const bisaVoid = bisaEdit
 
   const [locations, setLocations] = useState([])
   const [locId, setLocId] = useState(isCabang ? String(me.location_id) : '')
@@ -117,11 +118,12 @@ export default function Barang({ me, onUbah }) {
   // gadai: satu atau beberapa barang tersedia dari lokasi yang sama, oleh akun cabang atau Super Admin
   const bisaGadai = (isCabang || me.role === 'super_admin') && terpilih.length >= 1 && !adaTanpaGram &&
     terpilih.every((r) => r.status === 'tersedia' && r.location_id === terpilih[0].location_id)
-  const aksiTersedia = aksiUntukMode(mode, { isCabang, adaLM, adaTanpaGram, bisaGadai })
+  const aksiTersediaSemua = aksiUntukMode(mode, { isCabang, adaLM, adaTanpaGram, bisaGadai })
+  const aksiTersedia = bisaEdit ? aksiTersediaSemua : aksiTersediaSemua.filter(([kode]) => kode !== 'batal_kirim')
 
   useEffect(() => {
     if (aksi && !aksiTersedia.some(([k]) => k === aksi)) setAksi(null)
-  }, [mode, adaLM, adaTanpaGram, bisaGadai])
+  }, [mode, adaLM, adaTanpaGram, bisaGadai, bisaEdit])
 
   function toggleSemua() {
     // hanya memengaruhi barang yang sedang tampil; pilihan dari pencarian sebelumnya tetap
@@ -189,6 +191,9 @@ export default function Barang({ me, onUbah }) {
   return (
     <div>
       <Pesan error={error} info={info} />
+      {!bisaEdit && (
+        <p className="muted">Barang baru tetap bisa diinput dan diproses. Edit atau pembatalan data stok yang sudah tercatat hanya bisa dilakukan Super Admin.</p>
+      )}
 
       <NotifBanner
         notif={notif}
@@ -281,6 +286,7 @@ export default function Barang({ me, onUbah }) {
         onPilih={setBakiF}
         lokasiId={locId}
         bolehTambah={locId !== '' && locId !== '0'}
+        bolehUbah={bisaEdit}
         onUbah={(pesan) => {
           resetPesan()
           setInfo(pesan)
@@ -330,7 +336,7 @@ export default function Barang({ me, onUbah }) {
         />
       )}
 
-      {bakiPindah.length > 0 && (
+      {bisaEdit && bakiPindah.length > 0 && (
         <PindahBaki
           terpilih={terpilih}
           baki={bakiPindah}
@@ -344,7 +350,7 @@ export default function Barang({ me, onUbah }) {
         />
       )}
 
-      {pindahItem && (
+      {bisaEdit && pindahItem && (
         <PindahSatu
           item={pindahItem}
           baki={baki.rows.filter((b) => b.location_id === pindahItem.location_id)}
@@ -418,12 +424,13 @@ export default function Barang({ me, onUbah }) {
           semuaDipilih={semuaDipilih}
           onToggleSemua={toggleSemua}
           bisaVoid={bisaVoid}
+          bisaEdit={bisaEdit}
           onBatal={mulaiBatal}
           gadaiMap={gadaiMap}
-          onJual={(r) => {
+          onJual={bisaEdit ? (r) => {
             resetPesan()
             setJualItem(r)
-          }}
+          } : undefined}
           onGadai={(r) => {
             resetPesan()
             setGadaiItem(r)
