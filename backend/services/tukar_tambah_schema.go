@@ -32,6 +32,16 @@ func SiapkanSkemaTukarTambah(db *sql.DB) error {
 	) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`); err != nil && !tabelAda(db, "tukar_tambah") {
 		return gagal("tabel tukar_tambah", err)
 	}
+	if !kolomAda(db, "tukar_tambah", "kas_id") {
+		if _, err := db.Exec("ALTER TABLE tukar_tambah ADD COLUMN kas_id INT NULL"); err != nil {
+			return gagal("kolom tukar_tambah.kas_id", err)
+		}
+	}
+	if !kolomAda(db, "tukar_tambah", "biaya_kas_id") {
+		if _, err := db.Exec("ALTER TABLE tukar_tambah ADD COLUMN biaya_kas_id INT NULL"); err != nil {
+			return gagal("kolom tukar_tambah.biaya_kas_id", err)
+		}
+	}
 	if !kolomAda(db, "items", "tukar_tambah_id") {
 		if _, err := db.Exec("ALTER TABLE items ADD COLUMN tukar_tambah_id INT NULL, ADD INDEX idx_items_tukar_tambah (tukar_tambah_id)"); err != nil {
 			return gagal("kolom items.tukar_tambah_id", err)

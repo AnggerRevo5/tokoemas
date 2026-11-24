@@ -274,7 +274,7 @@ func isiRincianBarangKas(db *sql.DB, rows []models.KasListRow) error {
 		rows[i].Barang = []models.KasBarangRow{}
 	}
 	in := utils.Placeholders(len(ids))
-	args := make([]interface{}, 0, len(ids)*11)
+	args := make([]interface{}, 0, len(ids)*10)
 	kumpulan := []string{
 		`SELECT i.purchase_cash_id AS cash_id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''), IFNULL(i.weight_gram,0), 1
 		 FROM items i WHERE i.purchase_cash_id IN (` + in + `)`,
@@ -299,8 +299,6 @@ func isiRincianBarangKas(db *sql.DB, rows []models.KasListRow) error {
 		 FROM tukar_tambah t JOIN items i ON i.tukar_tambah_id = t.id WHERE t.kas_id IN (` + in + `)`,
 		`SELECT t.biaya_kas_id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''), IFNULL(i.weight_gram,0), 1
 		 FROM tukar_tambah t JOIN items i ON i.tukar_tambah_id = t.id WHERE t.biaya_kas_id IN (` + in + `)`,
-		`SELECT m.cash_id, CONCAT('Lebur #', m.id), m.item_name, IFNULL(m.karat,''), IFNULL(m.weight_gram,0), m.qty
-		 FROM melt_records m WHERE m.cash_id IN (` + in + `)`,
 	}
 	for range kumpulan {
 		args = append(args, ids...)
