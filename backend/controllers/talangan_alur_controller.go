@@ -174,56 +174,6 @@ func TalanganTerimaBO(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
-// TalanganProses: menyambungkan catatan ke proses cuci lama yang memuat barangnya (proses_id). Status tetap DI_BO.
-// Hanya cuci: barang talangan tidak boleh dilebur, dan service di aplikasi ini adalah perbaikan barang customer, bukan barang stok.
-func TalanganProses(db *sql.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if _, ok := middleware.HanyaPeran(c, "pj", "owner", "super_admin"); !ok {
-			return
-		}
-		id, ok := utils.IDParam(c)
-		if !ok {
-			return
-		}
-		var req struct {
-			Jenis string `json:"jenis" binding:"required,oneof=cuci"`
-		}
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "hanya proses cuci yang bisa disambungkan (barang talangan tidak boleh dilebur)"})
-			return
-		}
-		tx, err := db.Begin()
-		if err != nil {
-			utils.Gagal(c, err)
-			return
-		}
-		defer tx.Rollback()
-		b, ok := kunciTalangan(c, tx, id)
-		if !ok {
-			return
-		}
-		if b.Arah != services.ArahMasuk || b.Status != services.StDiBO || b.StokID == 0 {
-			c.JSON(http.StatusConflict, gin.H{"error": "hanya barang talangan yang sudah di back office yang bisa disambungkan ke proses"})
-			return
-		}
-		var pid sql.NullInt64
-		if err := tx.QueryRow("SELECT washing_job_id FROM items WHERE id = ?", b.StokID).Scan(&pid); err != nil || !pid.Valid {
-			c.JSON(http.StatusConflict, gin.H{"error": "barang ini belum masuk proses cuci"})
-			return
-		}
-		if _, err := tx.Exec("UPDATE talangan_barang SET proses_id = ?, proses_jenis = ? WHERE id = ?", pid.Int64, req.Jenis, id); err != nil {
-			utils.Gagal(c, err)
-			return
-		}
-		services.CatatAudit(tx, middleware.Meta(c), "talangan_proses", "talangan_barang", int64(id), gin.H{"jenis": req.Jenis, "proses_id": pid.Int64})
-		if err := tx.Commit(); err != nil {
-			utils.Gagal(c, err)
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{"message": "tersambung ke proses " + req.Jenis, "proses_id": pid.Int64})
-	}
-}
-
 // TalanganKeluarCreate: PJ mencatat barang kita yang dibeli BP dari customer (talangan KELUAR, status TERCATAT).
 // Barang masuk stok BO sebagai stok kita biasa (tanpa tanda talangan).
 func TalanganKeluarCreate(db *sql.DB) gin.HandlerFunc {

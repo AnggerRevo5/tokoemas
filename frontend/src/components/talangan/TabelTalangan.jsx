@@ -8,7 +8,6 @@ import BarisKosong from '../common/BarisKosong'
 const NAMA_AKSI = {
   'kirim-bo': 'Bawa ke BO',
   'terima-bo': 'Terima di BO',
-  proses: 'Sambung ke cuci',
   'koreksi-harga': 'Koreksi harga',
 }
 
@@ -16,7 +15,7 @@ const wkt = (s) => (s ? new Date(s).toLocaleString('id-ID', { dateStyle: 'short'
 
 // Daftar talangan (MASUK atau KELUAR) dengan aksi sesuai role dan status. Setiap aksi meminta konfirmasi lebih dulu.
 export default function TabelTalangan({ rows, me, onUbah, onError, onInfo }) {
-  const [konfirmasi, setKonfirmasi] = useState(null) // { row, aksi, jenisProses }
+  const [konfirmasi, setKonfirmasi] = useState(null) // { row, aksi }
   const [harga, setHarga] = useState('')
   const [alasan, setAlasan] = useState('')
   const [riwayat, setRiwayat] = useState(null)
@@ -35,7 +34,6 @@ export default function TabelTalangan({ rows, me, onUbah, onError, onInfo }) {
       if (!alasan.trim()) return onError('Alasan koreksi wajib diisi')
       body = { harga_baru: Math.round(Number(harga)), alasan }
     }
-    if (aksi === 'proses') body = { jenis: 'cuci' }
     setLoading(true)
     try {
       const res = await api(`/talangan/${row.id}/${aksi}`, { method: 'POST', body: JSON.stringify(body) })
@@ -93,7 +91,6 @@ export default function TabelTalangan({ rows, me, onUbah, onError, onInfo }) {
                 <td>
                   <span className={KELAS_STATUS[r.status]}>{LABEL_STATUS[r.status] || r.status}</span>
                   {r.tukar_id > 0 && <div className="muted">Penukaran #{r.tukar_id}</div>}
-                  {r.proses_jenis && <div className="muted">Proses {r.proses_jenis} #{r.proses_id}</div>}
                 </td>
                 <td>{r.toko_input || '-'}</td>
                 <td>
@@ -124,12 +121,6 @@ export default function TabelTalangan({ rows, me, onUbah, onError, onInfo }) {
           </p>
           {konfirmasi.aksi === 'kirim-bo' && <p>Barang dibawa PJ ke back office dan menunggu konfirmasi owner.</p>}
           {konfirmasi.aksi === 'terima-bo' && <p>Barang sudah diterima di back office. Barang masuk stok BO dengan tanda talangan (bukan stok milik kita).</p>}
-          {konfirmasi.aksi === 'proses' && (
-            <p>
-              Menyambungkan catatan ini ke proses cuci yang memuat barangnya. Barang harus sudah dimasukkan ke menu Cuci. Barang BP hanya boleh
-              dicuci (tidak boleh dilebur). Status talangan tetap di back office.
-            </p>
-          )}
           {konfirmasi.aksi === 'koreksi-harga' && (
             <div className="form-grid">
               <div>

@@ -59,7 +59,6 @@ export function aksiTalangan(row, role) {
   if (row.arah === 'MASUK') {
     if (row.status === 'TALANGAN' && pj) aksi.push('kirim-bo')
     if (row.status === 'KIRIM_BO' && owner) aksi.push('terima-bo')
-    if (row.status === 'DI_BO' && (pj || owner) && row.stok_id > 0 && !row.proses_id) aksi.push('proses')
   }
   if (owner && !row.tukar_id && row.status !== 'LUNAS') aksi.push('koreksi-harga')
   return aksi

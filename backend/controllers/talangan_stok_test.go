@@ -272,16 +272,6 @@ func TestBarangTalanganHanyaBolehDicuciBukanDilebur(t *testing.T) {
 	}
 }
 
-func TestProsesTalanganHanyaCuci(t *testing.T) {
-	db := dbUji(t)
-	a := akunDariDB(t, db)
-	id, _ := masukDiBO(t, a, 300000)
-	pj := mesinTalangan(db, "pj", a.User, 0)
-	if w := panggil(pj, "POST", fmt.Sprintf("/talangan/%d/proses", id), `{"jenis":"lebur"}`); w.Code != http.StatusBadRequest {
-		t.Errorf("proses lebur: kode %d, seharusnya 400", w.Code)
-	}
-}
-
 // owner melihat badge bila ada barang talangan berstatus KIRIM_BO yang menunggu konfirmasinya
 func TestNotifOwnerTalanganKirimBO(t *testing.T) {
 	db := dbUji(t)

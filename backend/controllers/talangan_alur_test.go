@@ -41,7 +41,6 @@ func TestTalanganAlurHanyaRoleYangBerhak(t *testing.T) {
 	cek("owner", "/talangan/1/kirim-bo", http.StatusForbidden)
 	cek("pj", "/talangan/1/terima-bo", http.StatusForbidden)
 	cek("cabang", "/talangan/1/terima-bo", http.StatusForbidden)
-	cek("cabang", "/talangan/1/proses", http.StatusForbidden)
 	cek("cabang", "/talangan/keluar", http.StatusForbidden)
 	cek("owner", "/talangan/keluar", http.StatusForbidden)
 }
@@ -101,26 +100,6 @@ func TestTalanganAlurLengkapMasukSampaiDiBO(t *testing.T) {
 	if log != 3 { // TALANGAN, KIRIM_BO, DI_BO
 		t.Errorf("baris log = %d, seharusnya 3", log)
 	}
-
-	// proses lama: belum diproses -> 409; setelah barang masuk cuci -> tersambung
-	if w := panggil(pj, "POST", path("proses"), `{"jenis":"cuci"}`); w.Code != http.StatusConflict {
-		t.Errorf("proses sebelum cuci: kode %d, seharusnya 409", w.Code)
-	}
-	var job int
-	db.QueryRow("SELECT id FROM washing_jobs ORDER BY id LIMIT 1").Scan(&job)
-	if job == 0 {
-		t.Skip("database uji tanpa washing_jobs; bagian proses dilewati")
-	}
-	db.Exec("UPDATE items SET washing_job_id = ?, status = 'cuci' WHERE id = ?", job, stokID)
-	if w := panggil(pj, "POST", path("proses"), `{"jenis":"cuci"}`); w.Code != http.StatusOK {
-		t.Fatalf("proses: %d %s", w.Code, w.Body.String())
-	}
-	var pid int
-	var pj2, st string
-	db.QueryRow("SELECT IFNULL(proses_id,0), IFNULL(proses_jenis,''), status FROM talangan_barang WHERE id = ?", id).Scan(&pid, &pj2, &st)
-	if pid != job || pj2 != "cuci" || st != "DI_BO" {
-		t.Errorf("proses_id %d jenis %s status %s (status harus tetap DI_BO)", pid, pj2, st)
-	}
 }
 
 func TestTalanganKeluarCreate(t *testing.T) {
@@ -149,5 +128,13 @@ func TestTalanganKeluarCreate(t *testing.T) {
 	// KELUAR tidak lewat jalur kirim-bo/terima-bo
 	if w := panggil(pj, "POST", fmt.Sprintf("/talangan/%d/kirim-bo", res.ID), `{}`); w.Code != http.StatusConflict {
 		t.Errorf("kirim-bo pada KELUAR: kode %d, seharusnya 409", w.Code)
+	}
+}
+
+// "sambung ke cuci" dihapus: alur cuci dari BO sudah ada, tidak perlu tombol terpisah di Talangan
+func TestEndpointProsesTalanganSudahDihapus(t *testing.T) {
+	r := mesinTalangan(nil, "owner", 1, 0)
+	if w := panggil(r, "POST", "/talangan/1/proses", `{"jenis":"cuci"}`); w.Code != http.StatusNotFound {
+		t.Errorf("kode %d, seharusnya 404", w.Code)
 	}
 }

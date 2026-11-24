@@ -25,6 +25,5 @@ func RuteTalangan(r gin.IRoutes, db *sql.DB) {
 	r.GET("/talangan/:id/riwayat", TalanganRiwayat(db))
 	r.POST("/talangan/:id/kirim-bo", TalanganKirimBO(db))
 	r.POST("/talangan/:id/terima-bo", TalanganTerimaBO(db))
-	r.POST("/talangan/:id/proses", TalanganProses(db))
 	r.POST("/talangan/:id/koreksi-harga", TalanganKoreksiHarga(db))
 }
