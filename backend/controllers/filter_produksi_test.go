@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+
+	"toko-emas/utils"
 )
 
 func TestSyaratBarang(t *testing.T) {
@@ -23,6 +25,23 @@ func TestSyaratBarang(t *testing.T) {
 	c.Request = httptest.NewRequest("GET", "/?q=cincin", nil)
 	if sy, args := syaratBarang(c, "s", "s.weight_gram", "s.origin_location_id", false); sy != "" || len(args) != 0 {
 		t.Fatalf("q harus diabaikan bila denganNama=false: %s %v", sy, args)
+	}
+}
+
+func TestSyaratTanggalBarangMasuk(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest("GET", "/?from=2026-01-01&to=2026-01-31", nil)
+	if !utils.TanggalOpsional(c, "from", "to") {
+		t.Fatal("tanggal masuk valid seharusnya diterima")
+	}
+
+	syarat, args := syaratTanggal(c, "i.entry_date")
+	if syarat != " AND DATE(i.entry_date) >= ? AND DATE(i.entry_date) <= ?" {
+		t.Fatalf("syarat tanggal masuk salah: %s", syarat)
+	}
+	if len(args) != 2 || args[0] != "2026-01-01" || args[1] != "2026-01-31" {
+		t.Fatalf("argumen rentang tanggal masuk salah: %v", args)
 	}
 }
 
