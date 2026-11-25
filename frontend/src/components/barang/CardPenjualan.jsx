@@ -4,7 +4,6 @@ import { m } from 'motion/react'
 import { X } from 'lucide-react'
 import { api } from '../../services/api'
 import { hariIni, rupiah } from '../../utils/format'
-import { BIAYA_KOSONG, nominalBiaya } from '../../utils/biaya'
 import Popup from '../common/Popup'
 import Pesan from '../common/Pesan'
 import PilihMetodeBayar from '../common/PilihMetodeBayar'
@@ -24,8 +23,8 @@ export default function CardPenjualan({ item, me, onUbah, onTutup }) {
   const [aksi, setAksi] = useState(null) // 'koreksi' | 'batal'
   const [harga, setHarga] = useState(String(item.harga_jual ?? ''))
   const [tgl, setTgl] = useState(tglLama || hariIni())
-  const [metode, setMetode] = useState(metodeLama)
-  const [biaya, setBiaya] = useState(BIAYA_KOSONG)
+  // QRIS/Debit sudah tidak ada; penjualan lama berbayar QRIS dikoreksi sebagai tunai kecuali diganti
+  const [metode, setMetode] = useState(metodeLama === 'qris' ? 'tunai' : metodeLama)
   const [alasan, setAlasan] = useState('')
   const [konfirmasi, setKonfirmasi] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -35,7 +34,6 @@ export default function CardPenjualan({ item, me, onUbah, onTutup }) {
   // tempat/kotak perhiasan boleh berharga 0 (gratis)
   const gratisBoleh = bolehGratis(item.jenis)
   const teksHarga = (h) => (h === 0 && gratisBoleh ? 'Gratis' : rupiah(h || 0))
-  const potongan = metode === 'qris' ? nominalBiaya(hargaBaru, biaya) : 0
 
   // alasan barang ini tidak bisa diubah oleh akun ini (kosong = boleh)
   let terkunci = ''
@@ -57,7 +55,6 @@ export default function CardPenjualan({ item, me, onUbah, onTutup }) {
     if (!alasan.trim()) return setError('Alasan wajib diisi')
     if (aksi === 'koreksi') {
       if (harga === '' || hargaBaru < 0 || (hargaBaru === 0 && !gratisBoleh)) return setError('Harga jual wajib diisi')
-      if (metode === 'qris' && potongan > hargaBaru) return setError('Potongan tidak boleh melebihi harga jual')
     }
     setKonfirmasi(true)
   }
@@ -69,7 +66,7 @@ export default function CardPenjualan({ item, me, onUbah, onTutup }) {
         ? await api(`/jual-toko/${item.id}/batal`, { method: 'POST', body: JSON.stringify({ reason: alasan.trim() }) })
         : await api(`/jual-toko/${item.id}/koreksi`, {
           method: 'POST',
-          body: JSON.stringify({ harga: hargaBaru, date: tgl, metode, biaya: potongan, reason: alasan.trim() }),
+          body: JSON.stringify({ harga: hargaBaru, date: tgl, metode, reason: alasan.trim() }),
         })
       onUbah(res.message)
       onTutup()
@@ -143,10 +140,7 @@ export default function CardPenjualan({ item, me, onUbah, onTutup }) {
                 <PilihMetodeBayar
                   metode={metode}
                   onMetode={setMetode}
-                  total={hargaBaru}
-                  biaya={biaya}
-                  onBiaya={setBiaya}
-                  tujuanTunai={`kas ${item.lokasi}`}
+                  tujuan={`kas ${item.lokasi}`}
                 />
               </>
             )}

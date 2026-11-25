@@ -22,17 +22,16 @@ func TestHitungTukarTambah(t *testing.T) {
 		{"banyak barang", []float64{5e6, 3e6}, []float64{4e6, 4e6, 2e6}, MetodeTunai, 0, 2e6, false},
 		{"toko bayar", []float64{5e6}, []float64{4e6}, MetodeTunai, 0, -1e6, false},
 		{"selisih nol", []float64{5e6}, []float64{5e6}, MetodeTunai, 0, 0, false},
-		{"qris dengan potongan", []float64{5e6}, []float64{6e6}, MetodeQRIS, 10_000, 1e6, false},
-		{"qris selisih negatif ditolak", []float64{5e6}, []float64{4e6}, MetodeQRIS, 0, 0, true},
-		{"qris selisih nol ditolak potongannya", []float64{5e6}, []float64{5e6}, MetodeQRIS, 1000, 0, true},
-		{"potongan lebih besar dari selisih", []float64{5e6}, []float64{6e6}, MetodeQRIS, 2e6, 0, true},
+		{"transfer pelanggan bayar", []float64{5e6}, []float64{6e6}, MetodeTransfer, 0, 1e6, false},
+		{"transfer toko bayar", []float64{5e6}, []float64{4e6}, MetodeTransfer, 0, -1e6, false},
+		{"qris ditolak", []float64{5e6}, []float64{6e6}, MetodeQRIS, 0, 0, true},
 		{"potongan di tunai ditolak", []float64{5e6}, []float64{6e6}, MetodeTunai, 5000, 0, true},
 		{"barang lama kosong", nil, []float64{6e6}, MetodeTunai, 0, 0, true},
 		{"barang baru kosong", []float64{5e6}, nil, MetodeTunai, 0, 0, true},
 		{"nilai tukar nol", []float64{0}, []float64{6e6}, MetodeTunai, 0, 0, true},
 		{"harga baru negatif", []float64{5e6}, []float64{-1}, MetodeTunai, 0, 0, true},
 		{"lebih dari 100 barang", seratus, []float64{6e6}, MetodeTunai, 0, 0, true},
-		{"transfer ditolak", []float64{5e6}, []float64{6e6}, MetodeTransfer, 0, 0, true},
+		{"potongan di transfer ditolak", []float64{5e6}, []float64{6e6}, MetodeTransfer, 5000, 0, true},
 	}
 	for _, c := range cases {
 		got, err := HitungTukarTambah(c.lama, c.baru, c.metode, c.biaya)

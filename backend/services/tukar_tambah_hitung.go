@@ -7,7 +7,7 @@ const MaksBarangTukarTambah = 100
 
 // HitungTukarTambah memeriksa satu tukar tambah dan mengembalikan selisih = total harga barang baru - total nilai tukar
 // barang lama. Positif: pelanggan membayar (kas toko masuk). Negatif: toko membayar (kas toko keluar).
-// Metode hanya tunai atau QRIS; potongan hanya untuk QRIS saat pelanggan membayar, dan tidak boleh melebihi selisih.
+// Metode hanya tunai atau transfer; keduanya masuk atau keluar dari kas toko. Tidak ada potongan.
 func HitungTukarTambah(nilaiLama, hargaBaru []float64, metode string, biaya float64) (float64, error) {
 	if len(nilaiLama) == 0 || len(hargaBaru) == 0 {
 		return 0, salah("tukar tambah butuh minimal satu barang lama dan satu barang baru")
@@ -15,8 +15,8 @@ func HitungTukarTambah(nilaiLama, hargaBaru []float64, metode string, biaya floa
 	if len(nilaiLama) > MaksBarangTukarTambah || len(hargaBaru) > MaksBarangTukarTambah {
 		return 0, salah(fmt.Sprintf("maksimal %d barang di tiap sisi", MaksBarangTukarTambah))
 	}
-	if metode != MetodeTunai && metode != MetodeQRIS {
-		return 0, salah("tukar tambah hanya bisa tunai atau QRIS/Debit")
+	if metode != MetodeTunai && metode != MetodeTransfer {
+		return 0, salah("tukar tambah hanya bisa tunai atau transfer")
 	}
 	var lama, baru float64
 	for _, n := range nilaiLama {
@@ -32,12 +32,6 @@ func HitungTukarTambah(nilaiLama, hargaBaru []float64, metode string, biaya floa
 		baru += h
 	}
 	selisih := baru - lama
-	if metode == MetodeQRIS && selisih < 0.005 && biaya > 0 {
-		return 0, salah("potongan QRIS hanya bila pelanggan membayar selisih")
-	}
-	if metode == MetodeQRIS && selisih < -0.005 {
-		return 0, salah("selisih yang dibayar toko ke pelanggan hanya bisa tunai")
-	}
 	if err := ValidasiBiaya(metode, biaya, selisih); err != nil {
 		return 0, err
 	}

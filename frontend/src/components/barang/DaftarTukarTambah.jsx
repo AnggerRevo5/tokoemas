@@ -47,7 +47,7 @@ export default function DaftarTukarTambah({ locId, versi, onUbah }) {
           <div className="muted">Barang baru: {r.barang_baru || '-'}</div>
           <div>
             Selisih {r.selisih > 0 ? 'masuk kas' : r.selisih < 0 ? 'keluar kas' : ''} {r.selisih === 0 ? 'nol' : rupiah(Math.abs(r.selisih))}
-            {' '}({r.metode === 'qris' ? 'QRIS/Debit' : 'Tunai'}{r.biaya > 0 ? `, potongan ${rupiah(r.biaya)}` : ''})
+            {' '}({r.metode === 'qris' ? 'QRIS/Debit' : r.metode === 'transfer' ? 'Transfer' : 'Tunai'}{r.biaya > 0 ? `, potongan ${rupiah(r.biaya)}` : ''})
           </div>
           {r.bisa_batal && (
             <button type="button" className="mini danger-fill" style={{ marginTop: 8 }} onClick={() => { setError(''); setAlasan(''); setBatal(r) }}>

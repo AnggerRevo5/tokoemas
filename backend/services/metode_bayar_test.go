@@ -9,7 +9,7 @@ func TestNormalMetode(t *testing.T) {
 	}{
 		{"", MetodeTunai, true},
 		{"tunai", MetodeTunai, true},
-		{" QRIS ", MetodeQRIS, true},
+		{" QRIS ", "", false},
 		{"Transfer", MetodeTransfer, true},
 		{"cek", "", false},
 	} {

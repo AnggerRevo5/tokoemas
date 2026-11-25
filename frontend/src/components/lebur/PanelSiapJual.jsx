@@ -5,7 +5,6 @@ import AngkaBerjalan from '../common/AngkaBerjalan'
 import BarisKosong from '../common/BarisKosong'
 import Spinner from '../common/Spinner'
 import PilihMetodeBayar from '../common/PilihMetodeBayar'
-import { BIAYA_KOSONG, nominalBiaya } from '../../utils/biaya'
 
 const formatRupiah = (v) => rupiah(Math.round(v))
 
@@ -19,7 +18,6 @@ export default function PanelSiapJual({ siap, bisaCatat, onMulai, onSukses, onEr
   const [jualTgl, setJualTgl] = useState(hariIni())
   const [jualNote, setJualNote] = useState('')
   const [metode, setMetode] = useState('tunai')
-  const [biaya, setBiaya] = useState(BIAYA_KOSONG)
 
   const terpilih = siap.filter((r) => pilih[r.id])
   const nCukim = terpilih.filter((r) => r.jenis === 'hasil_lebur').length
@@ -33,10 +31,6 @@ export default function PanelSiapJual({ siap, bisaCatat, onMulai, onSukses, onEr
   async function jual(e) {
     e.preventDefault()
     onMulai()
-    if (metode === 'qris' && nominalBiaya(hargaJual, biaya) > Number(hargaJual)) {
-      onError('Potongan tidak boleh melebihi harga jual')
-      return
-    }
     setLoading(true)
     try {
       const res = await api('/penjualan', {
@@ -48,7 +42,6 @@ export default function PanelSiapJual({ siap, bisaCatat, onMulai, onSukses, onEr
           sale_date: jualTgl,
           note: jualNote,
           metode,
-          biaya: metode === 'qris' ? nominalBiaya(hargaJual, biaya) : 0,
         }),
       })
       setPilih({})
@@ -56,7 +49,6 @@ export default function PanelSiapJual({ siap, bisaCatat, onMulai, onSukses, onEr
       setHargaJual('')
       setJualNote('')
       setMetode('tunai')
-      setBiaya(BIAYA_KOSONG)
       onSukses(`${res.message} (untung atau rugi ${rupiah(res.untung)})`)
     } catch (err) {
       onError(err.message)
@@ -132,10 +124,7 @@ export default function PanelSiapJual({ siap, bisaCatat, onMulai, onSukses, onEr
           <PilihMetodeBayar
             metode={metode}
             onMetode={setMetode}
-            total={hargaJual}
-            biaya={biaya}
-            onBiaya={setBiaya}
-            tujuanTunai="kas back office"
+            tujuan="kas back office"
           />
           {hargaJual && (
             <div className="total-bar">

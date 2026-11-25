@@ -3,7 +3,6 @@ import { api } from '../../services/api'
 import { gram, hariIni, rupiah } from '../../utils/format'
 import { KETERANGAN_AKSI, BP_LIST } from '../../constants/barang'
 import PilihMetodeBayar from '../common/PilihMetodeBayar'
-import { BIAYA_KOSONG, nominalBiaya } from '../../utils/biaya'
 import { bolehGratis, tanpaGram } from '../../utils/barang'
 import { m } from 'motion/react'
 import AngkaBerjalan from '../common/AngkaBerjalan'
@@ -27,7 +26,6 @@ export default function BarAksiBarang({
   const [catatan, setCatatan] = useState('')
   const [harga, setHarga] = useState({}) // harga jual per barang { id: 'nominal' }
   const [metode, setMetode] = useState('tunai')
-  const [biaya, setBiaya] = useState(BIAYA_KOSONG)
   const [konfirmasiJual, setKonfirmasiJual] = useState(false)
   const [galat, setGalat] = useState('') // pesan galat ditampilkan di dalam card, karena halaman tertutup latar
   const mulai = () => {
@@ -52,9 +50,6 @@ export default function BarAksiBarang({
     e.preventDefault()
     mulai()
     if (hargaKosong) return gagal('Harga jual setiap barang wajib diisi')
-    if (metode === 'qris' && nominalBiaya(totalJual, biaya) > totalJual) {
-      return gagal('Potongan tidak boleh melebihi total penjualan')
-    }
     setKonfirmasiJual(true)
   }
 
@@ -66,9 +61,6 @@ export default function BarAksiBarang({
     try {
       if (aksi === 'jual' && hargaKosong) {
         throw new Error('Harga jual setiap barang wajib diisi')
-      }
-      if (aksi === 'jual' && metode === 'qris' && nominalBiaya(totalJual, biaya) > totalJual) {
-        throw new Error('Potongan tidak boleh melebihi total penjualan')
       }
       let res
       if (aksi === 'kirim') {
@@ -140,14 +132,12 @@ export default function BarAksiBarang({
             items: terpilih.map((r) => ({ item_id: r.id, harga: Number(harga[r.id]) })),
             date: tgl,
             metode,
-            biaya: metode === 'qris' ? nominalBiaya(totalJual, biaya) : 0,
           }),
         })
       }
       setCatatan('')
       setHarga({})
       setMetode('tunai')
-      setBiaya(BIAYA_KOSONG)
       onSelesai(res.message)
     } catch (err) {
       gagal(err.message)
@@ -310,7 +300,7 @@ export default function BarAksiBarang({
               </table>
               <div className="total-bar">
                 <span>
-                  Total harga jual ({metode === 'qris' ? 'masuk ke kas back office' : 'masuk ke kas toko'}):{' '}
+                  Total harga jual (masuk ke kas toko):{' '}
                   <b className="utama">
                     <AngkaBerjalan nilai={totalJual} format={formatRupiah} />
                   </b>
@@ -322,9 +312,6 @@ export default function BarAksiBarang({
             <PilihMetodeBayar
               metode={metode}
               onMetode={setMetode}
-              total={totalJual}
-              biaya={biaya}
-              onBiaya={setBiaya}
             />
           )}
 
@@ -368,9 +355,8 @@ export default function BarAksiBarang({
           <table className="tabel-spek" style={{ marginTop: 12 }}>
             <tbody>
               <tr><th>Tanggal</th><td>{tgl}</td></tr>
-              <tr><th>Metode</th><td>{metode === 'qris' ? 'QRIS/Debit (masuk kas back office)' : metode === 'transfer' ? 'Transfer (masuk kas toko)' : 'Tunai (masuk kas toko)'}</td></tr>
+              <tr><th>Metode</th><td>{metode === 'transfer' ? 'Transfer (masuk kas toko)' : 'Tunai (masuk kas toko)'}</td></tr>
               <tr><th>Total harga jual</th><td>{rupiah(totalJual)}</td></tr>
-              {metode === 'qris' && <tr><th>Potongan</th><td>{rupiah(nominalBiaya(totalJual, biaya))}</td></tr>}
             </tbody>
           </table>
         </Popup>

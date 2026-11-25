@@ -176,7 +176,7 @@ export default function RiwayatPenjualan({
                 <td className="num">
                   {rupiah(r.sale_total)}
                   <div className="muted">
-                    {r.metode === 'qris' ? 'QRIS/Debit' : 'Tunai'}
+                    {r.metode === 'qris' ? 'QRIS/Debit' : r.metode === 'transfer' ? 'Transfer' : 'Tunai'}
                     {r.biaya > 0 && `, potongan ${rupiah(r.biaya)}`}
                   </div>
                 </td>

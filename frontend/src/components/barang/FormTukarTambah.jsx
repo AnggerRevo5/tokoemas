@@ -9,7 +9,7 @@ import DaftarTukarTambah from './DaftarTukarTambah'
 const LAMA_KOSONG = { jenis: 'perhiasan', item_name: '', karat: '8', weight_gram: '', brand: '', nilai: '', kondisi: 'kotor' }
 
 // Tukar tambah: banyak barang lama dari pelanggan (nilai tukar diisi manual) dan banyak barang baru dari stok toko.
-// Kas toko hanya mencatat selisih; tunai atau QRIS/Debit sama-sama masuk kas toko.
+// Kas toko hanya mencatat selisih; tunai atau transfer sama-sama lewat kas toko.
 export default function FormTukarTambah({ me, locations, onTutup, onSelesai }) {
   const cabang = locations.filter((l) => l.type === 'cabang')
   const [tab, setTab] = useState('baru')
@@ -20,7 +20,6 @@ export default function FormTukarTambah({ me, locations, onTutup, onSelesai }) {
   const [cari, setCari] = useState('')
   const [hasil, setHasil] = useState([])
   const [metode, setMetode] = useState('tunai')
-  const [biaya, setBiaya] = useState('')
   const [tgl, setTgl] = useState(hariIni())
   const [note, setNote] = useState('')
   const [konfirmasi, setKonfirmasi] = useState(false)
@@ -30,7 +29,6 @@ export default function FormTukarTambah({ me, locations, onTutup, onSelesai }) {
   const totalLama = lama.reduce((s, x) => s + (Number(x.nilai) || 0), 0)
   const totalBaru = baru.reduce((s, x) => s + (Number(x.harga) || 0), 0)
   const selisih = totalBaru - totalLama
-  const potongan = metode === 'qris' && selisih > 0 ? Number(biaya) || 0 : 0
 
   useEffect(() => {
     if (!lokasi || !cari.trim()) {
@@ -65,8 +63,6 @@ export default function FormTukarTambah({ me, locations, onTutup, onSelesai }) {
     for (const x of baru) {
       if (!(Number(x.harga) > 0) && !x.gratis) return setError('Harga semua barang baru wajib diisi')
     }
-    if (metode === 'qris' && selisih < 0) return setError('Selisih yang dibayar toko ke pelanggan hanya bisa tunai')
-    if (potongan > selisih) return setError('Potongan tidak boleh melebihi selisih')
     setKonfirmasi(true)
   }
 
@@ -76,7 +72,7 @@ export default function FormTukarTambah({ me, locations, onTutup, onSelesai }) {
       const res = await api('/barang/tukar-tambah', {
         method: 'POST',
         body: JSON.stringify({
-          location_id: Number(lokasi), date: tgl, note: note.trim(), metode, biaya: potongan,
+          location_id: Number(lokasi), date: tgl, note: note.trim(), metode,
           lama: lama.map((x) => ({
             jenis: x.jenis, item_name: x.item_name, brand: x.brand, karat: `${x.karat}K`, weight_gram: Number(x.weight_gram),
             nilai: Number(x.nilai), kondisi: x.kondisi,
@@ -87,7 +83,6 @@ export default function FormTukarTambah({ me, locations, onTutup, onSelesai }) {
       onSelesai(res.message)
       setLama([{ ...LAMA_KOSONG }])
       setBaru([])
-      setBiaya('')
       setNote('')
       setCari('')
       setKonfirmasi(false)
@@ -190,16 +185,13 @@ export default function FormTukarTambah({ me, locations, onTutup, onSelesai }) {
               <label>Metode pembayaran selisih</label>
               <select value={metode} onChange={(e) => setMetode(e.target.value)}>
                 <option value="tunai">Tunai</option>
-                <option value="qris">QRIS/Debit</option>
+                <option value="transfer">Transfer</option>
               </select>
             </div>
-            {metode === 'qris' && selisih > 0 && (
-              <div><label>Potongan QRIS/Debit (Rp)</label><input type="number" min="0" step="1" value={biaya} onChange={(e) => setBiaya(e.target.value)} placeholder="0" /></div>
-            )}
             <div><label>Tanggal</label><input type="date" value={tgl} onChange={(e) => setTgl(e.target.value)} /></div>
             <div><label>Catatan</label><input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} /></div>
           </div>
-          <p><strong>{teksSelisih}</strong>. Tunai dan QRIS/Debit masuk kas toko ini, bukan back office.</p>
+          <p><strong>{teksSelisih}</strong>. Tunai dan transfer lewat kas toko ini, bukan back office.</p>
           <button type="submit" className="mini primary-fill">Periksa dan simpan</button>
         </form>
       )}
@@ -211,7 +203,7 @@ export default function FormTukarTambah({ me, locations, onTutup, onSelesai }) {
               <tr><th>Barang lama</th><td>{lama.length} barang, nilai tukar {rupiah(totalLama)}</td></tr>
               <tr><th>Barang baru</th><td>{baru.length} barang, harga {rupiah(totalBaru)}</td></tr>
               <tr><th>Selisih</th><td>{teksSelisih}</td></tr>
-              <tr><th>Metode</th><td>{metode === 'qris' ? 'QRIS/Debit' : 'Tunai'}{potongan > 0 ? `, potongan ${rupiah(potongan)}` : ''}</td></tr>
+              <tr><th>Metode</th><td>{metode === 'transfer' ? 'Transfer' : 'Tunai'}</td></tr>
               <tr><th>Tanggal</th><td>{tgl}</td></tr>
             </tbody>
           </table>

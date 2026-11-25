@@ -94,7 +94,7 @@ export default function TabelBarang({
                   </div>
                 )}
                 {r.tanggal_jual && <div className="muted">{r.tanggal_jual.slice(0, 10)}</div>}
-                {r.metode && <div className="muted">{r.metode === 'qris' ? 'QRIS/Debit' : 'Tunai'}</div>}
+                {r.metode && <div className="muted">{r.metode === 'qris' ? 'QRIS/Debit' : r.metode === 'transfer' ? 'Transfer' : 'Tunai'}</div>}
               </td>
               <td>{r.note}</td>
               <td>{r.lokasi}</td>

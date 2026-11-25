@@ -22,14 +22,14 @@ const (
 )
 
 // NormalMetode mengembalikan metode yang valid. Kosong dianggap tunai.
+// QRIS/Debit tidak lagi diterima untuk transaksi baru (hanya tunai dan transfer, keduanya masuk kas lokasi penjual);
+// konstanta dan kategori QRIS tetap ada supaya data lama bisa dibaca dan dibatalkan.
 func NormalMetode(m string) (string, bool) {
 	switch strings.ToLower(strings.TrimSpace(m)) {
 	case "", MetodeTunai:
 		return MetodeTunai, true
 	case MetodeTransfer:
 		return MetodeTransfer, true
-	case MetodeQRIS:
-		return MetodeQRIS, true
 	}
 	return "", false
 }
