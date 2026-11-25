@@ -74,8 +74,24 @@ export default function Lebur({ me }) {
     <div>
       <Pesan error={error} info={info} />
 
-      <div className="card">
-        <h3>Proses Lebur</h3>
+    {['pj', 'owner', 'super_admin'].includes(me.role) && (
+      <AntrianLebur
+        rows={antrian}
+        locations={locations}
+        role={me.role}
+        onSelesai={(pesan) => {
+          setInfo(pesan)
+          setError('')
+          muat()
+        }}
+        onError={setError}
+      />
+    )}
+
+      <details className="card" style={{ marginTop: 16 }} open>
+        <summary style={{ cursor: 'pointer', fontWeight: 700 }}>
+          Proses Lebur ({batches.length} batch)
+        </summary>
         <p className="muted">
           Owner memilih barang di Stok untuk dimasukkan ke antrean tanpa mengelompokkannya. PJ lalu memilih barang
           yang dijadikan satu batch, mencatat berat setelah dipotong dan leburan kotor, lalu cukim. Cukim dijual ke
@@ -113,20 +129,6 @@ export default function Lebur({ me }) {
           )}
         </div>
 
-        {['pj', 'owner', 'super_admin'].includes(me.role) && (
-          <AntrianLebur
-            rows={antrian}
-            locations={locations}
-            role={me.role}
-            onSelesai={(pesan) => {
-              setInfo(pesan)
-              setError('')
-              muat()
-            }}
-            onError={setError}
-          />
-        )}
-
         {aksi && batchAksi && (
           <FormAksiLebur
             key={aksi.n}
@@ -144,7 +146,7 @@ export default function Lebur({ me }) {
         )}
 
         <TabelLebur batches={batches} bisaCatat={bisaCatat} bisaUndo={bisaUndo} onAksi={bukaAksi} />
-      </div>
+      </details>
 
       <PanelSiapJual
         siap={siap}

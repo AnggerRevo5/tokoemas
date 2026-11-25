@@ -113,8 +113,24 @@ export default function Cuci({ me }) {
     <div>
       <Pesan error={error} info={info} />
 
-      <div className="card">
-        <h3>Daftar Cuci</h3>
+    {!isCabang && ['pj', 'owner', 'super_admin'].includes(me.role) && (
+      <AntrianCuci
+        rows={antrian}
+        locations={locations}
+        role={me.role}
+        onSelesai={(pesan) => {
+          setInfo(pesan)
+          setError('')
+          muat()
+        }}
+        onError={setError}
+      />
+    )}
+
+      <details className="card" style={{ marginTop: 16 }} open>
+        <summary style={{ cursor: 'pointer', fontWeight: 700 }}>
+          Proses Cuci ({rows.length} pekerjaan)
+        </summary>
         <p className="muted">
           Owner memilih barang di menu Stok lalu klik Cuci untuk memasukkannya ke antrean tanpa mengelompokkan.
           PJ memilih barang dari lokasi asal yang sama untuk membentuk pekerjaan, lalu memilih barang yang akan
@@ -180,20 +196,6 @@ export default function Cuci({ me }) {
           </div>
         )}
 
-        {!isCabang && ['pj', 'owner', 'super_admin'].includes(me.role) && (
-          <AntrianCuci
-            rows={antrian}
-            locations={locations}
-            role={me.role}
-            onSelesai={(pesan) => {
-              setInfo(pesan)
-              setError('')
-              muat()
-            }}
-            onError={setError}
-          />
-        )}
-
         {aksi && (
           <FormAksiCuci
             key={aksi.n}
@@ -220,7 +222,7 @@ export default function Cuci({ me }) {
           onToggleKirim={toggleKirim}
           onAksi={mulaiAksi}
         />
-      </div>
+      </details>
 
       {!isCabang && (
         <BarangDiPencuci
