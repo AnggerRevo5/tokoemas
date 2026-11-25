@@ -86,7 +86,7 @@ const SEMUA = {
   investor: 'Setoran investor',
   investor_baru: 'Investor baru',
   setor_investor: 'Setoran / top-up investor',
-  terima_pinjaman: 'Terima pinjaman',
+  terima_pinjaman: 'Terima Hutang / pinjaman',
   catat_hutang: 'Hutang tanpa uang masuk',
   bayar_bunga_investor: 'Pembayaran bunga investor',
   ambil_investor: 'Pengambilan pokok dan/atau bunga investor',
