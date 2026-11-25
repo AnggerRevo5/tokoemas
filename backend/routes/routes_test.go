@@ -109,18 +109,46 @@ func mesinUji(t *testing.T, role string) *gin.Engine {
 }
 
 func kirim(t *testing.T, r *gin.Engine, method, path string) *httptest.ResponseRecorder {
+	return kirimDenganBody(t, r, method, path, "{}")
+}
+
+func kirimDenganBody(t *testing.T, r *gin.Engine, method, path, body string) *httptest.ResponseRecorder {
 	t.Helper()
 	tok, err := middleware.BuatToken(9, "uji", "apa saja", 0, sesiID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	req := httptest.NewRequestWithContext(context.Background(), method, path, strings.NewReader("{}"))
+	req := httptest.NewRequestWithContext(context.Background(), method, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-CSRF-Token", services.TokenCSRF(sesiID))
 	req.AddCookie(&http.Cookie{Name: middleware.NamaCookieSesi, Value: tok})
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	return w
+}
+
+func TestOperasiTulisInvestorDanHutangMemerlukanBackOffice(t *testing.T) {
+	tests := []struct {
+		method string
+		path   string
+		body   string
+	}{
+		{http.MethodPost, "/investor", `{"name":"Investor Uji","amount":1000,"start_date":"2020-01-01","rate_percent":1,"catat_kas":false}`},
+		{http.MethodPost, "/investor/1/gerak", `{"jenis":"setor","amount":1000,"tx_date":"2020-01-01","catat_kas":false}`},
+		{http.MethodPost, "/hutang", `{"creditor_type":"perorangan","creditor_name":"Kreditur Uji","principal":1000,"start_date":"2020-01-01"}`},
+		{http.MethodPost, "/dana/terima", `{"creditor_type":"perorangan","creditor_name":"Kreditur Uji","principal":1000,"start_date":"2020-01-01"}`},
+		{http.MethodPost, "/hutang/1/bayar", `{"amount":1000,"paid_date":"2020-01-01"}`},
+	}
+	for _, role := range []string{"owner", "super_admin"} {
+		r := mesinUji(t, role)
+		for _, test := range tests {
+			w := kirimDenganBody(t, r, test.method, test.path, test.body)
+			if w.Code != http.StatusInternalServerError || !strings.Contains(w.Body.String(), "lokasi back office tidak ditemukan") {
+				t.Errorf("%s %s sebagai %s harus berhenti tanpa lokasi Back Office, dapat %d %s",
+					test.method, test.path, role, w.Code, w.Body.String())
+			}
+		}
+	}
 }
 
 // Pembatasan per role: role biasa diteruskan, PJ tetap dibatasi ke menu Lebur, Cuci, dan Service.

@@ -86,3 +86,12 @@ func resolveLocation(c *gin.Context, db *sql.DB, requested int) (int, string, bo
 	}
 	return id, tipe, true
 }
+
+func wajibIDBackOffice(c *gin.Context, db *sql.DB) (int, bool) {
+	id, err := services.IDBackOffice(db)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "lokasi back office tidak ditemukan"})
+		return 0, false
+	}
+	return id, true
+}

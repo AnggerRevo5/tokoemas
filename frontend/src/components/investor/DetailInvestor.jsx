@@ -26,7 +26,7 @@ const PETUNJUK = {
 }
 
 // Isi card: ringkasan, form pencatatan, lalu tab riwayat dan bunga per siklus.
-function IsiKelola({ data, onSimpan, onPesan }) {
+function IsiKelola({ data, onSimpan, onPesan, readOnly }) {
   const { investor: inv, riwayat, bunga } = data
   const [tab, setTab] = useState('riwayat')
   const [jenis, setJenis] = useState('ambil')
@@ -35,7 +35,6 @@ function IsiKelola({ data, onSimpan, onPesan }) {
   const [bunganya, setBunganya] = useState('')
   const [tanggal, setTanggal] = useState(hariIni())
   const [note, setNote] = useState('')
-  const [catatKas, setCatatKas] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -50,12 +49,12 @@ function IsiKelola({ data, onSimpan, onPesan }) {
       const res =
         jenis === 'ambil'
           ? await api(`/investor/${inv.id}/ambil`, {
-              method: 'POST',
-              body: JSON.stringify({ pokok: Number(pokok) || 0, bunga: Number(bunganya) || 0, tx_date: tanggal, note, catat_kas: catatKas }),
+          method: 'POST',
+          body: JSON.stringify({ pokok: Number(pokok) || 0, bunga: Number(bunganya) || 0, tx_date: tanggal, note }),
             })
           : await api(`/investor/${inv.id}/gerak`, {
               method: 'POST',
-              body: JSON.stringify({ jenis, amount: Number(jumlah), tx_date: tanggal, note, catat_kas: catatKas }),
+          body: JSON.stringify({ jenis, amount: Number(jumlah), tx_date: tanggal, note }),
             })
       setJumlah('')
       setPokok('')
@@ -103,9 +102,9 @@ function IsiKelola({ data, onSimpan, onPesan }) {
         <div><label>Belum dibayar</label><b>{rupiah(inv.bunga_belum)}</b></div>
       </div>
 
-      <Pesan error={error} />
+      {!readOnly && <Pesan error={error} />}
 
-      <form onSubmit={catat}>
+      {!readOnly && <form onSubmit={catat}>
         <div className="section-title">Catat setor, tarik, atau bayar bunga</div>
         <div className="form-grid">
           <div>
@@ -152,18 +151,12 @@ function IsiKelola({ data, onSimpan, onPesan }) {
             <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} />
           </div>
         </div>
-        <label className="cek-item" style={{ margin: '10px 0' }}>
-          <input type="checkbox" checked={catatKas} onChange={(e) => setCatatKas(e.target.checked)} />
-          {jenis === 'setor'
-            ? 'Catat setoran ini juga sebagai kas masuk back office'
-            : 'Catat juga sebagai pengeluaran kas back office'}
-        </label>
         {jenis === 'ambil' && (Number(pokok) > 0 || Number(bunganya) > 0) && (
           <p>Total yang diserahkan ke investor: <b>{rupiah((Number(pokok) || 0) + (Number(bunganya) || 0))}</b></p>
         )}
         <p className="muted">{PETUNJUK[jenis]}</p>
         <button disabled={loading}>{loading ? <><Spinner />Menyimpan...</> : 'Simpan catatan'}</button>
-      </form>
+      </form>}
 
       <div className="tab-mini" role="tablist">
         <button type="button" role="tab" aria-selected={tab === 'riwayat'} className={tab === 'riwayat' ? 'mini aktif' : 'mini'} onClick={() => setTab('riwayat')}>
@@ -210,7 +203,7 @@ function IsiKelola({ data, onSimpan, onPesan }) {
                     {r.is_void && <div className="muted">Dibatalkan: {r.void_reason}</div>}
                   </td>
                   <td>
-                    {!r.is_void && (
+                    {!readOnly && !r.is_void && (
                       <button type="button" className="mini" onClick={() => { setBatalRow(r); setAlasan(''); setError('') }}>
                         Batalkan
                       </button>
@@ -250,7 +243,7 @@ function IsiKelola({ data, onSimpan, onPesan }) {
 
 // Card Kelola investor di tengah layar. data = respons GET /investor/:id (null selama dimuat).
 // Ditutup dengan tombol silang, klik latar, atau Esc.
-export default function DetailInvestor({ nama, data, onTutup, onSimpan, onPesan }) {
+export default function DetailInvestor({ nama, data, onTutup, onSimpan, onPesan, readOnly = false }) {
   useEffect(() => {
     const esc = (e) => e.key === 'Escape' && onTutup()
     window.addEventListener('keydown', esc)
@@ -263,7 +256,7 @@ export default function DetailInvestor({ nama, data, onTutup, onSimpan, onPesan 
         className="popup popup-lebar"
         role="dialog"
         aria-modal="true"
-        aria-label={`Kelola investor ${nama}`}
+        aria-label={`${readOnly ? 'Detail' : 'Kelola'} investor ${nama}`}
         initial={{ opacity: 0, scale: 0.97, y: 8 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.18, ease: 'easeOut' }}
@@ -275,7 +268,7 @@ export default function DetailInvestor({ nama, data, onTutup, onSimpan, onPesan 
           </button>
         </div>
         {data ? (
-          <IsiKelola data={data} onSimpan={onSimpan} onPesan={onPesan} />
+          <IsiKelola data={data} onSimpan={onSimpan} onPesan={onPesan} readOnly={readOnly} />
         ) : (
           <p className="muted"><Spinner />Memuat...</p>
         )}

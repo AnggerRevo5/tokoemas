@@ -229,13 +229,9 @@ func InvestorCreate(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		note := strings.TrimSpace(req.Note)
-		boID := 0
-		if req.CatatKas {
-			var err error
-			if boID, err = services.IDBackOffice(db); err != nil {
-				utils.Gagal(c, err)
-				return
-			}
+		boID, ok := wajibIDBackOffice(c, db)
+		if !ok {
+			return
 		}
 
 		tx, err := db.Begin()
@@ -262,20 +258,20 @@ func InvestorCreate(db *sql.DB) gin.HandlerFunc {
 		gid, _ := res2.LastInsertId()
 		services.CatatAudit(tx, middleware.Meta(c), "create", "investors", id,
 			gin.H{"name": nama, "start_date": tglStr, "rate_bp": bp, "amount": req.Amount, "gerak_id": gid})
-		if req.CatatKas {
-			if err := catatKasGerak(tx, middleware.Meta(c), cl.UserID, boID, services.GerakSetor, req.Amount, nama, "Setoran awal", tglStr, gid); err != nil {
-				utils.Gagal(c, err)
-				return
-			}
+		catatanAwal := "Setoran awal"
+		if note != "" {
+			catatanAwal += " - " + note
+		}
+		if err := catatKasGerak(tx, middleware.Meta(c), cl.UserID, boID, services.GerakSetor, req.Amount, nama, catatanAwal, tglStr, gid); err != nil {
+			utils.Gagal(c, err)
+			return
 		}
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
 			return
 		}
 		pesan := fmt.Sprintf("Investor %s tersimpan, bunga pertama jatuh tempo %s", nama, services.JatuhTempoKe(tgl, 1).Format(format))
-		if req.CatatKas {
-			pesan += ". Setoran tercatat sebagai kas masuk back office"
-		}
+		pesan += ". Setoran tercatat sebagai kas masuk back office"
 		c.JSON(http.StatusCreated, gin.H{"id": id, "message": pesan})
 	}
 }
@@ -290,8 +286,8 @@ type gerakBaru struct {
 
 // simpanGerak menyimpan satu atau beberapa catatan investor sekaligus dalam satu transaksi.
 // Semua catatan diperiksa bersama-sama dengan riwayat yang ada; bila satu saja gagal, tidak ada yang tersimpan.
-// catatKas: setiap catatan ikut dicatat di kas back office (setor masuk; tarik pokok dan bayar bunga keluar).
-func simpanGerak(c *gin.Context, db *sql.DB, id int, tglStr, note string, baru []gerakBaru, catatKas bool) ([]int64, bool) {
+// Setiap catatan ikut dicatat di kas back office (setor masuk; tarik pokok dan bayar bunga keluar).
+func simpanGerak(c *gin.Context, db *sql.DB, id int, tglStr, note string, baru []gerakBaru) ([]int64, bool) {
 	cl := c.MustGet("claims").(*models.Claims)
 	tgl, _ := time.Parse(format, tglStr)
 	hari := services.HariIniWIB()
@@ -300,13 +296,9 @@ func simpanGerak(c *gin.Context, db *sql.DB, id int, tglStr, note string, baru [
 		return nil, false
 	}
 
-	boID := 0
-	if catatKas {
-		var err error
-		if boID, err = services.IDBackOffice(db); err != nil {
-			utils.Gagal(c, err)
-			return nil, false
-		}
+	boID, ok := wajibIDBackOffice(c, db)
+	if !ok {
+		return nil, false
 	}
 
 	tx, err := db.Begin()
@@ -357,11 +349,9 @@ func simpanGerak(c *gin.Context, db *sql.DB, id int, tglStr, note string, baru [
 		services.CatatAudit(tx, middleware.Meta(c), "create", "investor_movements", gid,
 			gin.H{"investor_id": id, "jenis": g.Jenis, "amount": g.Jumlah, "tx_date": tglStr, "note": note})
 
-		if catatKas {
-			if err := catatKasGerak(tx, middleware.Meta(c), cl.UserID, boID, g.Jenis, g.Jumlah, namaInvestor, note, tglStr, gid); err != nil {
-				utils.Gagal(c, err)
-				return nil, false
-			}
+		if err := catatKasGerak(tx, middleware.Meta(c), cl.UserID, boID, g.Jenis, g.Jumlah, namaInvestor, note, tglStr, gid); err != nil {
+			utils.Gagal(c, err)
+			return nil, false
 		}
 	}
 	if err := tx.Commit(); err != nil {
@@ -397,14 +387,12 @@ func InvestorGerak(db *sql.DB) gin.HandlerFunc {
 		if !ok {
 			return
 		}
-		ids, ok := simpanGerak(c, db, id, tglStr, strings.TrimSpace(req.Note), []gerakBaru{{req.Jenis, req.Amount}}, req.CatatKas)
+		ids, ok := simpanGerak(c, db, id, tglStr, strings.TrimSpace(req.Note), []gerakBaru{{req.Jenis, req.Amount}})
 		if !ok {
 			return
 		}
 		pesan := fmt.Sprintf("%s %s tersimpan", strings.ToUpper(labelGerak[req.Jenis][:1])+labelGerak[req.Jenis][1:], services.FmtRp(float64(req.Amount)))
-		if req.CatatKas {
-			pesan += ", tercatat di kas back office"
-		}
+		pesan += ", tercatat di kas back office"
 		c.JSON(http.StatusCreated, gin.H{"id": ids[0], "message": pesan})
 	}
 }
@@ -440,14 +428,12 @@ func InvestorAmbil(db *sql.DB) gin.HandlerFunc {
 		if req.Bunga > 0 {
 			baru = append(baru, gerakBaru{services.GerakBayarBunga, req.Bunga})
 		}
-		if _, ok := simpanGerak(c, db, id, tglStr, strings.TrimSpace(req.Note), baru, req.CatatKas); !ok {
+		if _, ok := simpanGerak(c, db, id, tglStr, strings.TrimSpace(req.Note), baru); !ok {
 			return
 		}
 		pesan := fmt.Sprintf("Pengambilan tersimpan: pokok %s, bunga %s (total %s)",
 			services.FmtRp(float64(req.Pokok)), services.FmtRp(float64(req.Bunga)), services.FmtRp(float64(req.Pokok+req.Bunga)))
-		if req.CatatKas {
-			pesan += "; tercatat sebagai pengeluaran kas back office"
-		}
+		pesan += "; tercatat sebagai pengeluaran kas back office"
 		c.JSON(http.StatusCreated, gin.H{"message": pesan})
 	}
 }
@@ -457,6 +443,10 @@ func InvestorAmbil(db *sql.DB) gin.HandlerFunc {
 func InvestorGerakVoid(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if _, ok := middleware.HanyaAdminOwner(c); !ok {
+			return
+		}
+		boID, ok := wajibIDBackOffice(c, db)
+		if !ok {
 			return
 		}
 		mid, ok := utils.IDParam(c)
@@ -522,8 +512,18 @@ func InvestorGerakVoid(db *sql.DB) gin.HandlerFunc {
 		services.CatatAudit(tx, middleware.Meta(c), "void", "investor_movements", int64(mid),
 			gin.H{"investor_id": investorID, "jenis": jenis, "amount": jumlah, "reason": reason})
 		if kasID.Valid {
-			if _, err := tx.Exec("UPDATE cash_transactions SET is_void = TRUE, void_reason = ? WHERE id = ?", reason, kasID.Int64); err != nil {
+			res, err := tx.Exec("UPDATE cash_transactions SET is_void = TRUE, void_reason = ? WHERE id = ? AND location_id = ?", reason, kasID.Int64, boID)
+			if err != nil {
 				utils.Gagal(c, err)
+				return
+			}
+			n, err := res.RowsAffected()
+			if err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			if n != 1 {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "transaksi kas investor tidak ditemukan di Back Office"})
 				return
 			}
 			services.CatatAudit(tx, middleware.Meta(c), "void", "cash_transactions", kasID.Int64, gin.H{"reason": reason})

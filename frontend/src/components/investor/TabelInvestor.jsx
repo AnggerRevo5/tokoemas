@@ -34,7 +34,7 @@ export default function TabelInvestor({ rows, terpilih, onPilih }) {
               <td className="num">{r.jatuh_tempo_berikut ? rupiah(r.perkiraan_bunga_berikut) : '-'}</td>
               <td>
                 <button type="button" className="mini primary" onClick={() => onPilih(r.id)}>
-                  Kelola
+                  Lihat
                 </button>
               </td>
             </tr>

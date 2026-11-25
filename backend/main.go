@@ -40,6 +40,9 @@ func main() {
 	if err := services.SiapkanSkemaInvestor(db); err != nil {
 		log.Fatal(err)
 	}
+	if err := services.SiapkanSkemaHutang(db); err != nil {
+		log.Fatal(err)
+	}
 	if err := services.SiapkanSkemaMetode(db); err != nil {
 		log.Fatal(err)
 	}

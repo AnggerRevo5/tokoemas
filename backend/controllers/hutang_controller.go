@@ -15,13 +15,15 @@ import (
 	"toko-emas/utils"
 )
 
-// Dana investor dicatat lewat menu Investor (kas ikut otomatis), jadi tidak ada lagi di sini.
 var jenisHutang = map[string]bool{"perorangan": true, "pabrik": true, "bank_pegadaian": true}
 
 func HutangCreate(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		cl, ok := middleware.HanyaAdminOwner(c)
 		if !ok {
+			return
+		}
+		if _, ok := wajibIDBackOffice(c, db); !ok {
 			return
 		}
 		var req models.HutangCreateRequest
@@ -101,9 +103,8 @@ func HutangTerimaDana(db *sql.DB) gin.HandlerFunc {
 			}
 			due = req.DueDate
 		}
-		boID, err := services.IDBackOffice(db)
-		if err != nil {
-			utils.Gagal(c, err)
+		boID, ok := wajibIDBackOffice(c, db)
+		if !ok {
 			return
 		}
 		kategori := "pinjaman"
@@ -119,7 +120,7 @@ func HutangTerimaDana(db *sql.DB) gin.HandlerFunc {
 		res, err := tx.Exec(
 			`INSERT INTO cash_transactions (location_id, direction, category, amount, note, transaction_date, created_by)
 			 VALUES (?,?,?,?,?,?,?)`,
-			boID, "in", kategori, req.Principal, "Dana dari "+nama, start, cl.UserID,
+			boID, "in", kategori, req.Principal, catatanDana(nama, note), start, cl.UserID,
 		)
 		if err != nil {
 			utils.Gagal(c, err)
@@ -184,7 +185,53 @@ func HutangList(db *sql.DB) gin.HandlerFunc {
 				r.DueDate = &t
 			}
 			r.Sisa = r.Principal - r.Terbayar
+			r.Pembayaran = []models.HutangPembayaranRow{}
 			out = append(out, r)
+		}
+		if err := rows.Err(); err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		rows.Close()
+
+		if len(out) > 0 {
+			ids := make([]int, 0, len(out))
+			args := make([]interface{}, 0, len(out))
+			for _, r := range out {
+				ids = append(ids, r.ID)
+				args = append(args, r.ID)
+			}
+			riwayat, err := db.Query(
+				`SELECT p.id, p.debt_id, p.amount, p.paid_date, IFNULL(p.note,''), IFNULL(u.username,'')
+				 FROM debt_payments p LEFT JOIN users u ON u.id = p.created_by
+				 WHERE p.debt_id IN (`+utils.Placeholders(len(ids))+`) ORDER BY p.paid_date DESC, p.id DESC`,
+				args...,
+			)
+			if err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			defer riwayat.Close()
+			pembayaran := make(map[int][]models.HutangPembayaranRow, len(out))
+			for riwayat.Next() {
+				var debtID int
+				var p models.HutangPembayaranRow
+				if err := riwayat.Scan(&p.ID, &debtID, &p.Amount, &p.PaidDate, &p.Note, &p.Pencatat); err != nil {
+					utils.Gagal(c, err)
+					return
+				}
+				pembayaran[debtID] = append(pembayaran[debtID], p)
+			}
+			if err := riwayat.Err(); err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			for i := range out {
+				out[i].Pembayaran = pembayaran[out[i].ID]
+				if out[i].Pembayaran == nil {
+					out[i].Pembayaran = []models.HutangPembayaranRow{}
+				}
+			}
 		}
 		c.JSON(http.StatusOK, out)
 	}
@@ -211,12 +258,10 @@ func HutangBayar(db *sql.DB) gin.HandlerFunc {
 		if !ok {
 			return
 		}
-		boID, err := services.IDBackOffice(db)
-		if err != nil {
-			utils.Gagal(c, err)
+		boID, ok := wajibIDBackOffice(c, db)
+		if !ok {
 			return
 		}
-
 		tx, err := db.Begin()
 		if err != nil {
 			utils.Gagal(c, err)
@@ -238,7 +283,10 @@ func HutangBayar(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		var terbayar float64
-		tx.QueryRow("SELECT IFNULL(SUM(amount),0) FROM debt_payments WHERE debt_id = ?", id).Scan(&terbayar)
+		if err := tx.QueryRow("SELECT IFNULL(SUM(amount),0) FROM debt_payments WHERE debt_id = ?", id).Scan(&terbayar); err != nil {
+			utils.Gagal(c, err)
+			return
+		}
 		sisa := principal - terbayar
 		if req.Amount > sisa+0.005 {
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("melebihi sisa hutang (sisa %s)", services.FmtRp(sisa))})
@@ -246,41 +294,46 @@ func HutangBayar(db *sql.DB) gin.HandlerFunc {
 		}
 
 		var saldo float64
-		tx.QueryRow(
+		if err := tx.QueryRow(
 			"SELECT IFNULL(SUM(IF(direction='in',amount,-amount)),0) FROM cash_transactions WHERE location_id = ? AND is_void = FALSE",
 			boID,
-		).Scan(&saldo)
+		).Scan(&saldo); err != nil {
+			utils.Gagal(c, err)
+			return
+		}
 		peringatan := ""
 		if saldo-req.Amount < 0 {
 			peringatan = fmt.Sprintf("Saldo kas back office tidak cukup, menjadi minus %s", services.FmtRp(req.Amount-saldo))
 		}
 
-		res, err := tx.Exec(
-			"INSERT INTO debt_payments (debt_id, amount, paid_date, note, created_by) VALUES (?,?,?,?,?)",
-			id, req.Amount, tgl, req.Note, cl.UserID,
-		)
-		if err != nil {
-			utils.Gagal(c, err)
-			return
-		}
-		payID, _ := res.LastInsertId()
-		services.CatatAudit(tx, middleware.Meta(c), "create", "debt_payments", payID, req)
-
 		res2, err := tx.Exec(
 			`INSERT INTO cash_transactions (location_id, direction, category, amount, note, transaction_date, created_by)
 			 VALUES (?,?,?,?,?,?,?)`,
-			boID, "out", "bayar_hutang", req.Amount, fmt.Sprintf("Bayar hutang #%d - %s", id, nama), tgl, cl.UserID,
+			boID, "out", "bayar_hutang", req.Amount, catatanBayar(id, nama, req.Note), tgl, cl.UserID,
 		)
 		if err != nil {
 			utils.Gagal(c, err)
 			return
 		}
 		cashID, _ := res2.LastInsertId()
+		res, err := tx.Exec(
+			"INSERT INTO debt_payments (debt_id, amount, paid_date, note, cash_id, created_by) VALUES (?,?,?,?,?,?)",
+			id, req.Amount, tgl, req.Note, cashID, cl.UserID,
+		)
+		if err != nil {
+			utils.Gagal(c, err)
+			return
+		}
+		payID, _ := res.LastInsertId()
+		services.CatatAudit(tx, middleware.Meta(c), "create", "debt_payments", payID, gin.H{"request": req, "cash_id": cashID})
 		services.CatatAudit(tx, middleware.Meta(c), "create_auto", "cash_transactions", cashID, gin.H{"dari_pembayaran_hutang": payID})
 
 		lunas := sisa-req.Amount < 0.005
 		if lunas {
-			tx.Exec("UPDATE debts SET status = 'lunas' WHERE id = ?", id)
+			if _, err := tx.Exec("UPDATE debts SET status = 'lunas' WHERE id = ?", id); err != nil {
+				utils.Gagal(c, err)
+				return
+			}
 		}
 
 		if err := tx.Commit(); err != nil {
@@ -301,6 +354,10 @@ func HutangBayar(db *sql.DB) gin.HandlerFunc {
 func HutangVoid(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		_, ok := middleware.HanyaSuperAdmin(c)
+		if !ok {
+			return
+		}
+		boID, ok := wajibIDBackOffice(c, db)
 		if !ok {
 			return
 		}
@@ -332,17 +389,36 @@ func HutangVoid(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		var n int
-		tx.QueryRow("SELECT COUNT(*) FROM debt_payments WHERE debt_id = ?", id).Scan(&n)
+		if err := tx.QueryRow("SELECT COUNT(*) FROM debt_payments WHERE debt_id = ?", id).Scan(&n); err != nil {
+			utils.Gagal(c, err)
+			return
+		}
 		if n > 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "hutang sudah ada pembayaran, tidak bisa dibatalkan"})
 			return
 		}
 
 		if cashID.Valid {
-			tx.Exec("UPDATE cash_transactions SET is_void = TRUE, void_reason = ? WHERE id = ?", reason, cashID.Int64)
+			res, err := tx.Exec("UPDATE cash_transactions SET is_void = TRUE, void_reason = ? WHERE id = ? AND location_id = ?", reason, cashID.Int64, boID)
+			if err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			n, err := res.RowsAffected()
+			if err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			if n != 1 {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "transaksi kas hutang tidak ditemukan di Back Office"})
+				return
+			}
 			services.CatatAudit(tx, middleware.Meta(c), "void", "cash_transactions", cashID.Int64, gin.H{"reason": reason})
 		}
-		tx.Exec("UPDATE debts SET is_void = TRUE, void_reason = ? WHERE id = ?", reason, id)
+		if _, err := tx.Exec("UPDATE debts SET is_void = TRUE, void_reason = ? WHERE id = ?", reason, id); err != nil {
+			utils.Gagal(c, err)
+			return
+		}
 		services.CatatAudit(tx, middleware.Meta(c), "void", "debts", int64(id), gin.H{"reason": reason})
 
 		if err := tx.Commit(); err != nil {
@@ -351,4 +427,20 @@ func HutangVoid(db *sql.DB) gin.HandlerFunc {
 		}
 		c.JSON(http.StatusOK, gin.H{"message": "hutang dibatalkan, kas dikembalikan"})
 	}
+}
+
+func catatanDana(nama, note string) string {
+	catatan := "Dana dari " + nama
+	if note != "" {
+		catatan += ": " + note
+	}
+	return catatan
+}
+
+func catatanBayar(id int, nama, note string) string {
+	catatan := fmt.Sprintf("Bayar hutang #%d - %s", id, nama)
+	if note != "" {
+		catatan += ": " + note
+	}
+	return catatan
 }

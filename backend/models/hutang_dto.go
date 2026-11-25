@@ -24,17 +24,26 @@ type HutangTerimaDanaRequest struct {
 
 // HutangListRow adalah satu baris respons JSON dari HutangList.
 type HutangListRow struct {
-	ID           int        `json:"id"`
-	CreditorType string     `json:"creditor_type"`
-	CreditorName string     `json:"creditor_name"`
-	Principal    float64    `json:"principal"`
-	Terbayar     float64    `json:"terbayar"`
-	Sisa         float64    `json:"sisa"`
-	Note         string     `json:"note"`
-	StartDate    time.Time  `json:"start_date"`
-	DueDate      *time.Time `json:"due_date"`
-	Status       string     `json:"status"`
-	DariKas      bool       `json:"dari_kas"`
+	ID           int                   `json:"id"`
+	CreditorType string                `json:"creditor_type"`
+	CreditorName string                `json:"creditor_name"`
+	Principal    float64               `json:"principal"`
+	Terbayar     float64               `json:"terbayar"`
+	Sisa         float64               `json:"sisa"`
+	Note         string                `json:"note"`
+	StartDate    time.Time             `json:"start_date"`
+	DueDate      *time.Time            `json:"due_date"`
+	Status       string                `json:"status"`
+	DariKas      bool                  `json:"dari_kas"`
+	Pembayaran   []HutangPembayaranRow `json:"pembayaran"`
+}
+
+type HutangPembayaranRow struct {
+	ID       int       `json:"id"`
+	Amount   float64   `json:"amount"`
+	PaidDate time.Time `json:"paid_date"`
+	Note     string    `json:"note"`
+	Pencatat string    `json:"pencatat"`
 }
 
 // HutangBayarRequest adalah payload JSON untuk HutangBayar.

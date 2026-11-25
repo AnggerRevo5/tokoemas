@@ -26,6 +26,7 @@ type DebtPayment struct {
 	Amount    float64   `json:"amount"`
 	PaidDate  time.Time `json:"paid_date"`
 	Note      *string   `json:"note"`
+	CashID    *int      `json:"cash_id"`
 	CreatedBy int       `json:"created_by"`
 	CreatedAt time.Time `json:"created_at"`
 }

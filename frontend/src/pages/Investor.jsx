@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../services/api'
 import Pesan from '../components/common/Pesan'
-import FormInvestor from '../components/investor/FormInvestor'
 import TabelInvestor from '../components/investor/TabelInvestor'
 import DetailInvestor from '../components/investor/DetailInvestor'
 
@@ -59,17 +58,9 @@ export default function Investor() {
     <div>
       <Pesan error={error} info={info} />
 
-      <FormInvestor
-        onMulai={resetPesan}
-        onSukses={(res) => {
-          setInfo(res.message)
-          muatDaftar()
-        }}
-        onError={setError}
-      />
-
       <div className="card" style={{ marginTop: 16 }}>
         <h3>Daftar Investor</h3>
+        <p className="muted">Halaman ini hanya untuk melihat saldo, status, dan riwayat. Pengelolaan investor dilakukan dari Kas Back Office.</p>
         <TabelInvestor rows={rows} terpilih={terpilih} onPilih={buka} />
       </div>
 
@@ -81,6 +72,7 @@ export default function Investor() {
           onTutup={tutup}
           onSimpan={muatUlang}
           onPesan={setInfo}
+          readOnly
         />
       )}
     </div>

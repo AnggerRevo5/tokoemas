@@ -25,8 +25,8 @@ export default function RingkasInvestor() {
         {aktif.length} investor, pokok yang ditanggung <b>{rupiah(pokok)}</b>, bunga belum dibayar <b>{rupiah(bunga)}</b>.
       </p>
       <p className="muted" style={{ marginBottom: 0 }}>
-        Termasuk kewajiban toko dan ikut di laporan Hutang. Setor, tarik pokok, dan bunga dicatat di menu Investor dan
-        kasnya ikut otomatis, jadi tidak perlu dimasukkan lagi di sini.
+        Termasuk kewajiban toko dan ikut di laporan Hutang. Setor, tarik pokok, dan bunga dicatat dari Kas Back Office
+        serta otomatis muncul di riwayat investor dan kas.
       </p>
     </div>
   )
