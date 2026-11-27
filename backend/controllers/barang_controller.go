@@ -543,6 +543,9 @@ func BarangVoid(db *sql.DB) gin.HandlerFunc {
 func BarangList(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		cl := c.MustGet("claims").(*models.Claims)
+		if !utils.TanggalOpsional(c, "from", "to") {
+			return
+		}
 
 		kolom := `SELECT i.id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''), i.weight_gram,
 		             i.jenis, IFNULL(i.brand,''), i.kondisi, i.harga_beli,
@@ -638,6 +641,9 @@ func BarangList(db *sql.DB) gin.HandlerFunc {
 			dari += " AND i.tray_id = ?"
 			args = append(args, b)
 		}
+		st, at := syaratTanggal(c, "i.entry_date")
+		dari += st
+		args = append(args, at...)
 		kb, ak := syaratKadarBerat(c, "i", "i.weight_gram")
 		dari += kb
 		args = append(args, ak...)

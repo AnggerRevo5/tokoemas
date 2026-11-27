@@ -4,7 +4,7 @@ import { KARAT } from '../../constants/barang'
 
 // Filter daftar barang (lokasi, status, jenis, asal, cari, kadar, berat) dan ringkasan jumlah/berat.
 export default function FilterBarang({
-  isCabang, locations, locId, onLocId, status, onStatus, jenisF, onJenis, asal, onAsal, talangan, onTalangan, cari, onCari, kadar, beratMin, beratMax, onKadarBerat, data,
+  isCabang, locations, locId, onLocId, status, onStatus, jenisF, onJenis, asal, onAsal, talangan, onTalangan, cari, onCari, kadar, beratMin, beratMax, onKadarBerat, tanggalMasukDari, tanggalMasukSampai, onTanggalMasuk, data,
 }) {
   return (
     <div className="card">
@@ -84,6 +84,14 @@ export default function FilterBarang({
         <div>
           <label>Berat sampai (g)</label>
           <input type="number" step="0.001" min="0" value={beratMax} onChange={(e) => onKadarBerat({ beratMax: e.target.value })} />
+        </div>
+        <div>
+          <label>Tanggal masuk dari</label>
+          <input type="date" value={tanggalMasukDari} onChange={(e) => onTanggalMasuk({ dari: e.target.value })} />
+        </div>
+        <div>
+          <label>Tanggal masuk sampai</label>
+          <input type="date" value={tanggalMasukSampai} onChange={(e) => onTanggalMasuk({ sampai: e.target.value })} />
         </div>
       </div>
       <p className="muted" style={{ marginBottom: 0 }}>

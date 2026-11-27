@@ -34,6 +34,8 @@ export default function Barang({ me, onUbah }) {
   const [kadar, setKadar] = useState('')
   const [beratMin, setBeratMin] = useState('')
   const [beratMax, setBeratMax] = useState('')
+  const [tanggalMasukDari, setTanggalMasukDari] = useState('')
+  const [tanggalMasukSampai, setTanggalMasukSampai] = useState('')
   const [data, setData] = useState({ rows: [], jumlah: 0, ditampilkan: 0, ada_lagi: false, batas: 200, total_gram: 0, total_gram_perak: 0, total_beli: 0, total_jual: 0 })
   const [batas, setBatas] = useState(LANGKAH_MUAT) // jumlah barang yang diminta; naik tiap tombol Muat lagi
   const [notif, setNotif] = useState({ menunggu: 0, belum_sampai: 0, keluar: 0 })
@@ -78,6 +80,8 @@ export default function Barang({ me, onUbah }) {
     if (kadar) p.set('karat', kadar)
     if (beratMin) p.set('berat_min', beratMin)
     if (beratMax) p.set('berat_max', beratMax)
+    if (tanggalMasukDari) p.set('from', tanggalMasukDari)
+    if (tanggalMasukSampai) p.set('to', tanggalMasukSampai)
     api(`/barang?${p.toString()}`)
       .then((d) => {
         setData(d)
@@ -98,7 +102,7 @@ export default function Barang({ me, onUbah }) {
       .then((d) => setGadaiMap(Object.fromEntries(d.flatMap((x) => x.barang.map((b) => [b.item_id, x])))))
       .catch(() => {})
     api('/barang/notif').then(setNotif).catch(() => {})
-  }, [locId, status, jenisF, asal, talanganF, cari, kadar, beratMin, beratMax, bakiF, batas])
+  }, [locId, status, jenisF, asal, talanganF, cari, kadar, beratMin, beratMax, tanggalMasukDari, tanggalMasukSampai, bakiF, batas])
 
   useEffect(() => {
     muat()
@@ -278,10 +282,17 @@ export default function Barang({ me, onUbah }) {
         kadar={kadar}
         beratMin={beratMin}
         beratMax={beratMax}
+        tanggalMasukDari={tanggalMasukDari}
+        tanggalMasukSampai={tanggalMasukSampai}
         onKadarBerat={(b) => {
           if ('kadar' in b) setKadar(b.kadar)
           if ('beratMin' in b) setBeratMin(b.beratMin)
           if ('beratMax' in b) setBeratMax(b.beratMax)
+          setBatas(LANGKAH_MUAT)
+        }}
+        onTanggalMasuk={(b) => {
+          if ('dari' in b) setTanggalMasukDari(b.dari)
+          if ('sampai' in b) setTanggalMasukSampai(b.sampai)
           setBatas(LANGKAH_MUAT)
         }}
         data={data}
