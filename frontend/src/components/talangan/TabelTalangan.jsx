@@ -7,7 +7,8 @@ import BarisKosong from '../common/BarisKosong'
 
 const NAMA_AKSI = {
   'kirim-bo': 'Bawa ke BO',
-  'terima-bo': 'Terima di BO',
+  'terima-bo': 'Sudah sampai',
+  'belum-sampai': 'Belum sampai',
   'koreksi-harga': 'Koreksi harga',
 }
 
@@ -17,26 +18,48 @@ const wkt = (s) => (s ? new Date(s).toLocaleString('id-ID', { dateStyle: 'short'
 export default function TabelTalangan({ rows, me, onUbah, onError, onInfo }) {
   const [konfirmasi, setKonfirmasi] = useState(null) // { row, aksi }
   const [harga, setHarga] = useState('')
+  const [berat, setBerat] = useState('')
+  const [kadar, setKadar] = useState('')
   const [alasan, setAlasan] = useState('')
+  const [catatan, setCatatan] = useState('')
   const [riwayat, setRiwayat] = useState(null)
   const [loading, setLoading] = useState(false)
 
+  // kadar hanya bisa dikoreksi untuk perhiasan emas (logam mulia dan perak kadarnya tetap)
+  const kadarBisaDiubah = (row) => row.jenis === 'perhiasan' && row.bahan === 'emas'
+
   function buka(row, aksi) {
     setHarga(String(row.harga_beli))
+    setBerat(String(row.berat))
+    setKadar(row.kadar || '')
     setAlasan('')
+    setCatatan('')
     setKonfirmasi({ row, aksi })
   }
 
   async function jalankan() {
     const { row, aksi } = konfirmasi
     let body = {}
+    let rute = aksi
     if (aksi === 'koreksi-harga') {
       if (!alasan.trim()) return onError('Alasan koreksi wajib diisi')
       body = { harga_baru: Math.round(Number(harga)), alasan }
     }
+    if (aksi === 'terima-bo') {
+      const beratBaru = Number(berat)
+      if (!(beratBaru > 0)) return onError('Berat harus lebih dari 0')
+      const kadarBaru = kadarBisaDiubah(row) ? kadar.trim() : ''
+      const berubah = Math.abs(beratBaru - row.berat) > 0.0005 || (kadarBaru !== '' && kadarBaru.toUpperCase() !== row.kadar)
+      if (berubah && !alasan.trim()) return onError('Alasan wajib diisi bila berat atau kadar diubah')
+      body = { berat: beratBaru, karat: kadarBaru, alasan }
+    }
+    if (aksi === 'belum-sampai') {
+      rute = 'terima-bo'
+      body = { result: 'belum', catatan }
+    }
     setLoading(true)
     try {
-      const res = await api(`/talangan/${row.id}/${aksi}`, { method: 'POST', body: JSON.stringify(body) })
+      const res = await api(`/talangan/${row.id}/${rute}`, { method: 'POST', body: JSON.stringify(body) })
       setKonfirmasi(null)
       onInfo(res.message)
       onUbah()
@@ -90,6 +113,12 @@ export default function TabelTalangan({ rows, me, onUbah, onError, onInfo }) {
                 </td>
                 <td>
                   <span className={KELAS_STATUS[r.status]}>{LABEL_STATUS[r.status] || r.status}</span>
+                  {r.belum_sampai && (
+                    <div>
+                      <span className="tag warn">Belum sampai</span>
+                      {r.belum_sampai_note && <span className="muted"> {r.belum_sampai_note}</span>}
+                    </div>
+                  )}
                   {r.tukar_id > 0 && <div className="muted">Penukaran #{r.tukar_id}</div>}
                 </td>
                 <td>{r.toko_input || '-'}</td>
@@ -120,7 +149,39 @@ export default function TabelTalangan({ rows, me, onUbah, onError, onInfo }) {
             harga {rupiah(konfirmasi.row.harga_beli)}.
           </p>
           {konfirmasi.aksi === 'kirim-bo' && <p>Barang dibawa PJ ke back office dan menunggu konfirmasi owner.</p>}
-          {konfirmasi.aksi === 'terima-bo' && <p>Barang sudah diterima di back office. Barang masuk stok BO dengan tanda talangan (bukan stok milik kita).</p>}
+          {konfirmasi.aksi === 'terima-bo' && (
+            <div className="form-grid">
+              <p className="span2">
+                {konfirmasi.row.arah === 'MASUK'
+                  ? 'Barang sudah diterima di back office. Barang masuk stok BO dengan tanda talangan (bukan stok milik kita).'
+                  : 'Barang kembali sudah diterima di back office. Barang masuk stok BO sebagai stok kita, berkondisi kotor.'}{' '}
+                Periksa berat dan kadar; ubah bila tidak sesuai.
+              </p>
+              <div>
+                <label>Berat (g)</label>
+                <input type="number" min="0.001" step="0.001" value={berat} onChange={(e) => setBerat(e.target.value)} />
+              </div>
+              {kadarBisaDiubah(konfirmasi.row) && (
+                <div>
+                  <label>Kadar</label>
+                  <input value={kadar} onChange={(e) => setKadar(e.target.value)} maxLength={10} />
+                </div>
+              )}
+              <div className="span2">
+                <label>Alasan koreksi (wajib bila berat atau kadar diubah)</label>
+                <input value={alasan} onChange={(e) => setAlasan(e.target.value)} maxLength={200} />
+              </div>
+            </div>
+          )}
+          {konfirmasi.aksi === 'belum-sampai' && (
+            <div className="form-grid">
+              <p className="span2">Barang hanya ditandai belum sampai. Stok dan status tidak berubah; konfirmasi &quot;Sudah sampai&quot; kalau barangnya tiba.</p>
+              <div className="span2">
+                <label>Catatan (opsional)</label>
+                <input value={catatan} onChange={(e) => setCatatan(e.target.value)} maxLength={200} />
+              </div>
+            </div>
+          )}
           {konfirmasi.aksi === 'koreksi-harga' && (
             <div className="form-grid">
               <div>

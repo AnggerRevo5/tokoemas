@@ -70,6 +70,8 @@ var tabelTalanganBO = []struct{ nama, sql string }{
 		diinput_oleh INT NOT NULL,
 		dikonfirmasi_pj_oleh INT NULL,
 		dikonfirmasi_owner_oleh INT NULL,
+		belum_sampai BOOLEAN NOT NULL DEFAULT FALSE,
+		belum_sampai_note VARCHAR(255) NULL,
 		catatan VARCHAR(255) NULL,
 		created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
 		updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -182,6 +184,11 @@ func SiapkanSkemaTalanganBO(db *sql.DB) error {
 	for _, n := range bpAwal {
 		if _, err := db.Exec("INSERT IGNORE INTO bp_cabang (nama) VALUES (?)", n); err != nil {
 			return gagal("isi bp_cabang", err)
+		}
+	}
+	if !kolomAda(db, "talangan_barang", "belum_sampai") {
+		if _, err := db.Exec("ALTER TABLE talangan_barang ADD COLUMN belum_sampai BOOLEAN NOT NULL DEFAULT FALSE, ADD COLUMN belum_sampai_note VARCHAR(255) NULL"); err != nil {
+			return gagal("kolom talangan_barang.belum_sampai", err)
 		}
 	}
 	if !kolomAda(db, "items", "talangan_id") {

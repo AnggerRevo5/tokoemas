@@ -7,8 +7,8 @@ import Popup from '../common/Popup'
 
 const kosong = () => ({ nama_barang: '', jenis: 'perhiasan', bahan: 'emas', karat: '18K', berat: '', harga_beli: '', no_referensi: '' })
 
-// Form PJ untuk barang kita yang dibeli BP dari customer (talangan KELUAR). Barang masuk stok BO sebagai stok kita biasa.
-// onSukses(idBaru): dipanggil setelah tersimpan (layar Penukaran memakainya untuk langsung memilih barang itu).
+// Form PJ untuk barang kita yang dibeli BP dari customer (talangan KELUAR). Masuk stok BO sebagai stok kita biasa setelah owner konfirmasi.
+// onSukses(idBaru, pesan): dipanggil setelah tersimpan.
 export default function FormKeluar({ bpId, namaBP, onSukses, onError, onMulai }) {
   const [f, setF] = useState(kosong)
   const [tgl, setTgl] = useState(hariIni())
@@ -109,7 +109,7 @@ export default function FormKeluar({ bpId, namaBP, onSukses, onError, onMulai })
         <Popup judul="Simpan barang keluar?" labelKonfirmasi="Ya, simpan" onKonfirmasi={simpan} onTutup={() => setKonfirmasi(false)} loading={loading}>
           <p>
             <b>{f.nama_barang}</b> {f.jenis === 'perhiasan' && f.bahan === 'emas' ? f.karat : ''} {gram(f.berat)} g, harga {rupiah(Number(f.harga_beli))}.
-            Barang masuk stok back office sebagai stok kita dan dihitung dalam penukaran dengan {namaBP}. Harga tidak bisa diubah setelah disimpan.
+            Barang menunggu konfirmasi owner di back office; setelah dikonfirmasi barang masuk stok sebagai stok kita dan bisa dihitung dalam penukaran dengan {namaBP}. Harga tidak bisa diubah setelah disimpan.
           </p>
         </Popup>
       )}

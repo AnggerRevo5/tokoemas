@@ -7,8 +7,8 @@ import (
 	"testing"
 )
 
-// keluarUji mencatat barang KELUAR (barang kita yang dibeli BP) lewat API; mengembalikan id talangan.
-func keluarUji(t *testing.T, a akunUji, harga int64) int {
+// keluarTercatatUji mencatat barang KELUAR (barang kita yang dibeli BP) lewat API, belum dikonfirmasi owner.
+func keluarTercatatUji(t *testing.T, a akunUji, harga int64) int {
 	t.Helper()
 	db := dbUji(t)
 	pj := mesinTalangan(db, "pj", a.User, 0)
@@ -20,6 +20,17 @@ func keluarUji(t *testing.T, a akunUji, harga int64) int {
 	var res struct{ ID int }
 	jsonKe(t, w, &res)
 	return res.ID
+}
+
+// keluarUji: barang KELUAR yang sudah dikonfirmasi owner (DI_BO), siap masuk penukaran; mengembalikan id talangan.
+func keluarUji(t *testing.T, a akunUji, harga int64) int {
+	t.Helper()
+	id := keluarTercatatUji(t, a, harga)
+	owner := mesinTalangan(dbUji(t), "owner", a.User, 0)
+	if w := panggil(owner, "POST", fmt.Sprintf("/talangan/%d/terima-bo", id), `{}`); w.Code != http.StatusOK {
+		t.Fatalf("terima-bo keluar: %d %s", w.Code, w.Body.String())
+	}
+	return id
 }
 
 type hasilTukar struct {

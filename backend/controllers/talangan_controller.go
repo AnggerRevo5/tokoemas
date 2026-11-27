@@ -157,7 +157,8 @@ func TalanganList(db *sql.DB) gin.HandlerFunc {
 		q := `SELECT t.id, t.arah, t.cabang_pemilik_id, bp.nama, IFNULL(t.toko_input_id,0), IFNULL(l.name,''),
 		        IFNULL(t.stok_id,0), IFNULL(t.proses_id,0), IFNULL(t.proses_jenis,''), t.nama_barang, t.jenis, t.bahan,
 		        t.berat, IFNULL(t.kadar,''), CAST(t.harga_beli AS SIGNED), t.ubah_harga, DATE_FORMAT(t.tanggal_beli,'%Y-%m-%d'),
-		        t.no_surat, t.no_referensi, t.status, IFNULL(t.tukar_id,0), IFNULL(t.catatan,''), IFNULL(u.username,''), t.created_at
+		        t.no_surat, t.no_referensi, t.status, IFNULL(t.tukar_id,0), IFNULL(t.catatan,''), t.belum_sampai, IFNULL(t.belum_sampai_note,''),
+		        IFNULL(u.username,''), t.created_at
 		      FROM talangan_barang t
 		      JOIN bp_cabang bp ON bp.id = t.cabang_pemilik_id
 		      LEFT JOIN locations l ON l.id = t.toko_input_id
@@ -196,7 +197,7 @@ func TalanganList(db *sql.DB) gin.HandlerFunc {
 			var dibuat sql.NullTime
 			if err := rows.Scan(&r.ID, &r.Arah, &r.BPID, &r.BP, &r.TokoInputID, &r.TokoInput, &r.StokID, &r.ProsesID, &r.ProsesJenis,
 				&r.NamaBarang, &r.Jenis, &r.Bahan, &r.Berat, &r.Kadar, &r.HargaBeli, &r.UbahHarga, &r.TanggalBeli,
-				&r.NoSurat, &r.NoReferensi, &r.Status, &r.TukarID, &r.Catatan, &r.DiinputOleh, &dibuat); err != nil {
+				&r.NoSurat, &r.NoReferensi, &r.Status, &r.TukarID, &r.Catatan, &r.BelumSampai, &r.BelumNote, &r.DiinputOleh, &dibuat); err != nil {
 				utils.Gagal(c, err)
 				return
 			}

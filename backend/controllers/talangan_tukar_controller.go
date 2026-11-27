@@ -150,7 +150,7 @@ func TukarCreate(db *sql.DB) gin.HandlerFunc {
 			}
 			return true
 		}
-		if !cek(req.MasukIDs, services.ArahMasuk, services.StDiBO) || !cek(req.KeluarIDs, services.ArahKeluar, services.StTercatat) {
+		if !cek(req.MasukIDs, services.ArahMasuk, services.StDiBO) || !cek(req.KeluarIDs, services.ArahKeluar, services.StDiBO) {
 			return
 		}
 
@@ -204,7 +204,7 @@ func TukarCreate(db *sql.DB) gin.HandlerFunc {
 					utils.Gagal(c, err)
 					return
 				}
-			} else if err := langkahOtomatis(tx, id, b.Arah, services.StTercatat, services.StDihitung, cl.UserID, "dihitung dalam penukaran"); err != nil {
+			} else if err := langkahOtomatis(tx, id, b.Arah, services.StDiBO, services.StDihitung, cl.UserID, "dihitung dalam penukaran"); err != nil {
 				utils.Gagal(c, err)
 				return
 			}

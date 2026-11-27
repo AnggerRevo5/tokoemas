@@ -21,19 +21,13 @@ export default function FormTukar({ bpList, onSelesai, onError, onInfo, onMulai 
   const bpAktif = bpId || (bpList[0] ? String(bpList[0].id) : '')
   const namaBP = (bpList.find((b) => String(b.id) === bpAktif) || {}).nama || ''
 
-  const muat = useCallback(
-    (pilihBaru) => {
-      if (!bpAktif) return
-      api(`/talangan?bp_id=${bpAktif}`)
-        .then((r) => {
-          const siap = r.filter((x) => !x.tukar_id && ((x.arah === 'MASUK' && x.status === 'DI_BO') || (x.arah === 'KELUAR' && x.status === 'TERCATAT')))
-          setRows(siap)
-          if (pilihBaru) setKeluar((k) => ({ ...k, [pilihBaru]: true }))
-        })
-        .catch((e) => onError(e.message))
-    },
-    [bpAktif, onError],
-  )
+  // siap ditukar = sudah dikonfirmasi owner di BO (MASUK maupun KELUAR) dan belum masuk penukaran
+  const muat = useCallback(() => {
+    if (!bpAktif) return
+    api(`/talangan?bp_id=${bpAktif}`)
+      .then((r) => setRows(r.filter((x) => !x.tukar_id && x.status === 'DI_BO')))
+      .catch((e) => onError(e.message))
+  }, [bpAktif, onError])
 
   useEffect(() => {
     setMasuk({})
@@ -133,7 +127,7 @@ export default function FormTukar({ bpList, onSelesai, onError, onInfo, onMulai 
       </div>
 
       {tabel(`Barang ${namaBP} di back office (MASUK)`, dataMasuk, masuk, setMasuk, 'Tidak ada barang BP ini yang menunggu ditukar')}
-      {tabel('Barang kita yang diambil dari BP (KELUAR)', dataKeluar, keluar, setKeluar, 'Belum ada barang kita yang tercatat dari BP ini')}
+      {tabel('Barang kita yang diambil dari BP (KELUAR)', dataKeluar, keluar, setKeluar, 'Belum ada barang kita dari BP ini yang sudah dikonfirmasi owner di back office')}
 
       <div style={{ marginTop: 8 }}>
         <button type="button" className="ghost" onClick={() => setBukaKeluar(!bukaKeluar)}>
@@ -147,7 +141,7 @@ export default function FormTukar({ bpList, onSelesai, onError, onInfo, onMulai 
             onError={onError}
             onSukses={(id, pesan) => {
               onInfo(pesan)
-              muat(id) // barang baru langsung ikut terpilih
+              muat()
             }}
           />
         )}

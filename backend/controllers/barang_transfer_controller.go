@@ -492,7 +492,7 @@ func BarangNotif(db *sql.DB) gin.HandlerFunc {
 		// pekerjaan menunggu owner: penjualan penadah yang belum dikonfirmasi dan barang talangan yang dibawa PJ ke BO
 		var penadahMenunggu, talanganMenunggu int
 		if cl.Role == "owner" || cl.Role == "super_admin" {
-			db.QueryRow("SELECT COUNT(*) FROM talangan_barang WHERE status = 'KIRIM_BO'").Scan(&talanganMenunggu)
+			db.QueryRow("SELECT COUNT(*) FROM talangan_barang WHERE status = 'KIRIM_BO' OR (arah = 'KELUAR' AND status = 'TERCATAT')").Scan(&talanganMenunggu)
 			db.QueryRow("SELECT COUNT(*) FROM penadah_sales WHERE is_void = FALSE AND konfirmasi = FALSE").Scan(&penadahMenunggu)
 		}
 		c.JSON(http.StatusOK, gin.H{"menunggu": menunggu, "belum_sampai": belum, "keluar": keluar,

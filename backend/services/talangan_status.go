@@ -13,6 +13,9 @@ const (
 	StTercatat    = "TERCATAT"
 	StDihitung    = "DIHITUNG"
 	StLunas       = "LUNAS"
+
+	// StBelumSampai hanya tercatat di log: owner menandai barang belum sampai di BO, status barang tidak berubah.
+	StBelumSampai = "BELUM_SAMPAI"
 )
 
 // langkah[arah][dari] = status berikutnya yang sah; tiap status hanya punya satu langkah maju (tidak boleh loncat).
@@ -25,7 +28,8 @@ var langkah = map[string]map[string]string{
 		StDihitung:    StLunas,
 	},
 	ArahKeluar: {
-		StTercatat: StDihitung,
+		StTercatat: StDiBO, // owner mengonfirmasi barang kembali sudah sampai di BO
+		StDiBO:     StDihitung,
 		StDihitung: StLunas,
 	},
 }

@@ -32,6 +32,16 @@ type TalanganKeluarReq struct {
 	Catatan     string  `json:"catatan" binding:"max=200"`
 }
 
+// TalanganTerimaReq: owner mengonfirmasi barang di BO. Result "sampai" (bawaan) atau "belum".
+// Berat dan Karat opsional (koreksi); bila berubah dari catatan, Alasan wajib.
+type TalanganTerimaReq struct {
+	Result  string  `json:"result" binding:"max=10"`
+	Berat   float64 `json:"berat" binding:"gte=0,lte=100000"`
+	Karat   string  `json:"karat" binding:"max=10"`
+	Alasan  string  `json:"alasan" binding:"max=200"`
+	Catatan string  `json:"catatan" binding:"max=200"`
+}
+
 // TalanganRow: satu baris daftar talangan.
 type TalanganRow struct {
 	ID          int       `json:"id"`
@@ -56,6 +66,8 @@ type TalanganRow struct {
 	Status      string    `json:"status"`
 	TukarID     int       `json:"tukar_id"`
 	Catatan     string    `json:"catatan"`
+	BelumSampai bool      `json:"belum_sampai"`
+	BelumNote   string    `json:"belum_sampai_note"`
 	DiinputOleh string    `json:"diinput_oleh"`
 	DibuatPada  time.Time `json:"created_at"`
 }

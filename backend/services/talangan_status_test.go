@@ -9,7 +9,8 @@ func TestLangkahValid(t *testing.T) {
 		{"MASUK", "DI_BO", "DIKIRIM_KE_BP"},
 		{"MASUK", "DIKIRIM_KE_BP", "DIHITUNG"},
 		{"MASUK", "DIHITUNG", "LUNAS"},
-		{"KELUAR", "TERCATAT", "DIHITUNG"},
+		{"KELUAR", "TERCATAT", "DI_BO"},
+		{"KELUAR", "DI_BO", "DIHITUNG"},
 		{"KELUAR", "DIHITUNG", "LUNAS"},
 	}
 	for _, c := range ok {
@@ -26,6 +27,7 @@ func TestLangkahValid(t *testing.T) {
 		{"MASUK", "TERCATAT", "DIHITUNG"},  // status milik KELUAR
 		{"KELUAR", "TALANGAN", "KIRIM_BO"}, // status milik MASUK
 		{"KELUAR", "TERCATAT", "LUNAS"},    // loncat
+		{"KELUAR", "TERCATAT", "DIHITUNG"}, // harus lewat konfirmasi owner dulu
 		{"LAIN", "TALANGAN", "KIRIM_BO"},   // arah tidak dikenal
 		{"MASUK", "KIRIM_BO", "KIRIM_BO"},  // diam di tempat
 	}
@@ -50,6 +52,9 @@ func TestPerananUntuk(t *testing.T) {
 	}
 	if !cocok("owner", PerananUntuk("MASUK", "DI_BO")) || cocok("pj", PerananUntuk("MASUK", "DI_BO")) {
 		t.Error("DI_BO hanya owner")
+	}
+	if !cocok("owner", PerananUntuk("KELUAR", "DI_BO")) || cocok("pj", PerananUntuk("KELUAR", "DI_BO")) {
+		t.Error("barang kembali (KELUAR) juga dikonfirmasi owner")
 	}
 	if !cocok("super_admin", PerananUntuk("MASUK", "DI_BO")) {
 		t.Error("super_admin boleh semua langkah manual")

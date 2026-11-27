@@ -3,6 +3,8 @@ package controllers
 import (
 	"database/sql"
 	"fmt"
+	"io"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -128,7 +130,10 @@ func TalanganKirimBO(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
-// TalanganTerimaBO: owner mengonfirmasi barang sudah masuk BO (KIRIM_BO -> DI_BO). Barang masuk stok BO bertanda talangan.
+// TalanganTerimaBO: owner memeriksa barang di BO. Berlaku untuk MASUK (status KIRIM_BO) dan barang kembali KELUAR (TERCATAT).
+//   - result "sampai" (bawaan): status jadi DI_BO dan barang masuk stok BO. MASUK bertanda talangan; KELUAR stok biasa milik kita.
+//     Berat dan kadar boleh dikoreksi sekarang (alasan wajib bila berubah); setelah masuk penukaran keduanya terkunci.
+//   - result "belum": hanya ditandai belum sampai (status dan stok tidak berubah); konfirmasi "sampai" berikutnya menghapus tandanya.
 func TalanganTerimaBO(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		cl, ok := middleware.HanyaPeran(c, services.PerananUntuk(services.ArahMasuk, services.StDiBO)...)
@@ -139,6 +144,19 @@ func TalanganTerimaBO(db *sql.DB) gin.HandlerFunc {
 		if !ok {
 			return
 		}
+		var req models.TalanganTerimaReq
+		if err := c.ShouldBindJSON(&req); err != nil && err != io.EOF {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "data tidak valid"})
+			return
+		}
+		if req.Result == "" {
+			req.Result = "sampai"
+		}
+		if req.Result != "sampai" && req.Result != "belum" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "pilih sudah sampai atau belum sampai"})
+			return
+		}
+		alasan := strings.TrimSpace(req.Alasan)
 		tx, err := db.Begin()
 		if err != nil {
 			utils.Gagal(c, err)
@@ -149,33 +167,95 @@ func TalanganTerimaBO(db *sql.DB) gin.HandlerFunc {
 		if !ok {
 			return
 		}
-		if !pindahStatus(c, tx, b, services.StDiBO, cl.UserID, "diterima owner di back office") {
+		if !services.LangkahValid(b.Arah, b.Status, services.StDiBO) {
+			c.JSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("status %s tidak bisa dipindah ke %s", b.Status, services.StDiBO)})
+			return
+		}
+		meta := middleware.Meta(c)
+
+		if req.Result == "belum" {
+			catatan := strings.TrimSpace(req.Catatan)
+			if _, err := tx.Exec("UPDATE talangan_barang SET belum_sampai = TRUE, belum_sampai_note = ? WHERE id = ?", utils.StrNull(catatan), id); err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			if err := services.CatatStatus(tx, id, b.Status, services.StBelumSampai, cl.UserID, catatan); err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			services.CatatAudit(tx, meta, "talangan_belum_sampai", "talangan_barang", int64(id), gin.H{"status": b.Status, "catatan": catatan})
+			if err := tx.Commit(); err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"message": "barang ditandai belum sampai di back office"})
+			return
+		}
+
+		// koreksi berat/kadar: nilai kosong berarti tidak diubah
+		berat, karat := b.Berat, b.Karat
+		if req.Berat > 0 {
+			berat = req.Berat
+		}
+		if k := strings.TrimSpace(req.Karat); k != "" {
+			_, _, nk, ok := rapikanBarangTalangan(c, b.Jenis, b.Bahan, k)
+			if !ok {
+				return
+			}
+			karat = nk
+		}
+		berubah := math.Abs(berat-b.Berat) > 0.0005 || karat != b.Karat
+		catatan := "diterima owner di back office"
+		if berubah {
+			if alasan == "" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "alasan wajib diisi bila berat atau kadar diubah"})
+				return
+			}
+			catatan += ", dikoreksi: " + alasan
+			if _, err := tx.Exec("UPDATE talangan_barang SET berat = ?, kadar = ? WHERE id = ?", berat, karat, id); err != nil {
+				utils.Gagal(c, err)
+				return
+			}
+			services.CatatAudit(tx, meta, "talangan_koreksi_fisik", "talangan_barang", int64(id),
+				gin.H{"berat_lama": b.Berat, "berat_baru": berat, "kadar_lama": b.Karat, "kadar_baru": karat, "alasan": alasan})
+			b.Berat, b.Karat = berat, karat
+		}
+		if !pindahStatus(c, tx, b, services.StDiBO, cl.UserID, catatan) {
 			return
 		}
 		boID, ok := idBOTx(c, tx)
 		if !ok {
 			return
 		}
-		stokID, err := buatItemBO(tx, boID, b.TokoInput, b, "talangan", "Talangan "+b.BP, cl.UserID, id)
+		var stokID int64
+		pesan := "barang masuk stok back office (bertanda talangan)"
+		if b.Arah == services.ArahMasuk {
+			stokID, err = buatItemBO(tx, boID, b.TokoInput, b, "talangan", "Talangan "+b.BP, cl.UserID, id)
+		} else {
+			stokID, err = buatItemBO(tx, boID, boID, b, "talangan_keluar", "Barang kita dari "+b.BP, cl.UserID, nil)
+			pesan = "barang kembali masuk stok back office sebagai stok kita"
+		}
 		if err != nil {
 			utils.Gagal(c, err)
 			return
 		}
-		if _, err := tx.Exec("UPDATE talangan_barang SET stok_id = ?, dikonfirmasi_owner_oleh = ? WHERE id = ?", stokID, cl.UserID, id); err != nil {
+		if _, err := tx.Exec(
+			"UPDATE talangan_barang SET stok_id = ?, dikonfirmasi_owner_oleh = ?, belum_sampai = FALSE, belum_sampai_note = NULL WHERE id = ?",
+			stokID, cl.UserID, id); err != nil {
 			utils.Gagal(c, err)
 			return
 		}
-		services.CatatAudit(tx, middleware.Meta(c), "talangan_terima_bo", "talangan_barang", int64(id), gin.H{"stok_id": stokID})
+		services.CatatAudit(tx, meta, "talangan_terima_bo", "talangan_barang", int64(id), gin.H{"stok_id": stokID})
 		if err := tx.Commit(); err != nil {
 			utils.Gagal(c, err)
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"message": "barang masuk stok back office (bertanda talangan)", "stok_id": stokID})
+		c.JSON(http.StatusOK, gin.H{"message": pesan, "stok_id": stokID})
 	}
 }
 
 // TalanganKeluarCreate: PJ mencatat barang kita yang dibeli BP dari customer (talangan KELUAR, status TERCATAT).
-// Barang masuk stok BO sebagai stok kita biasa (tanpa tanda talangan).
+// Barang belum masuk stok: stok BO (stok kita biasa, tanpa tanda talangan) baru terbentuk saat owner mengonfirmasi (TalanganTerimaBO).
 func TalanganKeluarCreate(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		cl, ok := middleware.HanyaPeran(c, services.PerananUntuk(services.ArahKeluar, services.StTercatat)...)
@@ -210,10 +290,6 @@ func TalanganKeluarCreate(db *sql.DB) gin.HandlerFunc {
 		if !ok {
 			return
 		}
-		boID, ok := idBOTx(c, tx)
-		if !ok {
-			return
-		}
 		res, err := tx.Exec(
 			`INSERT INTO talangan_barang (arah, cabang_pemilik_id, nama_barang, jenis, bahan, berat, kadar, harga_beli, tanggal_beli,
 			   no_referensi, status, diinput_oleh, catatan)
@@ -225,16 +301,6 @@ func TalanganKeluarCreate(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 		id, _ := res.LastInsertId()
-		b := barisTalangan{Nama: req.NamaBarang, Jenis: jenis, Bahan: bahan, Karat: karat, Berat: req.Berat, Harga: req.HargaBeli}
-		stokID, err := buatItemBO(tx, boID, boID, b, "talangan_keluar", "Barang kita dari "+bp, cl.UserID, nil)
-		if err != nil {
-			utils.Gagal(c, err)
-			return
-		}
-		if _, err := tx.Exec("UPDATE talangan_barang SET stok_id = ? WHERE id = ?", stokID, id); err != nil {
-			utils.Gagal(c, err)
-			return
-		}
 		if err := services.CatatStatus(tx, int(id), "", services.StTercatat, cl.UserID, "barang diambil dari "+bp); err != nil {
 			utils.Gagal(c, err)
 			return
@@ -244,7 +310,7 @@ func TalanganKeluarCreate(db *sql.DB) gin.HandlerFunc {
 			utils.Gagal(c, err)
 			return
 		}
-		c.JSON(http.StatusCreated, gin.H{"id": id, "stok_id": stokID, "message": "barang kita dari " + bp + " tercatat dan masuk stok back office"})
+		c.JSON(http.StatusCreated, gin.H{"id": id, "message": "barang kita dari " + bp + " tercatat, menunggu konfirmasi owner di back office"})
 	}
 }
 

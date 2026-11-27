@@ -1,15 +1,16 @@
 // Status talangan (sama dengan backend services/talangan_status.go).
 export const STATUS_MASUK = ['TALANGAN', 'KIRIM_BO', 'DI_BO', 'DIKIRIM_KE_BP', 'DIHITUNG', 'LUNAS']
-export const STATUS_KELUAR = ['TERCATAT', 'DIHITUNG', 'LUNAS']
+export const STATUS_KELUAR = ['TERCATAT', 'DI_BO', 'DIHITUNG', 'LUNAS']
 
 export const LABEL_STATUS = {
   TALANGAN: 'Talangan di toko',
   KIRIM_BO: 'Dibawa ke BO',
   DI_BO: 'Di back office',
   DIKIRIM_KE_BP: 'Dikirim ke BP',
-  TERCATAT: 'Tercatat',
+  TERCATAT: 'Tercatat, menunggu owner',
   DIHITUNG: 'Sudah dihitung',
   LUNAS: 'Lunas',
+  BELUM_SAMPAI: 'Ditandai belum sampai', // hanya muncul di riwayat
 }
 
 export const KELAS_STATUS = {
@@ -56,10 +57,10 @@ export function aksiTalangan(row, role) {
   const pj = role === 'pj' || role === 'super_admin'
   const owner = role === 'owner' || role === 'super_admin'
   const aksi = []
-  if (row.arah === 'MASUK') {
-    if (row.status === 'TALANGAN' && pj) aksi.push('kirim-bo')
-    if (row.status === 'KIRIM_BO' && owner) aksi.push('terima-bo')
-  }
+  if (row.arah === 'MASUK' && row.status === 'TALANGAN' && pj) aksi.push('kirim-bo')
+  // owner memeriksa barang di BO: MASUK yang dibawa PJ (KIRIM_BO) dan barang kembali KELUAR (TERCATAT)
+  const menungguOwner = (row.arah === 'MASUK' && row.status === 'KIRIM_BO') || (row.arah === 'KELUAR' && row.status === 'TERCATAT')
+  if (menungguOwner && owner) aksi.push('terima-bo', 'belum-sampai')
   if (owner && !row.tukar_id && row.status !== 'LUNAS') aksi.push('koreksi-harga')
   return aksi
 }

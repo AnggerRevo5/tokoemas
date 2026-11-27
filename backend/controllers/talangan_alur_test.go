@@ -106,18 +106,29 @@ func TestTalanganKeluarCreate(t *testing.T) {
 	db := dbUji(t)
 	a := akunDariDB(t, db)
 	pj := mesinTalangan(db, "pj", a.User, 0)
-	body := fmt.Sprintf(`{"bp_id":%d,"nama_barang":"Kalung kita","jenis":"perhiasan","karat":"17K","berat":6,"harga_beli":3000000,"no_referensi":"N-9"}`, a.BPID)
-	w := panggil(pj, "POST", "/talangan/keluar", body)
-	if w.Code != http.StatusCreated {
-		t.Fatalf("keluar: %d %s", w.Code, w.Body.String())
-	}
-	var res struct{ ID int }
-	jsonKe(t, w, &res)
+	owner := mesinTalangan(db, "owner", a.User, 0)
+	id := keluarTercatatUji(t, a, 3000000)
 	var arah, status string
 	var stokID int
-	db.QueryRow("SELECT arah, status, IFNULL(stok_id,0) FROM talangan_barang WHERE id = ?", res.ID).Scan(&arah, &status, &stokID)
-	if arah != "KELUAR" || status != "TERCATAT" || stokID == 0 {
-		t.Fatalf("baris salah: %s %s stok %d", arah, status, stokID)
+	db.QueryRow("SELECT arah, status, IFNULL(stok_id,0) FROM talangan_barang WHERE id = ?", id).Scan(&arah, &status, &stokID)
+	if arah != "KELUAR" || status != "TERCATAT" || stokID != 0 {
+		t.Fatalf("barang kembali belum boleh masuk stok sebelum owner konfirmasi: %s %s stok %d", arah, status, stokID)
+	}
+	// KELUAR tidak lewat jalur kirim-bo, dan belum bisa ditukar sebelum dikonfirmasi owner
+	if w := panggil(pj, "POST", fmt.Sprintf("/talangan/%d/kirim-bo", id), `{}`); w.Code != http.StatusConflict {
+		t.Errorf("kirim-bo pada KELUAR: kode %d, seharusnya 409", w.Code)
+	}
+	tukar := fmt.Sprintf(`{"bp_id":%d,"masuk_ids":[],"keluar_ids":[%d]}`, a.BPID, id)
+	if w := panggil(pj, "POST", "/talangan/tukar", tukar); w.Code != http.StatusConflict {
+		t.Errorf("tukar sebelum konfirmasi owner: kode %d, seharusnya 409 (%s)", w.Code, w.Body.String())
+	}
+
+	if w := panggil(owner, "POST", fmt.Sprintf("/talangan/%d/terima-bo", id), `{}`); w.Code != http.StatusOK {
+		t.Fatalf("terima-bo keluar: %d %s", w.Code, w.Body.String())
+	}
+	db.QueryRow("SELECT status, IFNULL(stok_id,0) FROM talangan_barang WHERE id = ?", id).Scan(&status, &stokID)
+	if status != "DI_BO" || stokID == 0 {
+		t.Fatalf("setelah konfirmasi: %s stok %d", status, stokID)
 	}
 	var loc, tgn int
 	var st string
@@ -125,9 +136,62 @@ func TestTalanganKeluarCreate(t *testing.T) {
 	if loc != a.BO || st != "tersedia" || tgn != 0 {
 		t.Errorf("barang kita di BO harus stok biasa: lokasi %d status %s talangan_id %d", loc, st, tgn)
 	}
-	// KELUAR tidak lewat jalur kirim-bo/terima-bo
-	if w := panggil(pj, "POST", fmt.Sprintf("/talangan/%d/kirim-bo", res.ID), `{}`); w.Code != http.StatusConflict {
-		t.Errorf("kirim-bo pada KELUAR: kode %d, seharusnya 409", w.Code)
+}
+
+func TestTalanganTerimaBOBelumSampai(t *testing.T) {
+	db := dbUji(t)
+	a := akunDariDB(t, db)
+	id := masukUji(t, a, 1000000)
+	pj := mesinTalangan(db, "pj", a.User, 0)
+	owner := mesinTalangan(db, "owner", a.User, 0)
+	path := fmt.Sprintf("/talangan/%d/terima-bo", id)
+	panggil(pj, "POST", fmt.Sprintf("/talangan/%d/kirim-bo", id), `{}`)
+
+	if w := panggil(owner, "POST", path, `{"result":"belum","catatan":"kurir belum datang"}`); w.Code != http.StatusOK {
+		t.Fatalf("belum sampai: %d %s", w.Code, w.Body.String())
+	}
+	var belum bool
+	var note string
+	var stokID int
+	db.QueryRow("SELECT belum_sampai, IFNULL(belum_sampai_note,''), IFNULL(stok_id,0) FROM talangan_barang WHERE id = ?", id).Scan(&belum, &note, &stokID)
+	if !belum || note != "kurir belum datang" || stokID != 0 || statusTalangan(t, id) != "KIRIM_BO" {
+		t.Errorf("belum sampai: tanda %v catatan %q stok %d status %s", belum, note, stokID, statusTalangan(t, id))
+	}
+	if w := panggil(owner, "POST", path, `{}`); w.Code != http.StatusOK {
+		t.Fatalf("sampai setelah belum: %d %s", w.Code, w.Body.String())
+	}
+	db.QueryRow("SELECT belum_sampai FROM talangan_barang WHERE id = ?", id).Scan(&belum)
+	if belum || statusTalangan(t, id) != "DI_BO" {
+		t.Errorf("tanda belum sampai harus hilang setelah konfirmasi sampai (tanda %v, status %s)", belum, statusTalangan(t, id))
+	}
+}
+
+func TestTalanganTerimaBOKoreksiBeratKadar(t *testing.T) {
+	db := dbUji(t)
+	a := akunDariDB(t, db)
+	id := masukUji(t, a, 1000000) // berat 4.5, 18K
+	panggil(mesinTalangan(db, "pj", a.User, 0), "POST", fmt.Sprintf("/talangan/%d/kirim-bo", id), `{}`)
+	owner := mesinTalangan(db, "owner", a.User, 0)
+	path := fmt.Sprintf("/talangan/%d/terima-bo", id)
+
+	if w := panggil(owner, "POST", path, `{"berat":4.2}`); w.Code != http.StatusBadRequest {
+		t.Errorf("koreksi tanpa alasan: kode %d, seharusnya 400", w.Code)
+	}
+	if s := statusTalangan(t, id); s != "KIRIM_BO" {
+		t.Fatalf("koreksi yang ditolak tidak boleh mengubah status: %s", s)
+	}
+	if w := panggil(owner, "POST", path, `{"berat":4.2,"karat":"17K","alasan":"timbang ulang"}`); w.Code != http.StatusOK {
+		t.Fatalf("koreksi: %d %s", w.Code, w.Body.String())
+	}
+	var berat float64
+	var kadar string
+	var stokID int
+	db.QueryRow("SELECT berat, kadar, stok_id FROM talangan_barang WHERE id = ?", id).Scan(&berat, &kadar, &stokID)
+	var beratItem float64
+	var karatItem string
+	db.QueryRow("SELECT weight_gram, karat FROM items WHERE id = ?", stokID).Scan(&beratItem, &karatItem)
+	if berat != 4.2 || kadar != "17K" || beratItem != 4.2 || karatItem != "17K" {
+		t.Errorf("hasil koreksi: talangan %v/%s, stok %v/%s", berat, kadar, beratItem, karatItem)
 	}
 }
 
