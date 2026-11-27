@@ -196,7 +196,10 @@ func TabelCuci(db *sql.DB, dari, sampai string) (models.TabelLaporan, error) {
 		Tipe: []string{"teks", "teks", "teks", "teks", "teks", "angka", "angka", "gram", "gram", "gram", "gram", "teks", "teks", "teks"},
 	}
 	rows, err := db.Query(`
-		SELECT w.id, w.start_date, l.name,
+		SELECT w.id, w.start_date,
+		       COALESCE((SELECT CASE WHEN COUNT(DISTINCT i.origin_location_id) > 1 THEN 'Campuran' ELSE MAX(o.name) END
+		                 FROM items i JOIN locations o ON o.id = i.origin_location_id
+		                 WHERE i.washing_job_id = w.id AND i.is_void = FALSE), l.name),
 		       COALESCE(NULLIF((SELECT GROUP_CONCAT(DISTINCT NULLIF(xp.washer_name,'') SEPARATOR ', ')
 		                        FROM washing_job_items xp WHERE xp.job_id = w.id),''), w.washer_name),
 		       w.qty, w.weight_gram, w.status, w.finish_date, IFNULL(w.note,''),

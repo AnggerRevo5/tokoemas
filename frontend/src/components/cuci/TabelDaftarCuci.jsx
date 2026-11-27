@@ -47,6 +47,7 @@ export default function TabelDaftarCuci({
                       />
                     )}{' '}
                     <b>{it.item_no}</b> {it.item_name} {it.karat}, awal {gram(it.berat_awal)} g
+                    {r.asal_campuran && <div className="muted">Asal: {it.asal}</div>}
                     {it.berat_sesudah !== null ? (
                       <span className="muted"> → sesudah {gram(it.berat_sesudah)} g, susut {gram(it.berat_awal - it.berat_sesudah)} g</span>
                     ) : it.sudah_dikirim ? (

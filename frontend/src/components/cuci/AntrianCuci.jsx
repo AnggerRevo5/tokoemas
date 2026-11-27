@@ -14,7 +14,7 @@ export default function AntrianCuci({ rows, locations, role, onSelesai, onError 
   const bisaBuatPekerjaan = role === 'pj' || role === 'super_admin'
   const bisaTarik = role === 'owner' || role === 'super_admin'
   const terpilih = rows.filter((r) => pilih.includes(r.id))
-  const asalTerpilih = terpilih[0]?.origin_location_id
+  const asalCampuran = new Set(terpilih.map((r) => r.origin_location_id)).size > 1
   const rowsTampil = useMemo(() => {
     const q = filter.q.trim().toLowerCase()
     return rows.filter((r) => {
@@ -30,7 +30,6 @@ export default function AntrianCuci({ rows, locations, role, onSelesai, onError 
       )
     })
   }, [rows, filter])
-  const asalSama = terpilih.every((r) => r.origin_location_id === asalTerpilih)
   const bisaPilihTampil = rowsTampil
   const semuaDipilih = bisaPilihTampil.length > 0 && bisaPilihTampil.every((r) => pilih.includes(r.id))
 
@@ -88,8 +87,9 @@ export default function AntrianCuci({ rows, locations, role, onSelesai, onError 
         Antrean Barang untuk Cuci ({rowsTampil.length} dari {rows.length} barang)
       </summary>
       <p className="muted">
-        Owner memasukkan barang satu per satu ke antrean. PJ memilih barang dari lokasi asal yang sama untuk
-        membentuk satu pekerjaan cuci. Barang tetap terkunci dari transaksi lain sampai dibentuk atau ditarik owner.
+        Owner memasukkan barang satu per satu ke antrean. PJ dapat menggabungkan barang dari beberapa lokasi asal
+        dalam satu pekerjaan cuci; asal masing-masing barang tetap tercatat. Barang tetap terkunci dari transaksi
+        lain sampai dibentuk atau ditarik owner.
       </p>
       <details style={{ marginBottom: 12 }}>
         <summary style={{ cursor: 'pointer' }}>Cari dan filter barang</summary>
@@ -97,7 +97,9 @@ export default function AntrianCuci({ rows, locations, role, onSelesai, onError 
       </details>
       <div className="total-bar">
         <span>Berat antrean tampil: <b>{gram(rowsTampil.reduce((total, r) => total + r.weight_gram, 0))} g</b></span>
-        {asalTerpilih && <span>Lokasi asal pilihan: <b>{asalSama ? terpilih[0].asal : 'campuran'}</b></span>}
+        {terpilih.length > 0 && (
+          <span>Asal barang dipilih: <b>{asalCampuran ? 'campuran' : terpilih[0].asal}</b></span>
+        )}
       </div>
       <div className="table-wrap">
         <table>
@@ -154,11 +156,8 @@ export default function AntrianCuci({ rows, locations, role, onSelesai, onError 
         <form className="panel-aksi" onSubmit={(e) => proses(e, false)}>
           <div>
             <b>{terpilih.length}</b> barang dipilih
-            {asalSama ? ` dari lokasi asal ${terpilih[0].asal}.` : ' dari beberapa lokasi asal.'}
+            {asalCampuran ? ' dari beberapa lokasi asal.' : ` dari lokasi asal ${terpilih[0].asal}.`}
           </div>
-          {bisaBuatPekerjaan && !asalSama && (
-            <p className="muted">Satu pekerjaan cuci hanya dapat berisi barang dari lokasi asal yang sama.</p>
-          )}
           {bisaBuatPekerjaan && (
             <div className="form-grid">
               <div>
@@ -173,7 +172,7 @@ export default function AntrianCuci({ rows, locations, role, onSelesai, onError 
           )}
           <div className="aksi-tombol">
             {bisaBuatPekerjaan && (
-              <button disabled={loading || !asalSama}>
+              <button disabled={loading}>
                 {loading ? <><Spinner />Memproses...</> : 'Jadikan satu pekerjaan cuci'}
               </button>
             )}

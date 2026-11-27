@@ -302,11 +302,9 @@ func CuciBuatBatch(db *sql.DB) gin.HandlerFunc {
 				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%s tidak memenuhi syarat untuk dibentuk menjadi pekerjaan cuci", it.Name)})
 				return
 			}
-			if origin != 0 && origin != q.Origin {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "barang dari lokasi asal berbeda tidak bisa digabung dalam satu pekerjaan cuci"})
-				return
+			if origin == 0 {
+				origin = q.Origin
 			}
-			origin = q.Origin
 			group = append(group, it)
 			if note := strings.TrimSpace(q.Note); note != "" {
 				catatan[note] = true
@@ -1003,7 +1001,13 @@ func CuciList(db *sql.DB) gin.HandlerFunc {
 		if !utils.TanggalOpsional(c, "from", "to") {
 			return
 		}
-		q := `SELECT w.id, w.origin_location_id, l.name, w.item_name, IFNULL(w.karat,''), w.weight_gram, w.qty,
+		q := `SELECT w.id, w.origin_location_id,
+		             COALESCE((SELECT CASE WHEN COUNT(DISTINCT i.origin_location_id) > 1 THEN 'Campuran' ELSE MAX(o.name) END
+		                       FROM items i JOIN locations o ON o.id = i.origin_location_id
+		                       WHERE i.washing_job_id = w.id AND i.is_void = FALSE), l.name),
+		             (SELECT COUNT(DISTINCT i.origin_location_id) > 1
+		              FROM items i WHERE i.washing_job_id = w.id AND i.is_void = FALSE),
+		             w.item_name, IFNULL(w.karat,''), w.weight_gram, w.qty,
 		             COALESCE(NULLIF((SELECT GROUP_CONCAT(DISTINCT NULLIF(xp.washer_name,'') SEPARATOR ', ')
 		                              FROM washing_job_items xp WHERE xp.job_id = w.id),''), w.washer_name),
 		             w.status, w.start_date, w.finish_date, IFNULL(w.note,''),
@@ -1015,7 +1019,9 @@ func CuciList(db *sql.DB) gin.HandlerFunc {
 		      WHERE w.is_void = FALSE`
 		args := []interface{}{}
 		if cl.Role == "cabang" {
-			q += " AND w.origin_location_id = ?"
+			q += ` AND EXISTS (SELECT 1 FROM items own
+			                   WHERE own.washing_job_id = w.id AND own.origin_location_id = ?
+			                     AND own.is_void = FALSE)`
 			args = append(args, cl.LocationID)
 		}
 		switch s := c.Query("status"); s {
@@ -1044,7 +1050,7 @@ func CuciList(db *sql.DB) gin.HandlerFunc {
 			q += " AND w.status NOT IN ('selesai','batal')"
 		}
 		// filter barang (nama, kadar, berat, asal) bekerja lewat barang di dalam pekerjaan
-		if sy, sa := syaratBarang(c, "i", "IFNULL(x.weight_before, i.weight_gram)", "w.origin_location_id", true); sy != "" {
+		if sy, sa := syaratBarang(c, "i", "IFNULL(x.weight_before, i.weight_gram)", "i.origin_location_id", true); sy != "" {
 			q += ` AND EXISTS (SELECT 1 FROM items i LEFT JOIN washing_job_items x ON x.job_id = i.washing_job_id AND x.item_id = i.id
 							   WHERE i.washing_job_id = w.id AND i.is_void = FALSE` + sy + ")"
 			args = append(args, sa...)
@@ -1072,7 +1078,7 @@ func CuciList(db *sql.DB) gin.HandlerFunc {
 		for rows.Next() {
 			var r models.CuciListRow
 			var fin sql.NullTime
-			if err := rows.Scan(&r.ID, &r.LocationID, &r.Cabang, &r.ItemName, &r.Karat, &r.WeightGram, &r.Qty,
+			if err := rows.Scan(&r.ID, &r.LocationID, &r.Cabang, &r.AsalCampuran, &r.ItemName, &r.Karat, &r.WeightGram, &r.Qty,
 				&r.Washer, &r.Status, &r.StartDate, &fin, &r.Note, &r.Sisa, &r.CancelReason, &r.CancelReturned,
 				&r.BeratAwalSelesai, &r.BeratSesudah); err != nil {
 				utils.Gagal(c, err)
@@ -1102,16 +1108,23 @@ func isiBarangCuci(db *sql.DB, jobs []models.CuciListRow, c *gin.Context, tampil
 	}
 	syarat, argsBarang := "", []interface{}{}
 	if !tampilkanSemua {
-		syarat, argsBarang = syaratBarang(c, "i", "IFNULL(x.weight_before, i.weight_gram)", "w.origin_location_id", true)
+		syarat, argsBarang = syaratBarang(c, "i", "IFNULL(x.weight_before, i.weight_gram)", "i.origin_location_id", true)
+	}
+	cl := c.MustGet("claims").(*models.Claims)
+	if cl.Role == "cabang" {
+		syarat += " AND i.origin_location_id = ?"
+		argsBarang = append(argsBarang, cl.LocationID)
 	}
 	args = append(args, argsBarang...)
 	rows, err := db.Query(
 		`SELECT i.washing_job_id, i.id, IFNULL(i.item_no,''), i.item_name, IFNULL(i.karat,''),
+			i.origin_location_id, o.name,
 			IFNULL(x.weight_before, i.weight_gram), x.weight_after, i.status = 'cuci',
 			(x.weight_before IS NOT NULL OR (w.status = 'proses' AND
 			 NOT EXISTS (SELECT 1 FROM washing_job_items x0 WHERE x0.job_id = w.id)))
 		 FROM items i
 		 JOIN washing_jobs w ON w.id = i.washing_job_id
+		 JOIN locations o ON o.id = i.origin_location_id
 		 LEFT JOIN washing_job_items x ON x.job_id = i.washing_job_id AND x.item_id = i.id
 		 WHERE i.is_void = FALSE AND i.washing_job_id IN (`+utils.Placeholders(len(idx))+`)`+syarat+` ORDER BY i.id`, args...)
 	if err != nil {
@@ -1122,7 +1135,8 @@ func isiBarangCuci(db *sql.DB, jobs []models.CuciListRow, c *gin.Context, tampil
 		var job int
 		var it models.CuciItemRow
 		var sesudah sql.NullFloat64
-		if err := rows.Scan(&job, &it.ID, &it.ItemNo, &it.ItemName, &it.Karat, &it.BeratAwal, &sesudah, &it.DiPencuci, &it.SudahDikirim); err != nil {
+		if err := rows.Scan(&job, &it.ID, &it.ItemNo, &it.ItemName, &it.Karat, &it.OriginLocation, &it.Asal,
+			&it.BeratAwal, &sesudah, &it.DiPencuci, &it.SudahDikirim); err != nil {
 			return err
 		}
 		it.BeratSesudah = utils.PtrFloat(sesudah)

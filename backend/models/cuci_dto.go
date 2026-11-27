@@ -74,6 +74,7 @@ type CuciListRow struct {
 	ID               int           `json:"id"`
 	LocationID       int           `json:"origin_location_id"`
 	Cabang           string        `json:"cabang"`
+	AsalCampuran     bool          `json:"asal_campuran"`
 	ItemName         string        `json:"item_name"`
 	Karat            string        `json:"karat"`
 	WeightGram       float64       `json:"weight_gram"`
@@ -105,12 +106,14 @@ type CuciAntrianRow struct {
 
 // CuciItemRow: satu barang di dalam pekerjaan cuci (untuk mencocokkan barang fisik).
 type CuciItemRow struct {
-	ID           int      `json:"id"`
-	ItemNo       string   `json:"item_no"`
-	ItemName     string   `json:"item_name"`
-	Karat        string   `json:"karat"`
-	BeratAwal    float64  `json:"berat_awal"`
-	BeratSesudah *float64 `json:"berat_sesudah"`
-	DiPencuci    bool     `json:"di_pencuci"`
-	SudahDikirim bool     `json:"sudah_dikirim"`
+	ID             int      `json:"id"`
+	ItemNo         string   `json:"item_no"`
+	ItemName       string   `json:"item_name"`
+	Karat          string   `json:"karat"`
+	OriginLocation int      `json:"origin_location_id"`
+	Asal           string   `json:"asal"`
+	BeratAwal      float64  `json:"berat_awal"`
+	BeratSesudah   *float64 `json:"berat_sesudah"`
+	DiPencuci      bool     `json:"di_pencuci"`
+	SudahDikirim   bool     `json:"sudah_dikirim"`
 }

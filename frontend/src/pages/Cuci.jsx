@@ -133,7 +133,7 @@ export default function Cuci({ me }) {
         </summary>
         <p className="muted">
           Owner memilih barang di menu Stok lalu klik Cuci untuk memasukkannya ke antrean tanpa mengelompokkan.
-          PJ memilih barang dari lokasi asal yang sama untuk membentuk pekerjaan, lalu memilih barang yang akan
+            PJ dapat memilih barang dari beberapa lokasi asal untuk membentuk satu pekerjaan, lalu memilih barang yang akan
           dikirim dan menimbang tiap barang (berat awal). Saat barang kembali, PJ menimbang lagi (berat sesudah)
           dan mencatat susutnya. Barang yang
           selesai dikembalikan ke back office dengan berat terbaru, lalu owner mengonfirmasi sudah diterima.
